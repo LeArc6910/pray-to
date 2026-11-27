@@ -43,12 +43,11 @@ namespace Game.Core
                 || attack.Shape == AttackShape.Burst && !(attack.Angle > 0 && attack.Angle < 360)
                 || attack.Shape == AttackShape.Burrow || attack.Shape == AttackShape.Leap);
 
-        // For the wire: the settled start plus one while the boss winds up a burst or a spiral all the way round; 0
-        // otherwise. (A burrow's or a leap's rocks leave from where it comes down, not from where it is seen winding
-        // up, so no lines are drawn for those and nothing is sent.)
-        public static int BossAim(Boss boss) =>
-            boss.State == BossState.Telegraph && AimsRound(boss.Attack) && (boss.Attack.Shape == AttackShape.Burst || boss.Attack.Shape == AttackShape.Spiral)
-                ? boss.AimStep + 1 : 0;
+        // For the wire: the settled start plus one while the boss winds up a burst or a spiral all the way round, or a
+        // burrow or a leap that flings rocks; 0 otherwise. The rocks leave from where it comes down, not from where
+        // it is seen winding up: that is the middle of the circle it marked (WorldClient.ComesDownAt), so the screen
+        // draws their lines from there (0.114.0).
+        public static int BossAim(Boss boss) => boss.State == BossState.Telegraph && AimsRound(boss.Attack) ? boss.AimStep + 1 : 0;
 
         public static int BossPhaseField(Boss boss)
         {

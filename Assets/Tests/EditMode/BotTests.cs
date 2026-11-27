@@ -225,6 +225,40 @@ namespace Game.Core.Tests
             Assert.IsFalse(fought, "let be once it mended past the blows for StallTicks");
         }
 
+        // Driven far from a boss's drops (2026-11-27, the first hour's seed 6: the bot backed 33 tiles off to rest after
+        // the warden fell and then found "nothing to pick up" within its 12 tiles till it gave the goal up), "loot" by
+        // the material's name goes back for it; plain "loot" still looks only near.
+        [Test]
+        public void GoesBackForANamedDropItWasDrivenFarFrom()
+        {
+            var world = new World(Maps.Room(60), TileMap.Center(10, 30), Monsters.Shipped, 1, new WorldConfig { EnemyTarget = 0 }, Gear.Data, Tiles.Shipped);
+            var player = world.AddPlayer("a", null);
+            var core = Gear.Data.FindMaterial("warden_core");
+            var drop = world.DropMaterial(core, player.Position + new Vec2(33, 0));
+            for (int i = 0; i < World.TicksPerSecond; i++) world.Step();
+            var pilot = new BotPilot(world, player, new BotMemory(world, player));
+
+            var near = pilot.Next(BotTarget.Loot);
+            Assert.AreEqual(BotDo.Arrived, near.Do, near.ToString());
+            var far = pilot.Next(BotTarget.LootOf("warden_core"));
+            Assert.AreEqual(BotDo.Move, far.Do, far.ToString());
+            Assert.Greater(Vec2.Dot(far.Direction, drop.Position - player.Position), 0, "toward the core");
+            Assert.AreEqual("loot warden_core", BotTarget.Parse(new[] { "loot", "warden_core" }).ToString());
+
+            // Walked there as the bot would, it has the core.
+            for (int i = 0; i < 40 * World.TicksPerSecond && player.Inventory.CountOf(core) == 0; i++)
+            {
+                var intent = pilot.Next(BotTarget.LootOf("warden_core"));
+                if (intent.Do == BotDo.Move)
+                {
+                    var to = PlayerMotor.Step(world.Map, player.Position, intent.Direction.Normalized, player.MoveSpeed, world.DoorsFor(player));
+                    world.MovePlayer(player.Id, to, intent.Direction.Normalized, 1);
+                }
+                world.Step();
+            }
+            Assert.AreEqual(1, player.Inventory.CountOf(core), "picked up");
+        }
+
         static BotSheets Shipped => new BotSheets
         {
             Monsters = Monsters.Shipped, Loot = Gear.Data, Bosses = Bosses.Shipped, Classes = Classes.Shipped, Tiles = Tiles.Shipped,

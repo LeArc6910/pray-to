@@ -3045,6 +3045,11 @@ const BossBlows = {
   elements: ['circle -7 3 2 0 0 F lava_titan slam', 'cone -4 2.6 3.6 80 0 F lava_titan fire_wave', 'circle 3 3.2 1.8 0 0 F void_lord star_fall', 'line 4.5 0.8 5 1.4 0 F void_lord beam',
     'circle -7 -3 1.6 0 0 F tide_serpent spray_rain', 'cone -4.6 -3.4 3.4 80 0 F tide_serpent tail_sweep', 'circle 1.4 -3.2 1.5 0 0 F crown_wraith lightning_fall',
     'cone 3.6 -3.4 3.2 80 0 F crown_wraith grasp'],
+  // F3: the stone bosses' own attacks by their own names (E6 looked at them only as the warden's).
+  vein: ['cone -8 2.6 3.6 120 0 F vein_eater claw', 'circle -2.6 3 1.5 0 0 F vein_eater cave_in', 'circle 2.4 2.6 2.6 0 0 F vein_eater burrow',
+    'circle -6 -2.8 3.2 0 0 F vein_eater quake', 'circle 0.4 -3.4 1.2 0 0 F vein_eater spike_line', 'ring 5.6 -2.2 3.6 1.4 0 F vein_eater collapse_ring'],
+  knight: ['cone -8 2.6 4.2 70 0 F black_knight smash', 'circle -2.4 3.2 1.5 0 0 F black_knight rubble', 'circle 2.6 2.6 2.8 0 0 F black_knight leap',
+    'circle -5.6 -2.6 3.4 0 0 F black_knight quake', 'circle 0.6 -3.4 1.3 0 0 F black_knight shockwave', 'line 3 -3.6 7 1.6 0 F black_knight fissure'],
 };
 const blowsAt = (blows, filled) => blows.map(b => 'warn ' + b.replace(' F ', ` ${filled} `)).join('; ');
 
@@ -3056,7 +3061,7 @@ async function bossfx(browser) {
   await game.send('goto wild');
   await clearRoom(game, 12, 7);
   await game.send('monsters hold; heal; face 1 0');
-  const Names = { queen: '수정 거미 여왕', general: '장군 모르그', stone: '돌 보스(수호자의 공격으로)', antlion: '개미귀신', elements: '용암·공허·물·망령' };
+  const Names = { queen: '수정 거미 여왕', general: '장군 모르그', stone: '돌 보스(수호자의 공격으로)', antlion: '개미귀신', elements: '용암·공허·물·망령', vein: '광맥 포식자(제 공격 이름으로)', knight: '흑철 기사 발두인(제 공격 이름으로)' };
   for (const [key, blows] of Object.entries(BossBlows)) {
     if (key === 'queen' || key === 'general') {
       // What falls onto the warnings before the blow.
@@ -3277,6 +3282,26 @@ async function mobwarn(browser) {
     await game.shot('mobwarn-shape-blows', '부채꼴 착지 0.14초: 슬라임(제 색), 버섯 병사(포자 보라), 심연 추적자(공허 보라)');
     await game.send('fxhold off; clear');
   }
+  {
+    // F3: the line follows its target while it moves. The host is held in the wind-up (speed 0 stops the host, not
+    // the player's own steps), the player walks down with the keys, and the line turns after them.
+    await pollState(game, t => t.bossShots === 0, 5000);
+    await game.send('clear; heal; monsters hold; face 1 0; spawn crystal_wisp 4 1.5 5000; mob crystal_wisp use prism');
+    await game.wait(350);
+    await game.send('speed 0');
+    await game.wait(250);
+    const first = await game.state();
+    await game.page.keyboard.down('s');
+    await game.wait(700);
+    await game.page.keyboard.up('s');
+    await game.wait(150);
+    const walked = await game.state();
+    const turned = Math.abs(((walked.targetAimWay - first.targetAimWay + 540) % 360) - 180);
+    check(first.targetAims > 0 && walked.targetAims > 0 && turned > 4, `한 발짜리 조준선이 움직이는 대상을 따라간다 (${first.targetAimWay}도 → ${walked.targetAimWay}도, ${turned.toFixed(1)}도 돌았다, ${walked.targetAims}줄)`);
+    await game.shot('mobwarn-aim-follows', '수정 정령의 조준선: 예고 중에 아래로 걸은 뒤에도 나를 향한다');
+    await game.send('speed 1; clear');
+    await game.wait(400);
+  }
   // A single shot (a bouncing or a returning one) is aimed as it leaves: the host says whom it is for and the line
   // goes to them through the wind-up (0.113.0, Docs/EffectsRework.md 14절); then the shot flies along it.
   for (const [id, attack, name] of [['crystal_wisp', 'prism', '수정 정령의 튕기는 빛'], ['void_wisp', 'orb', '공허 정령의 돌아오는 구슬']]) {
@@ -3324,6 +3349,10 @@ async function mobwarn(browser) {
 // Nine elements a row of three flying right, over a warning; a player's orbs beside them to tell them from.
 const ShotRows = [0, 1, 2, 3, 4, 5, 6, 7, 8].map(e => `shots ${e} ${-9 + (e % 3) * 6.5} ${3.4 - Math.floor(e / 3) * 2.6} ${e % 3 === 1 ? 20 : e % 3 === 2 ? -25 : 0} 3 0`);
 
+// A boss's line in the state's "bosses" (id:health:phase:state:attack:tell), and whether it is winding an attack up.
+const bossOf = (t, id) => String(t.bosses || '').split(' ').find(b => b.startsWith(id + ':')) || '-';
+const windingUp = (t, id) => bossOf(t, id).split(':')[3] === 'Telegraph';
+
 async function shots(browser) {
   note('\n## 적의 탄: 원소별 모습·꼬리·소멸·조준선 (PC)\n');
   const game = await open(browser, run, Profiles.pc, url);
@@ -3359,6 +3388,11 @@ async function shots(browser) {
     await game.send(`heal; goto boss ${id}`);
     await game.until(t => has(t.banner, '등장') || has(t.entrance, '등장'), 6000, game.texts);
     await game.wait(1500);
+    // The boss is awake and fights on by itself between what the check tells it to do (2026-11-27: one run in two
+    // failed here by a rock of its own burst flying along the new line, or by its next wind-up's lines showing "after
+    // the shot"). So: told to attack only once nothing of its own is in the air, and afterwards lines count only when
+    // it is not winding up again.
+    await pollState(game, t => t.bossShots === 0 && !windingUp(t, id), 8000);
     await game.send(`heal; boss ${id} use ${attack}`);
     // Before the shots: the lines of a burst all the way round, at the angle the host settled as the wind-up began
     // (0.113.0, Docs/EffectsRework.md 14절); then a shot flies along the first line.
@@ -3378,9 +3412,12 @@ async function shots(browser) {
     const off = ways.length ? Math.min(...ways.map(w => Math.abs(((w - flying.roundAimLast + 540) % 360) - 180))) : 999;
     check(off < 3, `${name}: 탄이 조준선을 따라 난다 (첫 줄 ${flying.roundAimLast}도, 가장 가까운 탄과 ${off.toFixed(1)}도 차이, 탄 ${ways.length}발)`);
     await game.shot(`shots-${id}`, `${name}이 날아가는 중`);
+    // The lines are gone once the shots are out: looked for from the moment they fly. Lines seen while the boss winds
+    // up again are its next burst's, rightly there (the old check read them seconds later and failed on those).
+    const fired = await pollState(game, t => t.roundAim < 0, 3000);
+    check(fired.roundAim < 0 || windingUp(fired, id), `${name}: 쏜 뒤에는 조준선이 없다 (${fired.roundAim}, 보스 ${bossOf(fired, id)})`);
     const ended = await pollState(game, t => t.shotEnds > 0, 5000);
     check(ended.shotEnds > 0, `${name}: 벽·수명에서 고리와 파편으로 사라진다 (${ended.shotEnds}개)`);
-    check(ended.roundAim < 0, `${name}: 쏜 뒤에는 조준선이 없다`);
   }
   {
     // F2: a spiral's later volleys are lined up too (the screen steps the first's angle on by the sheet's), and
@@ -3404,6 +3441,24 @@ async function shots(browser) {
   await game.shot('shots-vein-aim', '그룸의 바위 던지기 예고: 조준선 세 갈래');
   const thrown = await pollState(game, t => t.bossShots > 0, 3000);
   check(thrown.bossShots > 0 && thrown.enemyShots === 0, `그룸의 바위는 제 그림 그대로다 (호스트 ${thrown.bossShots}발, 원소 그림 ${thrown.enemyShots}발)`);
+  {
+    // F3 (0.114.0): the rocks a burrow flings are lined up before it comes up, from the circle it marked (where it
+    // will come up), and fly along those lines.
+    await pollState(game, t => t.bossShots === 0 && !windingUp(t, 'vein_eater'), 8000);
+    const had = (await game.state()).landAims;
+    await game.send('heal; boss vein_eater use burrow');
+    await game.wait(500);
+    await game.send('speed 0');
+    await game.wait(250);
+    const dug = await game.state();
+    check(dug.landAims > had && dug.roundAim >= 0 && dug.aimDots > 0, `그룸의 파고들기: 솟기 전에 바위 여덟의 조준선이 솟을 자리에서 나온다 (시작 각도 ${dug.roundAim}도, ${dug.aimDots}점, 보스에게서 ${dug.landAimAway}칸)`);
+    await game.shot('shots-burrow-aim', '그룸의 파고들기 예고: 솟을 자리(붉은 원)에서 바위마다 붉은 점선');
+    await game.send('speed 1');
+    const up = await pollState(game, t => t.bossShots >= 8, 4000);
+    check(up.bossShots >= 8, `그룸의 파고들기: 솟으며 바위가 난다 (호스트 ${up.bossShots}발)`);
+    const gone = await pollState(game, t => t.roundAim < 0, 3000);
+    check(gone.roundAim < 0 || windingUp(gone, 'vein_eater'), `그룸의 파고들기: 솟은 뒤에는 조준선이 없다 (${gone.roundAim})`);
+  }
   await game.context.close();
 
   note('\n## 적의 탄 (휴대폰 세로)\n');

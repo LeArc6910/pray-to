@@ -182,7 +182,7 @@ namespace Game.Client
             var stones = item.Slot == ItemSlot.Weapon ? (Rgba.Hex("#C88CFF"), Rgba.Hex("#7E46D0")) : (Rgba.Hex("#E8485A"), Rgba.Hex("#9A2234"));
             if (item.IsLegendary) stones = LegendaryStones(item.Legendary);
             // A weapon that adds an element's damage (2026-11-09) wears that element's stone: ember, frost or spark.
-            var adds = item.Implicits.Select(m => m.Stat).FirstOrDefault(s => s == StatType.FireDamage || s == StatType.ColdDamage || s == StatType.LightningDamage);
+            var adds = ElementOf(item);
             if (!item.IsLegendary && adds != default)
             {
                 stones = adds switch
@@ -193,6 +193,43 @@ namespace Game.Client
                 };
             }
             return (metal, stones.Item1, stones.Item2);
+        }
+
+        // The element a weapon strikes with: the damage it adds, else its tag (the frost staff and the storm bow turn the
+        // blow to their element without adding any).
+        static StatType ElementOf(ItemBase item)
+        {
+            if (item.Slot != ItemSlot.Weapon) return default;
+            var adds = item.Implicits.Select(m => m.Stat).FirstOrDefault(s => s == StatType.FireDamage || s == StatType.ColdDamage || s == StatType.LightningDamage);
+            if (adds != default) return adds;
+            return (item.Tags & SkillTag.Fire) != 0 ? StatType.FireDamage : (item.Tags & SkillTag.Cold) != 0 ? StatType.ColdDamage
+                : (item.Tags & SkillTag.Lightning) != 0 ? StatType.LightningDamage : default;
+        }
+
+        // The marks that tell apart pieces the slot's one drawing and the tier's metal drew pixel for pixel alike
+        // (2026-11-27, the art lint's twins: the flame blade was the mithril sword, the silk hood the silk helmet). By
+        // shape, not only colour: an element weapon's blade core, bowstring or staff sparks are its stone; an elite's
+        // unique piece of armour wears a stone the plain and set pieces do not.
+        static string[] Marked(string[] rows, ItemBase item)
+        {
+            var marks = new List<(int X, int Y, char C)>();
+            bool bow = (item.Tags & SkillTag.Ranged) != 0, staff = (item.Tags & SkillTag.Magic) != 0;
+            if (item.Slot == ItemSlot.Weapon && !item.IsLegendary && ElementOf(item) != default)
+            {
+                if (bow) for (int y = 2; y <= 7; y++) marks.Add((6, y, y % 2 == 0 ? 'g' : 'G'));
+                else if (staff) marks.AddRange(new[] { (9, 0, 'g'), (4, 1, 'g'), (9, 4, 'G') });
+                else marks.AddRange(new[] { (8, 1, 'g'), (7, 2, 'g'), (6, 3, 'G'), (5, 4, 'g'), (4, 5, 'G') });
+            }
+            if (item.Legendary == "elite")
+            {
+                if (item.Slot == ItemSlot.Helmet) marks.AddRange(new[] { (4, 1, 'g'), (5, 1, 'G'), (4, 2, 'w'), (5, 2, 'g'), (4, 0, 'g') });
+                else if (item.Slot == ItemSlot.Chest) marks.AddRange(new[] { (4, 3, 'g'), (5, 3, 'G'), (4, 4, 'w'), (5, 4, 'g') });
+                else if (item.Slot == ItemSlot.Boots) marks.AddRange(new[] { (2, 1, 'g'), (6, 2, 'g'), (2, 2, 'G'), (6, 3, 'G') });
+            }
+            if (marks.Count == 0) return rows;
+            var marked = rows.Select(r => r.ToCharArray()).ToArray();
+            foreach (var (x, y, c) in marks) marked[y][x] = c;
+            return marked.Select(r => new string(r)).ToArray();
         }
 
         // A weapon as the hero holds it (HeroArt draws it in the hand, turned with the motion): its kind and its
@@ -231,7 +268,7 @@ namespace Game.Client
                 ItemSlot.Ring => Ring,
                 _ => Amulet,
             };
-            return PixelImage.FromRows(colors, rows).Outlined(Outline);
+            return PixelImage.FromRows(colors, Marked(rows, item)).Outlined(Outline);
         }
 
         // A legendary's stones are its boss's colour (2026-11-11, the content audit: the legendaries of one slot were
@@ -247,6 +284,12 @@ namespace Game.Client
             "antlion" => (Rgba.Hex("#E8C060"), Rgba.Hex("#9A7020")),
             "tide_serpent" => (Rgba.Hex("#5AD2E6"), Rgba.Hex("#1E6A8A")),
             "rift" => (Rgba.Hex("#F0E8FF"), Rgba.Hex("#8C6CE0")),
+            // The dungeons' bosses (2026-11-27: their set pieces were all the default's gold, one slot's alike): ore
+            // green, blossom, black iron, web and venom.
+            "vein_eater" => (Rgba.Hex("#6AE8B0"), Rgba.Hex("#1E8A66")),
+            "shrine_samurai" => (Rgba.Hex("#FFC8DC"), Rgba.Hex("#C0608A")),
+            "black_knight" => (Rgba.Hex("#6A7890"), Rgba.Hex("#2A3040")),
+            "silk_mother" => (Rgba.Hex("#E4F2B8"), Rgba.Hex("#7CA048")),
             _ => (Rgba.Hex("#FF8A3C"), Rgba.Hex("#B83A10")),
         };
 
@@ -1043,6 +1086,15 @@ namespace Game.Client
             {
                 placed = placed.Copy();
                 placed.Draw(SplitterArrows, 0, 0);
+            }
+            else if (placed != null && (material.Places == TileType.BigSmelter || material.Places == TileType.BigAssembler))
+            {
+                // The big machine's item is the small one's picture (it stands as four tiles of it): a 2×2 of squares in
+                // the corner says which (2026-11-27, the art lint's twins).
+                placed = placed.Copy();
+                for (int y = 0; y < 5; y++)
+                    for (int x = 0; x < 5; x++)
+                        placed[placed.Width - 5 + x, y] = x == 2 || y == 2 ? Outline : Rgba.Hex("#F2C440");
             }
             else if (placed != null && material.Places == TileType.Arm)
             {

@@ -756,7 +756,7 @@ namespace Game.Core
             if (standing == null || standing.IsDead)
             {
                 Doing = "보스가 떨어뜨린 것 줍기";
-                Go(BotTarget.Loot);
+                Go(BotTarget.LootOf(boss.MaterialId));
                 return;
             }
             Doing = boss.Name + "와 싸움";

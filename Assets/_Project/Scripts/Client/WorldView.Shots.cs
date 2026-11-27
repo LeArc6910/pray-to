@@ -237,6 +237,21 @@ namespace Game.Client
                 _roundAimAt = Time.time;
                 return;
             }
+            // The rocks a burrow or a leap flings (0.114.0): the same lines, from where it will come down (the middle
+            // of the circle it marked), not from where it winds up.
+            if (view.AimsRound && attack.Count > 0 && (attack.Shape == AttackShape.Burrow || attack.Shape == AttackShape.Leap) && _client != null
+                && _client.ComesDownAt(view) is Vec2 down)
+            {
+                float degrees = 360f * (attack.Count - 1) / attack.Count;
+                int each = Mathf.Clamp(MostRoundDots / attack.Count, 2, 9);
+                LayAim(down, Vec2.FromAngle(view.AimAngle + degrees * Mathf.Deg2Rad / 2), view.Boss.Radius, degrees, attack.Count, progress,
+                    Mathf.Min(AimReach, 0.3f + each * AimStep), MostAimDots + MostRoundDots);
+                RoundAimDegrees = Mathf.Repeat(view.AimAngle * Mathf.Rad2Deg, 360);
+                _roundAimAt = Time.time;
+                LandAimAt = down;
+                LandAims++;
+                return;
+            }
             if (attack.Shape != AttackShape.Burst || attack.Angle <= 0 || attack.Angle >= 360) return;
             LayAim(view.Position, view.Facing, view.Boss.Radius, attack.Angle, attack.Count, progress);
         }
@@ -302,6 +317,9 @@ namespace Game.Client
         // drawn now; and the ways (degrees) the enemy shots drawn now are flying.
         public float RoundAimDegrees { get; private set; } = -1;
         public bool RoundAimShown => Time.time - _roundAimAt < 0.1f;
+        // For the playtest: frames a burrow's or a leap's rocks were lined up, and where from (the landing spot).
+        public int LandAims { get; private set; }
+        public Vec2 LandAimAt { get; private set; }
         public List<float> EnemyShotWays()
         {
             var ways = new List<float>();

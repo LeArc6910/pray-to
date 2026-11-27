@@ -155,8 +155,8 @@ namespace Game.Client
         void Thud(Body body, float shake, float volume)
         {
             var feet = body.Position;
-            Kick(feet + new Vector3(0.5f, 0, 0), new Vector3(1, 0.2f, 0), DustColor, 2);
-            Kick(feet + new Vector3(-0.5f, 0, 0), new Vector3(-1, 0.2f, 0), DustColor, 2);
+            Bits(feet + new Vector3(0.5f, 0, 0), new Vector3(1, 0.2f, 0), DustColor, 2);
+            Bits(feet + new Vector3(-0.5f, 0, 0), new Vector3(-1, 0.2f, 0), DustColor, 2);
             if (Settings.ScreenShake) _shake = Mathf.Max(_shake, shake);
             Hear(Sound.Thump, feet, volume);
         }
@@ -188,7 +188,7 @@ namespace Game.Client
                 SpeedLines(feet, moved);
                 if (puff)
                 {
-                    Kick(feet, -moved, DustColor, 3);
+                    Bits(feet, -moved, DustColor, 3);
                     if (Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.08f);
                     Hear(Sound.Thump, feet, 0.6f);
                 }

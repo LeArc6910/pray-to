@@ -23,6 +23,14 @@ namespace Game.Client
             // --only spider: just that boss's motions (gif, frame strips, continuity report), for working on them; --only hero
             // the player's.
             // --only flat: every tile drawn flat on the object layer, and the rails as they join (out/flat/, FlatPreview).
+            if (args.Length == 2 && args[0] == "--only" && args[1] == "lint")
+            {
+                // --only lint: just the pixel slips' counts and out/lint.md (ArtLint), without drawing the sheets.
+                string folder = FindFolder(Path.Combine("DevTools", "ArtPreview"));
+                string beasts = FindFolder(Path.Combine("Assets", "_Project", "Data", "Monsters"));
+                Directory.CreateDirectory(Path.Combine(folder, "out"));
+                return ArtLint.Run(LoadLoot(), MonsterSheet.Parse(File.ReadAllText(Path.Combine(beasts, MonsterSheet.File)), File.ReadAllText(Path.Combine(beasts, MonsterAttackSheet.File))), folder, Path.Combine(folder, "out")) ? 0 : 1;
+            }
             if (args.Length == 2 && args[0] == "--only" && args[1] == "title")
             {
                 // --only title: the title rework's art (out/title/, TitlePreview, Docs/TitleRework.md 묶음 T2).

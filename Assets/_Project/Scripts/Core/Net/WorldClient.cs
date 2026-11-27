@@ -1593,6 +1593,24 @@ namespace Game.Core
             return World.Landing(Map, projectile.Origin, projectile.Velocity, projectile.Radius, projectile.TicksLeft, bodies);
         }
 
+        // Where a boss winding up a burrow or a leap will come down, which is where its rocks fly out from: the middle
+        // of the circle it marked as the wind-up began (World.LayHazards lays it at the spot the boss lands on). The
+        // circle of the attack's size that lands soonest; null when the boss is not winding one up or none is seen.
+        public Vec2? ComesDownAt(EntityView boss)
+        {
+            var attack = boss.BossAttack;
+            if (boss.BossState != BossState.Telegraph || attack == null || attack.Shape != AttackShape.Burrow && attack.Shape != AttackShape.Leap) return null;
+            HazardView? best = null;
+            foreach (var hazard in Hazards())
+            {
+                var state = hazard.State;
+                // The wire rounds a size to an eighth of a tile.
+                if (state.Shape != HazardShape.Circle || Math.Abs(state.Size - attack.Radius) > 0.07f) continue;
+                if (best == null || state.TicksLeft < best.Value.State.TicksLeft) best = hazard;
+            }
+            return best?.State.Position;
+        }
+
         // Telegraphs with how far along they are right now; ones that have already landed are left out.
         public List<HazardView> Hazards()
         {

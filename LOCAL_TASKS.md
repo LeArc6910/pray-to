@@ -1297,6 +1297,11 @@ DevTools/Local/setup.sh --commit
   - 명령 한 줄을 다시 돌린다(새 파일 없음)
   - (클라우드 웹 점검) `sweep.js --only bosses,patterns`
   - (사람) 동굴 수호자가 팔을 들 때(내려찍기·천장 붕괴·포효) 몸에 빈 곳이 더 보이지 않는지, 메운 곳이 어색하지 않고 뚱뚱해 보이지 않는지
+- [ ] 199단계: 이펙트 개편(E1~E7, F1~F3)의 사진과 새 파일 — `Docs/EffectsRework.md` 13절
+  - 명령 한 줄을 `-Commit`과 함께 다시 돌린다. 새 파일의 `.meta`가 생기면 커밋한다: `Client/Art/`의 `BossFx.cs`·`FxLayers.cs`·`HazardArt.cs`·`HitFx.cs`·`MonsterFx.cs`·`ShotArt.cs`·`SkillFx.cs`·`SkillFxArt.cs`·`SkillFxArt.Layers.cs`, `Client/`의 `WorldView.BossFx.cs`·`WorldView.Hazards.cs`·`WorldView.HitFx.cs`·`WorldView.MonsterFx.cs`·`WorldView.Shots.cs`·`WorldView.SkillFx.cs`, `Core/Bot/BotRoll.cs`, `Core/Simulation/World.Roll.cs`, `Tests/EditMode/AimTests.cs`·`RollTests.cs`(그 밖에 `.meta`가 없는 파일이 저장소에 468개 있다: 시험·시트·소리. 명령 한 줄이 한꺼번에 만든다)
+  - PlayMode `Screens` 사진 열다섯 장이 `local-screens`에 올라오는지: `shots-elements`·`shots-ends`·`foretold-single-aim`·`mobwarn-together`·`mobwarn-pools`·`blast-ball`·`blast-smoke`·`hazard-warnings`·`hazard-blows`·`hazard-scars`·`bossfx-queen`·`bossfx-general`·`bossfx-elements`·`hits-elements`·`hits-numbers`
+  - F3에는 새 `.cs` 파일이 없다(통신 0.114.0, 시트 `item_bases.csv`의 `tint` 넷)
+  - (사람) `Docs/HumanChecklist.md` 7절 "이펙트 개편 마무리"
 
 ## 결과 보고
 

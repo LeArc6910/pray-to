@@ -93,6 +93,8 @@ dotnet run --project DevTools/ArtPreview -- --only dungeons
 dotnet run --project DevTools/ArtPreview -- --only portraits
 # 시작화면 개편의 그림만(out/title/: looks.png 주인공 외형(머리 모양·색·피부·눈·옷, 기본 외형과 옛 그림 비교), looks_moves.png 무작위 외형의 모션, logo.png·logo_glint.png 로고와 반짝임, buttons.png 글자 단추·판·목록 줄, biome_icons.png, loading_<생물군계>.png 로딩 장면, T3 화면 시안 screens_pc.png·screens_phone.png·screens_phonewide.png와 화면마다 screen_<크기>_<title|characters|make|worlds|loading|hub>.png. Docs/TitleRework.md T2·T3)
 dotnet run --project DevTools/ArtPreview -- --only title
+# 그림 린트만(몇 초): 외딴 픽셀·색 수·흔들림·쌍둥이를 세고 out/lint.md에 적는다. 기준(lint-baseline.txt)보다 늘면 실패
+dotnet run --project DevTools/ArtPreview -- --only lint
 
 # Unity 쪽 코드 컴파일 확인. fetch는 세션마다 한 번(몇 분, 에디터와 웹 플레이어의 엔진 DLL만 .unity/에 받는다)
 DevTools/UnityCompileCheck/fetch-unity.sh

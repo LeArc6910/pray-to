@@ -41,6 +41,9 @@ namespace Game.Core
         public static BotTarget Wall => new BotTarget { Aim = BotAim.Wall };
         public static BotTarget Explore => new BotTarget { Aim = BotAim.Explore };
         public static BotTarget Loot => new BotTarget { Aim = BotAim.Loot };
+        // What lies near, and failing that the drops of this material however far (a boss's core the bot was driven
+        // away from before it picked it up).
+        public static BotTarget LootOf(string material) => new BotTarget { Aim = BotAim.Loot, Id = material };
         public static BotTarget Dig(TileType tile) => new BotTarget { Aim = BotAim.Tile, Tile = tile };
         public static BotTarget Beside(TileType tile, Biome? biome = null) => new BotTarget { Aim = BotAim.Beside, Tile = tile, Biome = biome };
         public static BotTarget Monster(string id = null) => new BotTarget { Aim = BotAim.Monster, Id = id };
@@ -63,7 +66,7 @@ namespace Game.Core
                 case "boss": return Boss(Word(1));
                 case "fight": return Fight(Word(1));
                 case "explore": return Explore;
-                case "loot": return Loot;
+                case "loot": return words.Count > 1 ? LootOf(words[1]) : Loot;
                 case "at": return At(int.Parse(Word(1), CultureInfo.InvariantCulture), int.Parse(Word(2), CultureInfo.InvariantCulture));
             }
             throw new ArgumentException("nav: unknown target " + words[0]);
@@ -78,7 +81,7 @@ namespace Game.Core
             BotAim.Boss => "boss " + Id,
             BotAim.BossFight => "fight " + Id,
             BotAim.Explore => "explore",
-            BotAim.Loot => "loot",
+            BotAim.Loot => Id == null ? "loot" : "loot " + Id,
             _ => $"at {X} {Y}",
         };
     }
@@ -505,6 +508,16 @@ namespace Game.Core
                         .Where(l => l.For(_player.Id, _world.Tick) && Vec2.Distance(l.Position, _player.Position) <= 12
                             && !Memory.IsBlocked(TileMap.Cell(l.Position.X), TileMap.Cell(l.Position.Y)))
                         .OrderBy(l => Vec2.Distance(l.Position, _player.Position)).ThenBy(l => l.Id).FirstOrDefault();
+                    // Nothing near: the named material's drop, however far. 2026-11-27, the first hour's seed 6: the
+                    // bot felled the warden hurt, backed 33 tiles off from its brood to rest and then stood there with
+                    // "nothing to pick up" till the goal was given up, the core lying on open floor.
+                    if (drop == null && target.Id != null)
+                    {
+                        drop = _world.GroundLoot
+                            .Where(l => l.Material?.Id == target.Id && l.For(_player.Id, _world.Tick)
+                                && !Memory.IsBlocked(TileMap.Cell(l.Position.X), TileMap.Cell(l.Position.Y)))
+                            .OrderBy(l => Vec2.Distance(l.Position, _player.Position)).ThenBy(l => l.Id).FirstOrDefault();
+                    }
                     if (drop == null) return (null, "", new BotIntent { Do = BotDo.Arrived, Why = "주울 것 없음" });
                     LastLoot = (TileMap.Cell(drop.Position.X), TileMap.Cell(drop.Position.Y));
                     var path = Nav.To(hx, hy, TileMap.Cell(drop.Position.X), TileMap.Cell(drop.Position.Y));

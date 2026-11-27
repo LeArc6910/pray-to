@@ -358,7 +358,7 @@ namespace Game.Client
                 SpeedLines(feet, moved);
                 if (puff)
                 {
-                    Kick(feet, -moved + Vector3.up * 0.4f, DustColor, 3);
+                    Bits(feet, -moved + Vector3.up * 0.4f, DustColor, 3);
                     Hear(Sound.Skitter, feet, 0.9f);
                     if (Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.05f);
                 }
@@ -611,8 +611,8 @@ namespace Game.Client
         void Pierce(Vector3 at, float weight)
         {
             AddFlash(at, 0.5f + 0.3f * weight, Color.white, FlashKind.Impact);
-            Kick(at, Vector3.up, RockColor, 2 + Mathf.RoundToInt(weight));
-            Kick(at, Vector3.up, DustColor, 2);
+            Bits(at, Vector3.up, RockColor, 2 + Mathf.RoundToInt(weight));
+            Bits(at, Vector3.up, DustColor, 2);
             Cracks(at, 0.5f + 0.4f * weight, 3);
         }
 
@@ -656,7 +656,7 @@ namespace Game.Client
                     AddFlash(bite, 1.3f, VenomColor, FlashKind.Burst);
                     for (int side = -1; side <= 1; side += 2)
                         Kick(bite, Quaternion.Euler(0, 0, side * 50) * along, VenomBright, 4);
-                    Kick(bite, Vector3.up, DustColor, 2);
+                    Bits(bite, Vector3.up, DustColor, 2);
                     if (Settings.ScreenShake && Feel.HitStop) _hitStop = Mathf.Max(_hitStop, 0.07f);
                     if (Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.22f);
                     Hear(Sound.Thump, bite, 0.8f);
@@ -710,7 +710,7 @@ namespace Game.Client
                     Pierce(at + along * 0.3f, 1.5f);
                     for (float d = 1.2f; d < hazard.Size; d += 1.4f)
                     {
-                        Kick(at + along * d, Vector3.up, d % 2.8f < 1.4f ? RockColor : DustColor, 2);
+                        Bits(at + along * d, Vector3.up, d % 2.8f < 1.4f ? RockColor : DustColor, 2);
                         Cracks(at + along * d, 0.5f, 2);
                     }
                     AddFlash(at + along * hazard.Size * 0.5f, 0.8f, DustColor, FlashKind.Burst);

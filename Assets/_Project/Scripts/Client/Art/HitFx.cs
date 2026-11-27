@@ -159,10 +159,11 @@ namespace Game.Client
                 case HitElement.Void:
                     for (int i = 0, n = N(strong ? 6 : 4, thin); i < n; i++)
                     {
-                        // Dark lumps that drift off and thin.
+                        // Lumps that drift off, thin and darken. A shade lighter than they were (2026-11-27: at the two
+                        // darkest shades they were lost on the floor in the grey sheet; now the middle of the ramp first).
                         float angle = Spread(dir, i, n, strong ? 170 : 130, seed);
                         float far = reach * (0.3f + 0.7f * SkillFx.Out(p)) * (0.7f + 0.4f * Rnd(seed, i, 81));
-                        SkillFx.Put(o, FxShape.Lump, ramp, p < 0.4f ? 5 : p < 0.75f ? 4 : 3, (3 + (i & 1)) * 4 + (i & 3), SkillFx.Cos(angle) * far, SkillFx.Sin(angle) * far * 0.9f + 4 * p,
+                        SkillFx.Put(o, FxShape.Lump, ramp, p < 0.4f ? 5 : p < 0.75f ? 4 : 3, ((p < 0.5f ? 1 : 2) + (i & 1)) * 4 + (i & 3), SkillFx.Cos(angle) * far, SkillFx.Sin(angle) * far * 0.9f + 4 * p,
                             0.9f * (1 - 0.6f * p));
                     }
                     for (int i = 0, n = N(strong ? 3 : 2, thin); i < n; i++)

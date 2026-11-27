@@ -296,8 +296,8 @@ namespace Game.Client
                 {
                     case AttackShape.Charge:
                         // Pawing the ground: dust kicked out behind; in a frenzy, steam off its back.
-                        if (puff) Kick(feet - ahead * 0.9f, -ahead, DirtColor, 3);
-                        if (puff && attack.Count > 1) Kick(feet + new Vector3(0, 1.8f, 0), Vector3.up, RageColor, 2);
+                        if (puff) Bits(feet - ahead * 0.9f, -ahead, DirtColor, 3);
+                        if (puff && attack.Count > 1) Bits(feet + new Vector3(0, 1.8f, 0), Vector3.up, RageColor, 2);
                         break;
                     case AttackShape.Burst:
                         if (puff && progress < 0.5f) Kick(feet + ahead * 0.6f, Vector3.up, DirtColor, 2);
@@ -306,7 +306,7 @@ namespace Game.Client
                         // Digging in, then a mound running under the floor to where it will burst up. Gone under, it
                         // leaves no shadow.
                         if (progress >= 0.35f) body.Shadow.enabled = false;
-                        if (puff && progress < 0.4f) Kick(feet, Vector3.up, DirtColor, 4);
+                        if (puff && progress < 0.4f) Bits(feet, Vector3.up, DirtColor, 4);
                         if (progress >= 0.3f && LandingOf(attack, out var land))
                         {
                             float run = Mathf.Clamp01((progress - 0.3f) / 0.55f);
@@ -339,11 +339,11 @@ namespace Game.Client
             else if (view.BossState == BossState.Charge && puff)
             {
                 // Tearing along: earth thrown up behind, red in a frenzy.
-                Kick(feet - ahead * 0.8f, -ahead + Vector3.up * 0.5f, attack != null && attack.Count > 1 ? RageColor : DirtColor, 4);
+                Bits(feet - ahead * 0.8f, -ahead + Vector3.up * 0.5f, attack != null && attack.Count > 1 ? RageColor : DirtColor, 4);
             }
             else if (view.BossState == BossState.Recover && attack != null && attack.Shape == AttackShape.Spiral && since < attack.Width * 0.3f + 0.2f && puff)
             {
-                Kick(feet + new Vector3(0, 1, 0), UnityEngine.Random.insideUnitCircle.normalized, OreColor, 3);
+                Bits(feet + new Vector3(0, 1, 0), UnityEngine.Random.insideUnitCircle.normalized, OreColor, 3);
             }
             // In the last phase its ore smoulders.
             if (view.Phase >= 3 && puff && UnityEngine.Random.value < 0.35f) Kick(feet + new Vector3(UnityEngine.Random.Range(-0.6f, 0.6f), 2.2f, 0), Vector3.up, OreColor, 1);

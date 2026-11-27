@@ -106,6 +106,57 @@ namespace Game.Core.Tests
             Assert.IsFalse(table.Seen(boss.Id).AimsRound, "nothing is aimed once the shots are out");
         }
 
+        // The rocks a burrow or a leap flings (0.114.0): the angle is settled as the wind-up begins like a burst's, and
+        // they leave from where the boss comes down. The client hears the angle and finds the spot (the circle the
+        // boss marked), so its lines are the ways the rocks go; the rocks themselves fly as they did.
+        [TestCase("vein_eater", "burrow")]
+        [TestCase("vein_eater", "quake")]
+        [TestCase("black_knight", "leap")]
+        public void ALeapsRocksLeaveWhereAndAsTheWindUpSaidTheyWould(string bossId, string attackId)
+        {
+            var table = new Table();
+            var boss = table.Wake(bossId);
+            Assert.IsTrue(table.World.ForceAttack(boss, attackId), boss.State.ToString());
+            table.Settle();
+
+            var seen = table.Seen(boss.Id);
+            Assert.AreEqual(BossState.Telegraph, seen.BossState);
+            Assert.IsTrue(seen.AimsRound);
+            float aim = World.AimAngle(boss.AimStep);
+            Assert.AreEqual(aim, seen.AimAngle, 1e-6f);
+            var down = table.Client.ComesDownAt(seen);
+            Assert.IsNotNull(down, "the client finds where it will come down");
+            Assert.Less(Vec2.Distance(boss.LandAt, down.Value), 0.02f, "and it is where the host will put it");
+
+            var before = new HashSet<int>(table.World.Projectiles.Select(p => p.Id));
+            for (int i = 0; i < 10 * World.TicksPerSecond && boss.State == BossState.Telegraph; i++) table.Tick();
+            var rocks = table.World.Projectiles.Where(p => !before.Contains(p.Id) && p.Source == boss.Id).ToList();
+            int count = boss.Attack.Count;
+            Assert.AreEqual(count, rocks.Count);
+            Assert.Less(Vec2.Distance(boss.Position, down.Value), 0.02f, "it came down there");
+            for (int i = 0; i < count; i++)
+            {
+                float way = aim + 2 * MathF.PI * i / count;
+                Assert.IsTrue(rocks.Any(s => Turn(s.Velocity.Angle, way) < 1e-3f), $"a rock along line {i}");
+            }
+            table.Settle();
+            var after = table.Seen(boss.Id);
+            Assert.IsFalse(after.AimsRound, "nothing is aimed once the rocks are out");
+            Assert.IsNull(table.Client.ComesDownAt(after));
+        }
+
+        // A leap that flings nothing (the samurai's step) sends no angle.
+        [Test]
+        public void ALeapWithoutRocksSendsNoAngle()
+        {
+            var table = new Table();
+            var boss = table.Wake("shrine_samurai");
+            Assert.IsTrue(table.World.ForceAttack(boss, "shunpo"), boss.State.ToString());
+            table.Settle();
+            Assert.AreEqual(BossState.Telegraph, table.Seen(boss.Id).BossState);
+            Assert.IsFalse(table.Seen(boss.Id).AimsRound);
+        }
+
         [Test]
         public void TheSettledAngleIsTheSameForTheSameSeedAndNotAlwaysTheSame()
         {

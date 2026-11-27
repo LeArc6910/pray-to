@@ -2961,6 +2961,10 @@ namespace Game.Client
                 var view = root.View;
                 json.Field("roundAim", view != null && view.RoundAimShown ? Mathf.RoundToInt(view.RoundAimDegrees * 10) / 10f : -1);
                 json.Field("roundAimLast", view != null ? Mathf.RoundToInt(view.RoundAimDegrees * 10) / 10f : -1);
+                // A burrow's or a leap's rocks lined up before it comes down (0.114.0): frames shown, and how far from
+                // the boss the lines start (the landing spot, not where it winds up).
+                json.Field("landAims", view != null ? view.LandAims : 0);
+                json.Field("landAimAway", view != null && awake != null ? Mathf.RoundToInt(Vec2.Distance(view.LandAimAt, awake.Position) * 10) / 10f : -1);
                 json.Field("enemyShotWays", view != null ? string.Join(" ", view.EnemyShotWays().Take(40).Select(w => FormattableString.Invariant($"{w:0.0}"))) : "");
                 json.Field("targetAims", view?.TargetAimCount ?? 0);
                 json.Field("targetAimWay", view != null ? Mathf.RoundToInt(view.TargetAimDegrees * 10) / 10f : -1);
