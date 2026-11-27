@@ -476,6 +476,8 @@ namespace Game.Client
                         Puffs(o, FxRamp.Dust, 2, t, from, from + 0.3f, 1, 5, seed + i + 1, 5, 0.45f, fx * L * share, fy * L * share, 3);
                     }
                     Fly(o, FxShape.Dot, FxRamp.Dust, 2, 2, 5, t, RollTime - 0.03f, 0.26f, 2, 10, seed, rise: 3, cx: fx * L, cy: fy * L, cone: 140, toward: face);
+                    // A faint wave over the floor where they come up.
+                    FxLayers.Shock(o, FxRamp.Dust, t, RollTime - 0.03f, 6, fx * L, fy * L, 0.18f, true);
                     return 0.58f;
                 }
                 case RollSlide:
@@ -499,7 +501,11 @@ namespace Game.Client
                     float fx = (float)Math.Cos(c.Dir), fy = (float)Math.Sin(c.Dir), L = c.Length;
                     // A glint where they left and where they arrive, afterimages left along the way as the body passes
                     // (the first to be left the first to go), and motes that hang a moment and rise.
-                    if (In(t, 0, 0.12f)) Put(o, FxShape.Glint, m, 9, 1, 0, Body, 1 - U(t, 0.05f, 0.12f));
+                    if (In(t, 0, 0.12f))
+                    {
+                        Put(o, FxShape.Glint, m, 9, 1, 0, Body, 1 - U(t, 0.05f, 0.12f));
+                        FxLayers.Light(o, m, 20, 0.45f * (1 - U(t, 0.05f, 0.12f)), 0, Body);
+                    }
                     for (int k = 0; k < 3; k++)
                     {
                         float share = (k + 0.3f) / 3.3f, from = RollTime * share;
@@ -512,7 +518,11 @@ namespace Game.Client
                         float aside = (Rnd(seed, i, 15) - 0.5f) * 10;
                         Put(o, FxShape.Dot, m, 1, 2, fx * L * share - fy * aside, Body - 4 + fy * L * share + fx * aside + 7 * u, 1 - u);
                     }
-                    if (In(t, RollTime - 0.04f, RollTime + 0.12f)) Put(o, FxShape.Glint, m, 7, 0, fx * L, Body + fy * L, 1 - U(t, RollTime + 0.02f, RollTime + 0.12f));
+                    if (In(t, RollTime - 0.04f, RollTime + 0.12f))
+                    {
+                        Put(o, FxShape.Glint, m, 7, 0, fx * L, Body + fy * L, 1 - U(t, RollTime + 0.02f, RollTime + 0.12f));
+                        FxLayers.Light(o, m, 18, 0.4f * (1 - U(t, RollTime + 0.02f, RollTime + 0.12f)), fx * L, Body + fy * L);
+                    }
                     return 0.62f;
                 }
                 case "ground_slam":
