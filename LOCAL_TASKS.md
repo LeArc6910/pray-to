@@ -1808,3 +1808,17 @@ DevTools/Local/setup.sh --commit
 - 가져오기: 위 setup.ps1(-NoPull -NoScreens, 이 작업 폴더)에서 Unity가 새 wav를 모노·22050 Hz·Vorbis·불러올 때 풀기로 가져왔다(`SoundImport.cs`). PlayMode 실패 19개는 소리와 관계없는 그림·배치·보스 확인이다(클라우드 확인 필요). 이번 실행에서 바뀐 `GameSheets.asset`과 테스트 스크립트들의 .meta는 이 작업 범위 밖이라 커밋하지 않았다
 - **아직 못 한 것**: 사람이 "새로 찾기"를 고른 23세트(취소, 내려찍기, 부르기, 불·김, 얼음, 번개, 징글 넷, 발소리 다섯, 곡 다섯)는 Kenney에 맞는 것이 없어 다음에 한다(`Docs/SoundCredits.md` 4차 "아직 못 한 것"). 코드가 필요한 것 7가지는 `CLOUD_LOG.md` 2026-11-27 22:00 로컬 항목에 클라우드에 부탁으로 적었다
 - 사람이 다시 들어 볼 것: `Docs/HumanChecklist.md` "녹음 소리 4차"
+
+### 2026-11-28 01:23 setup.ps1 (Unity 6000.6.3f1)
+
+- 프로젝트 설정: 성공
+- 패키지: com.unity.netcode.gameobjects 2.13.3, com.unity.transport 6.6.0, com.unity.render-pipelines.universal 17.6.0, com.unity.inputsystem 1.20.0, com.unity.multiplayer.playmode 3.0.0, com.unity.test-framework 1.8.0
+- 테스트: 건너뜀
+
+### 2026-11-28 01:30 녹음 소리 4차 2부: 로컬 AI로 만든 소리 (로컬)
+
+- 사람 요청 "로컬 ai로 만들어줘": 4차에서 "새로 찾기"를 고른 세트의 후보를 이 컴퓨터의 ComfyUI로 만들었다. 효과음·발소리는 Stable Audio Open 1.0(사람이 Hugging Face 약관에 동의하고 받음), 징글·곡은 ACE-Step 1.5 turbo. 모델은 `F:\Comfy-Desktop\ComfyUI-Shared\models`에 두고 저장소에는 넣지 않았다. 자세한 것은 `Docs/SoundCredits.md` "4차 2부"
+- 같은 장면 듣기 페이지로 사람이 골라 16세트를 바꿨다(같은 파일 이름): 취소, 내려찍기, 몬스터 부르기(낮게), 불(작게), 김(작게), 얼음, 승리 징글, 발소리 눈·낙엽·젖은 발·거친 바위, 곡 용암 지대·모래 동굴·왕국(반복 이음매를 겹쳐 다듬음). 새로 생긴 4개(낙엽 3·4, 젖은 발 4, 취소 3)의 .meta를 커밋했다. 위 setup.ps1(-SkipTests)로 가져오기를 확인했다
+- **다시 만들 것(다음 차례)**: 번개(번개·천둥 쪽으로), 레벨업 징글(2초), 쓰러짐 징글(낮은 피아노·현악), 보스전 곡(일렉 기타·드럼의 빠른 비트), 오두막 곡(잔잔한 통기타·현악). GPU를 지금 보스 도트 세션이 쓰고 있어(`F:\Comfy-Desktop\gpu-lock.json`) 잠금이 풀린 뒤 만든다
+- **사람이 할 일**: 이 게임을 팔거나 상업적으로 쓰게 되면 Stability AI Community License에 따라 Stability AI에 무료 등록을 한다(https://stability.ai/community-license-agreement). 연 매출 100만 달러를 넘으면 따로 라이선스가 필요하다
+- 사람이 다시 들어 볼 것: `Docs/HumanChecklist.md` "녹음 소리 4차 2부"
