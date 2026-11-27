@@ -68,6 +68,17 @@ namespace Game.Client
             AddBossFx(BossFx.Cinders, at, new BossContext { Ramp = ramp, Count = count, Size = reach, Width = spread, Dir = toward.sqrMagnitude < 1e-6f ? 90 : Mathf.Atan2(toward.y, toward.x) * Mathf.Rad2Deg });
         }
 
+        // An explosion that is no skill's or attack's own effect (F2): the rework's blast in place of the old
+        // one-picture burst. radius in tiles; air: up off the floor (no soot or smoke).
+        void Explode(Vector3 at, float radius, FxRamp ramp, bool air = false, bool big = false)
+        {
+            AddBossFx(BossFx.Blast, at, new BossContext { Ramp = ramp, Size = radius * Ppu, Plain = air, Big = big });
+            Explosions++;
+        }
+
+        // For the playtest: such explosions laid.
+        public int Explosions { get; private set; }
+
         // Kick's bits in what their colour stands for (F2): stone and earth as stones, amber, ore and war fire as
         // sparks, crystal as shards, silk as wisps, sand as grains, steel as steel sparks, and a last phase's red as
         // lumps of red mist. For the bosses whose wind-ups and entrances still threw square dots.

@@ -37,6 +37,11 @@ namespace Game.Client
         // eight of them), Count how many. Ramp what the shots are made of (ShotArt.RampOf); Tint a kind's own colour.
         Muzzle,
 
+        // The rework's explosion (FxLayers.Blast) wherever the view has one that is no skill's or attack's own (F2,
+        // in place of the old one-picture burst): Size its reach. Big: rocks thrown. Plain: in the air, so only the
+        // ball, the wave, the sparks and the light (no soot or smoke on the floor).
+        Blast,
+
         // ---- the mad general ----
         // Fire running round a ring's band from Dir: tongues of flame in rows, soot under them, sparks rising. Size the
         // band's outer radius, Inner its inner.
@@ -138,6 +143,18 @@ namespace Game.Client
                 case BossFx.Column: life = Column(c, t, o); break;
                 case BossFx.Spray: life = Spray(c, t, o); break;
                 case BossFx.Cinders: life = Cinders(c, t, o); break;
+                case BossFx.Blast:
+                    if (!c.Plain) life = FxLayers.Blast(o, t, c.Size, c.Ramp, c.Seed, c.Big ? 12 : 8, c.Big ? 4 : 0, true, 1f);
+                    else
+                    {
+                        life = 0.6f;
+                        if (t < 0.08f) FxLayers.Light(o, c.Ramp, c.Size * 2.8f, 1, 0, 0, 3);
+                        if (t < 0.45f) FxLayers.Light(o, c.Ramp, c.Size * 2.1f, 0.9f * (1 - t / 0.45f));
+                        FxLayers.Ball(o, c.Ramp, t, 0, c.Size, c.Seed & 3);
+                        FxLayers.Shock(o, c.Ramp, t, 0.03f, c.Size);
+                        FxLayers.Embers(o, c.Ramp, 8, t, 0.03f, c.Size * 1.3f, c.Seed);
+                    }
+                    break;
                 case BossFx.Muzzle:
                 {
                     int from = o.Count;

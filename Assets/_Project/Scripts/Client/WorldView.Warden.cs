@@ -364,7 +364,7 @@ namespace Game.Client
                 // The core going out: a last burst of amber sparks.
                 if (Reached(WardenArt.DieOut))
                 {
-                    AddFlash(at + new Vector3(0, 1.2f, 0), 1.4f, AmberColor, FlashKind.Burst);
+                    Explode(at + new Vector3(0, 1.2f, 0), 1.1f, FxRamp.Fire, air: true);
                     Bits(at + new Vector3(0, 1.2f, 0), Vector3.up, AmberColor, 6);
                     Hear(Sound.Break, at, 0.7f);
                 }

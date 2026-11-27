@@ -249,7 +249,7 @@ namespace Game.Client
                     if (Reached(GeneralArt.EnterStood)) Thud(body, 0.05f, 0.6f);
                     if (Reached(GeneralArt.EnterDrawn))
                     {
-                        AddFlash(feet + new Vector3(0.5f, 0.3f, 0), 1.2f, WarFireColor, FlashKind.Burst);
+                        Explode(feet + new Vector3(0.5f, 0.3f, 0), 0.8f, FxRamp.Fire, air: true);
                         Bits(feet + new Vector3(0.5f, 0.2f, 0), Vector3.up, WarFireColor, 5);
                         Hear(Sound.Swing, feet, 1);
                     }

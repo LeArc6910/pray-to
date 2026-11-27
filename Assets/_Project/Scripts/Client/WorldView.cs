@@ -2670,6 +2670,8 @@ namespace Game.Client
                     LastSkillBurst = e.Position;
                     SkillBursts++;
                     if (HasSkillFx(burst)) ShowBurstFx(burst, at, e.Source == _client.PlayerId);
+                    // A skill with no effect of its own: fire goes off as the rework's blast (F2), the rest as before.
+                    else if ((burst.Tags & SkillTag.Fire) != 0 && Feel.SkillFx) Explode(at, Mathf.Max(0.5f, burst.Radius), FxRamp.Fire);
                     else AddFlash(at, Mathf.Max(0.4f, burst.Radius), Palette.Of(burst.Tags | GrantedTags(e.Source)), FlashKind.Burst);
                     if (Vector3.Distance(at, _self.Position) < ShakeRange) _shake = Mathf.Max(_shake, 0.08f);
                     Hear(Sound.Boom, at, 0.7f);
@@ -2760,7 +2762,7 @@ namespace Game.Client
                     if ((skill.Tags & SkillTag.Melee) != 0 || (skill.Tags & SkillTag.Cold) != 0 && skill.Radius >= 3)
                         AddFlash(caster.Position, skill.Radius + World.PlayerRadius, color, FlashKind.Vortex);
                     else if ((skill.Tags & SkillTag.Fire) != 0 && skill.Radius >= 3)
-                        AddFlash(caster.Position, skill.Radius, color, FlashKind.Burst);
+                        Explode(caster.Position, skill.Radius, FxRamp.Fire, big: true);
                     if (e.Source == _client.PlayerId) _shake = Mathf.Max(_shake, 0.06f);
                     // A wide blast sends a ring out past its edge (2026-11-19).
                     if (skill.Damage > 0 && skill.Radius >= 2) Shockwave(caster.Position, skill.Radius + World.PlayerRadius + 0.6f, Color.Lerp(color, Color.white, 0.6f));
