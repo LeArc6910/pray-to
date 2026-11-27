@@ -1828,3 +1828,31 @@ DevTools/Local/setup.sh --commit
 - 프로젝트 설정: 성공
 - 패키지: com.unity.netcode.gameobjects 2.13.3, com.unity.transport 6.6.0, com.unity.render-pipelines.universal 17.6.0, com.unity.inputsystem 1.20.0, com.unity.multiplayer.playmode 3.0.0, com.unity.test-framework 1.8.0
 - 테스트: 건너뜀
+
+### 2026-11-28 02:20 setup.ps1 (Unity 6000.6.3f1)
+
+- 프로젝트 설정: 성공
+- 패키지: com.unity.netcode.gameobjects 2.13.3, com.unity.transport 6.6.0, com.unity.render-pipelines.universal 17.6.0, com.unity.inputsystem 1.20.0, com.unity.multiplayer.playmode 3.0.0, com.unity.test-framework 1.8.0
+- EditMode 테스트: 1207개 중 1207개 통과, 0개 실패
+- PlayMode 테스트: 70개 중 58개 통과, 12개 실패
+  - `Game.Client.Tests.FeatureTests.ADungeonGateLeadsIntoThePocketAndOut: The gate's button starts going in.`
+  - `Game.Client.Tests.FeatureTests.ASingleShotIsLinedToItsTargetBeforeItFlies: A line to the player the shot is for.`
+  - `Game.Client.Tests.FeatureTests.ElitesWearTheirNamesAndWarnOfTheirBigAttack: A name over the leader and each champion.`
+  - `Game.Client.Tests.FeatureTests.EveryKindHasItsOwnAttacks: The stalker's cut is shown when it lands.`
+  - `Game.Client.Tests.FeatureTests.RumoursAndSlowRest: The goal list says only which way:`
+  - `Game.Client.Tests.FeatureTests.TheBagAndHudDraw: The food's buff has no icon.`
+  - `Game.Client.Tests.FeatureTests.TheEncounterWindowsDraw: Her portrait is in the talk box.`
+  - `Game.Client.Tests.FeatureTests.TheTideSerpentSurfacesAndWindsUp: The water jet can be forced once it fights.`
+  - `Game.Client.Tests.LayoutTests.TheBagAndHudFit: 작은 휴대폰 가로 667×375: 배너가 [메뉴] 판에 겹친다 (x:0.00, y:301.00, width:667.00, height:64.00) (x:353.00, y:186.00, width:304.00, height:160.00)`
+  - `Game.Client.Tests.LayoutTests.TheFixedPartsKeepToTheSafeArea: 작은 휴대폰 가로(안전 영역 32 0 32 16) 667×375, 스킬 1: 겹침 - 시간·장소 줄 / 구르기`
+  - `Game.Client.Tests.LayoutTests.TheGrowthScreensFit: 작은 휴대폰 세로 360×640, 특성: 고른 점과 서랍이 하늘을 거의 다 덮는다 (84)`
+  - `Game.Client.Tests.TitleScreenTests.TheTestGroundsPanelAndHitLogDraw: The hit log is on the screen.`
+
+### 2026-11-28 02:40 물살 뱀: 로컬 AI 그림과 몸짓·물 이펙트 (로컬 세션, 사람 허락으로 코드까지)
+
+- 사람 요청 "아직 개선 작업을 안한 보스 하나를 로컬 ai로 rd처럼 8방향 생성하고, 모션이나 이펙트는 너가": 사람이 물살 뱀을 골랐다. ComfyUI로 그림(Z-Image-Turbo + 도트 LoRA → Qwen-Image-Edit-2511 + 여러 각도 LoRA, 모델 약 36 GB를 사람 허락으로 받음, 모두 Apache-2.0), 이 세션이 몸짓·이펙트 코드까지 했다(`CLOUD_LOG.md` 2026-11-28 02:10, `Docs/Bosses.md` 물살 뱀 제 그림과 몸짓, `Docs/ArtSources.md` 로컬 AI로 보스 그림)
+- GPU: 소리 세션의 잠금이 풀린 뒤 01:08~01:50쯤 `gpu-lock.json`(owner boss-ai-sprites)으로 쓰고 ComfyUI를 끄고 잠금을 지웠다
+- 위 02:20 setup의 PlayMode 실패 12개 중 `TheTideSerpentSurfacesAndWindsUp`는 이 작업의 것: 입장 동안 플레이어가 쓰러져 강제 공격이 안 됐다. 다른 보스 장면처럼 `Toughen()`을 넣고(`c2144b6`) 그 시험만 다시 돌려 **통과**. `ADungeonGateLeadsIntoThePocketAndOut`는 다시 돌리니 통과(흔들림). `ASingleShotIsLinedToItsTargetBeforeItFlies`·`ElitesWearTheirNamesAndWarnOfTheirBigAttack`·`EveryKindHasItsOwnAttacks`는 이 작업 이전 커밋(`cddf4ac`)에서도 똑같이 실패한다(이 작업과 무관, 클라우드가 볼 것). 나머지 일곱은 F4가 적은 "남은 일곱"
+- 커밋한 것: 새 스크립트 셋의 `.meta`(`SerpentArt.cs`, `SerpentArt.Rows.cs`, `WorldView.Serpent.cs`). Unity가 만든 다른 `.meta` 400여 개와 `GameSheets.asset` 변경은 이 작업 밖이라 남겨 두었다(199단계)
+- **웹 점검은 하지 않았다**: 이 컴퓨터에 node·Playwright·Chromium이 없고 사람이 "클라우드에 맡김"을 골랐다. 배포 뒤 클라우드가 `sweep.js --wait <커밋> --only serpent,bossfx,arenas`
+- 사람이 볼 것: `Docs/HumanChecklist.md` "물살 뱀"

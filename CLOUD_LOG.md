@@ -15,9 +15,11 @@
 
 - **바뀐 것**: 사람 요청 "아직 개선 작업을 안한 보스 하나를 로컬 ai로 rd처럼 8방향 생성하고, 모션이나 이펙트는 너가". 사람이 물살 뱀을 고르고 로컬 세션이 `.cs`까지 고치는 것을 허락했다(이번만). 그림은 이 컴퓨터의 ComfyUI(Z-Image-Turbo + 도트 LoRA → Qwen-Image-Edit-2511 + 여러 각도 LoRA, 모두 Apache-2.0)로 만들어 다섯 시점을 64×64·24색 행과 부위 지도로 옮겼다(`Art/SerpentArt.Rows.cs`, 도구 `DevTools/ArtImport/LocalAi/`). 몸짓은 `Art/SerpentArt.cs`(목이 똬리에서 휘어 따라오고 볏·목·똬리가 부풀고 물속으로 가라앉는 자세 열아홉), 화면은 `WorldView.Serpent.cs`(공격 id마다 전조 자세, 예고 중 물방울·안개, 착지의 물 이펙트), 물 이펙트 넷(`BossFx.Wave`·`Torrent`·`Maelstrom`·`Geyser`), 새 입장 `Surface`(물속에서 솟기, `arenas.csv` 3.6초·1.2초). 옛 공용 뱀 그림(`CreatureArt.Serpent`)은 지웠다. 피해·체력·예고 시간은 그대로
 - **확인**: `dotnet test` 1207 통과, Unity 쪽 컴파일(로컬 Unity DLL, WebGL 포함) 오류 0, `--only serpent` 연속성 튀는 곳 0, 몸의 틈 18/1665장, `--only bossfx` 물살 뱀 일곱 줄 17~32조각(한도 72), 그림 검사 기준선 그대로
-- **요청 대조**: 보스 고르기 ○(사람이 물살 뱀) · 로컬 AI로 8방향 ○(시안 여덟 장 → 사람이 6번, 64px로 다시 보여 달라는 요청 ○, 부드러운 쪽 ○) · 모션 ○(공격 열하나·입장·포효) · 이펙트 ○(물 넷) · 전체 패턴 GIF ○(`anim/serpent_patterns.gif`, 사람 요청) · PlayMode 장면 ○(`TheTideSerpentSurfacesAndWindsUp`, 사진 넷) · 웹 점검 구역 ○(`sweep.js --only serpent`, `bossfx`에 `serpent` 줄, `arenas`의 입장 표) · 문서 ○(`Docs/Bosses.md` 물살 뱀 제 그림과 몸짓, `Docs/ArtSources.md` 로컬 AI로 보스 그림, `Commands.md`, `Codebase.md`, `HumanChecklist.md`) · 쓰러짐 연출 ✗(요청 없음, 다른 보스처럼 터진다) · 웹 점검 실행 ✗(이 컴퓨터에 node가 없다. 배포 뒤 클라우드가 `sweep.js --only serpent`)
-- **로컬에서 할 일**: 새 파일 `.meta`(`SerpentArt.cs`, `SerpentArt.Rows.cs`, `WorldView.Serpent.cs`) — 이 커밋 뒤 로컬 setup에서 생긴다
-- **로컬 확인**: [ ]
+- **요청 대조**: 보스 고르기 ○(사람이 물살 뱀) · 로컬 AI로 8방향 ○(시안 여덟 장 → 사람이 6번, 64px로 다시 보여 달라는 요청 ○, 부드러운 쪽 ○) · 모션 ○(공격 열하나·입장·포효) · 이펙트 ○(물 넷) · 전체 패턴 GIF ○(`anim/serpent_patterns.gif`, 사람 요청) · PlayMode 장면 ○(`TheTideSerpentSurfacesAndWindsUp`, 사진 넷) · 웹 점검 구역 ○(`sweep.js --only serpent`, `bossfx`에 `serpent` 줄, `arenas`의 입장 표) · 문서 ○(`Docs/Bosses.md` 물살 뱀 제 그림과 몸짓, `Docs/ArtSources.md` 로컬 AI로 보스 그림, `Commands.md`, `Codebase.md`, `HumanChecklist.md`) · 쓰러짐 연출 ✗(요청 없음, 다른 보스처럼 터진다) · 웹 점검 실행 ✗(이 컴퓨터에 node·Playwright·Chromium이 없고 사람이 "클라우드에 맡김"을 골랐다)
+- **Unity(로컬 setup 02:20)**: EditMode 1207 통과. PlayMode 70 중 12 실패: 뱀 장면은 `Toughen()`을 빠뜨린 탓이라 고쳐 그것만 다시 돌려 통과. 나머지는 이 작업 이전에도 실패(`LOCAL_TASKS.md` 2026-11-28 02:40)
+- **클라우드에 부탁**: 배포 뒤 `node DevTools/WebPlaytest/sweep.js --wait <커밋> --only serpent,bossfx,arenas`를 돌리고 사진을 본다(사람 요청 "웹 점검도", 로컬에 도구가 없어 클라우드에 맡김). 이 작업과 무관하게 이전부터 실패하는 PlayMode 셋: `ASingleShotIsLinedToItsTargetBeforeItFlies`·`ElitesWearTheirNamesAndWarnOfTheirBigAttack`·`EveryKindHasItsOwnAttacks`
+- **로컬에서 할 일**: 없음(새 스크립트 셋의 `.meta`는 같은 푸시에 커밋했다)
+- **로컬 확인**: [x] 로컬 세션이 직접 한 일
 
 ## 2026-11-28 01:50 F4 문서의 개수 바로잡음
 
