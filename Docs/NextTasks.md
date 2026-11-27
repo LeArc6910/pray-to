@@ -11,7 +11,19 @@
 
 E1~E7과 F1(14절)·F2(15절)·F3(16절: 파고들기·도약 바위의 조준선, 남은 사각 점, 덜 된 확인)까지 했다(`Docs/EffectsRework.md`). 정말 남은 것은 13절: 일부러 하지 않은 것(왕관의 망령의 탄 등), 로컬 감시가 찍을 사진과 `.meta`(`LOCAL_TASKS.md` 199단계), 사람 확인(`Docs/HumanChecklist.md` 7절).
 
-따로 볼 것(이펙트 개편 밖): 로컬의 PlayMode 실패 19개(`LOCAL_TASKS.md` 결과 보고 2026-11-27, 그림·배치·보스 확인. 클라우드가 원인을 봐야 한다), 웹 점검 `bossfx`의 발두인 "이펙트 하나의 조각이 한도 안"이 0조각으로 읽히는 것(이펙트는 18개 놓인다. `WorldView.BossFx.cs`의 `BossFxPieces`가 그 프레임에 왜 0인지), 웹 점검 `roll`의 "다시 쓰기 시간 안의 둘째 누름" 실패 둘(휴대폰, 확인 안 됨).
+발두인 0조각은 끝(점검이 화면 멈춤 중의 프레임을 읽었다, `Docs/EffectsRework.md` 17절). 로컬 PlayMode 실패 19개 중 열하나는 시험 쪽 원인(마을 안, 맨몸 1레벨, 방 고르기)을 고쳤고 다시 돌리기는 `LOCAL_TASKS.md` 200단계. 웹 점검 `roll`의 "다시 쓰기 시간 안의 둘째 누름" 실패 둘(휴대폰)은 아직 안 봤다.
+
+## PlayMode 실패 중 남은 여덟 (2026-11-27, 이펙트 무관)
+
+지난 보고는 메시지 첫 줄만 있어 원인을 끝까지 못 봤다. 200단계 결과(전체 메시지·Console 로그)를 받고 본다.
+
+- `FeatureTests.RumoursAndSlowRest` "The goal list says only which way:" — 메시지 뒤 `HudLines`가 비어 있다. `_hudLines`는 HUD가 그려질 때마다 "Lv …"부터 채우므로 HUD가 아예 안 그려졌을 수 있다(`RestoreJourney(…, 4, …)` 뒤 장 카드나 대화 상자가 덮는지, `DrawHud(compact)`의 `compact`/`side`). 원인 미확인
+- `FeatureTests.TheBagAndHudDraw` "The food's buff has no icon." — `BuffNames`는 `Buffs()`가 그릴 때(`playing && !compact && !squeezed`)만 채워진다. 어느 화면 크기(`tag`)에서인지, `UseConsumable(mushroom_soup)`가 거절됐는지(`_client.Food`) 볼 것. 원인 미확인
+- `FeatureTests.TheEncounterWindowsDraw` "Her portrait is in the talk box." — `TalkMerchant`는 첫 줄의 이름(`상인 도라`)으로 `SpeakerOf`를 찾아 `merchant:…`가 돼야 한다. 이야기 인물에 같은 이름은 없다. 실제 `_root.TalkPortrait`·`TalkText`를 메시지에 넣어 볼 것(시작 자리가 마을 안인 것도 의심). 원인 미확인
+- `LayoutTests.TheBagAndHudFit` 667×375 "배너가 [메뉴] 판에 겹친다 (0,301,667,64) / (353,186,304,160)": `GameRoot.BannerRoom`이 양옆 기둥 사이 폭이 260보다 좁으면 가로지르는 것들 아래로 내리는데, 메뉴 판 아래(354)는 화면 밖이라 바닥(301)으로 잘려 메뉴 판에 겹친다. 고칠 방향: 아래로 못 내려가면 메뉴 판 옆(왼쪽) 자리를 쓰기. 휴대폰 가로에서 기둥 크기를 보고 정할 것(배치 고침, 화면 확인 필요)
+- `LayoutTests.TheFixedPartsKeepToTheSafeArea` 667×375 안전 영역 32 0 32 16, 스킬 1: "시간·장소 줄 / 구르기" 겹침. 오른쪽 기둥의 시간·장소 줄이 낮게 내려왔거나 구르기 단추가 올라왔다. 두 자리의 값을 보고 정할 것
+- `LayoutTests.TheGrowthScreensFit` 360×640 특성: "고른 점과 서랍이 하늘을 거의 다 덮는다 (84)"(기준 100). 휴대폰 세로의 특성 화면 서랍 높이
+- `TitleScreenTests.TheTestGroundsPanelAndHitLogDraw` "The hit log is on the screen." — `TestGround.DrawOverlay`가 머리줄만 그리는 경우(`bottom - top < headHeight`: 목표 줄·HUD가 길 때)나 창이 덮어 `Hide`된 경우. 로컬 Game 창 크기와 함께 볼 것
 
 ## 정해진 것 (2026-11-27, 추천대로)
 

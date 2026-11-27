@@ -78,6 +78,51 @@ namespace Game.Client.Tests
 
         Enemy Spawn(string monster, Vec2 at) => World.SpawnEnemy(_root.MonsterSheet.Find(monster), at);
 
+        // Out of the places onto open floor, floored round and cleared, as the web check's monster sections do (Playtest
+        // "goto wild", sweep.js clearRoom): a solo game starts inside the dawn village, and World.KeepOutOfPlaces sets a
+        // monster put there back to the safe ring's edge, off the screen, before it acts (the local run of 2026-11-27:
+        // the monster scenes found no marks, no mound and no names).
+        IEnumerator ToTheWild()
+        {
+            Playtest.Run(_root, "goto wild");
+            var (px, py) = Near(0, 0);
+            for (int dx = -6; dx <= 6; dx++)
+                for (int dy = -4; dy <= 4; dy++)
+                    if (dx != 0 || dy != 0) Lay((px + dx, py + dy, TileType.Floor));
+            Playtest.Run(_root, "clear");
+            yield return new WaitForSecondsRealtime(0.4f);
+        }
+
+        // Up to the void gear's level, wearing it, healed, as the web check's boss sections are (sweep.js bosses): bare at
+        // level 1 the boss's first blows knocked the player down four tiles off its home, it went back to sleep, and
+        // World.ForceAttack had no one it fights (the local run of 2026-11-27; a Core run of the same scenes forces both
+        // attacks of all four bosses this way).
+        void Toughen() => Playtest.Run(_root, "xp 2000000; equip void_sword void_helmet void_armor void_boots; heal");
+
+        // The things "scene places" lays, beside the player.
+        static readonly (int Dx, int Dy, TileType Type)[] PlaceThings =
+            { (-9, 3, TileType.Cottage), (-4, 3, TileType.Cabin), (1, 3, TileType.Well), (3, 3, TileType.LampPost), (3, 5, TileType.Crates) };
+
+        // "scene places" in the first of a biome's first four pack rooms (the player stands in the first) where every
+        // thing laid takes the biome's look, as the web check does (sweep.js places): each takes the look of the biome
+        // under it, so in a room by another biome's edge some take that one's (the local run of 2026-11-27: the ice
+        // cave's lamp post, the abyss's well).
+        IEnumerator PlacesInARoomOfItsOwn(string room, int look)
+        {
+            for (int n = 1; n <= 4; n++)
+            {
+                if (n > 1)
+                {
+                    Playtest.Run(_root, $"clear; goto room pack {room} {n}");
+                    yield return new WaitForSecondsRealtime(1.5f);
+                }
+                Playtest.Run(_root, "clear; scene places");
+                yield return new WaitForSecondsRealtime(1.5f);
+                int px = TileMap.Cell(_root.LocalClient.Position.X), py = TileMap.Cell(_root.LocalClient.Position.Y);
+                if (PlaceThings.All(t => _root.View.StandAt(px + t.Dx, py + t.Dy).Shape == look)) yield break;
+            }
+        }
+
         // Holding the attack against a ring of slimes: the combo's three steps, hit stars, knockback, hit-stop, and
         // the slimes striking back (the red edge of the screen).
         [UnityTest, Category(Screens.Category)]
@@ -598,6 +643,7 @@ namespace Game.Client.Tests
         public IEnumerator TheMadGeneralRisesAndGivesOrders()
         {
             yield return Start();
+            Toughen();
             var boss = World.Bosses.FirstOrDefault(b => b.Definition.Id == "mad_general");
             Assert.IsNotNull(boss, "No mad general.");
             Assert.AreEqual(BossEntrance.Kneel, boss.Definition.Arena.Entrance, "arenas.csv gives the general his own entrance.");
@@ -628,6 +674,7 @@ namespace Game.Client.Tests
         public IEnumerator TheCaveWardenWakesAndWindsUp()
         {
             yield return Start();
+            Toughen();
             var boss = World.Bosses.FirstOrDefault(b => b.Definition.Id == "cave_warden");
             Assert.IsNotNull(boss, "No cave warden.");
             Assert.AreEqual(BossEntrance.Awaken, boss.Definition.Arena.Entrance, "arenas.csv gives the warden its own entrance.");
@@ -658,6 +705,7 @@ namespace Game.Client.Tests
         public IEnumerator TheAntlionBurstsUpAndWindsUp()
         {
             yield return Start();
+            Toughen();
             var boss = World.Bosses.FirstOrDefault(b => b.Definition.Id == "antlion");
             Assert.IsNotNull(boss, "No antlion.");
             Assert.AreEqual(BossEntrance.Ambush, boss.Definition.Arena.Entrance, "arenas.csv gives the antlion its own entrance.");
@@ -688,6 +736,7 @@ namespace Game.Client.Tests
         public IEnumerator TheCrystalQueenHatchesAndWindsUp()
         {
             yield return Start();
+            Toughen();
             var boss = World.Bosses.FirstOrDefault(b => b.Definition.Id == "crystal_queen");
             Assert.IsNotNull(boss, "No crystal queen.");
             Assert.AreEqual(BossEntrance.Cocoon, boss.Definition.Arena.Entrance, "arenas.csv gives the queen its own entrance.");
@@ -718,6 +767,7 @@ namespace Game.Client.Tests
         public IEnumerator MonstersWarnAndStrikeFromTheSheet()
         {
             yield return Start();
+            yield return ToTheWild();
             Assert.IsNotEmpty(_root.MonsterSheet.Find("slime").Attacks, "No monster attacks: monster_attacks.csv was not read (Game > Set Up Main Scene).");
             World.MonstersHold = true;
             var slime = Spawn("slime", Player.Position + new Vec2(3.2f, 0));
@@ -800,6 +850,7 @@ namespace Game.Client.Tests
         public IEnumerator MonsterWarningsFillAsShapesAndLeavePools()
         {
             yield return Start();
+            yield return ToTheWild();
             World.MonstersHold = true;
             var shooter = Spawn("crystal_shooter", Player.Position + new Vec2(-5, 2.6f));
             var spore = Spawn("spore_shooter", Player.Position + new Vec2(-5, -2.6f));
@@ -1042,6 +1093,7 @@ namespace Game.Client.Tests
         public IEnumerator APackNoticesTogetherWithMarks()
         {
             yield return Start();
+            yield return ToTheWild();
             World.MonstersHold = true;
             var members = Enumerable.Range(0, 5).Select(i => Spawn("slime", Player.Position + new Vec2(6 + i * 1.3f, (i % 2 == 0 ? 1 : -1) * (i * 0.4f)))).ToList();
             foreach (var member in members) member.MaxHealth = member.Health = 5000;
@@ -1064,6 +1116,7 @@ namespace Game.Client.Tests
         public IEnumerator ElitesWearTheirNamesAndWarnOfTheirBigAttack()
         {
             yield return Start();
+            yield return ToTheWild();
             World.MonstersHold = true;
             var leader = World.MakeEliteHere(_root.MonsterSheet.Find("myconid"), Player.Position + new Vec2(4, 0.5f), EliteRank.Leader,
                 RiftAffix.Fire | RiftAffix.Guard, _root.MonsterSheet.Find("slime"), 3);
@@ -1088,6 +1141,7 @@ namespace Game.Client.Tests
         public IEnumerator EveryKindHasItsOwnAttacks()
         {
             yield return Start();
+            yield return ToTheWild();
             Assert.IsNotEmpty(_root.MonsterSheet.Find("abyss_stalker").Attacks, "No rows for the later monsters: monster_attacks.csv is old (Game > Set Up Main Scene).");
             World.MonstersHold = true;
             var scorpion = Spawn("sand_scorpion", Player.Position + new Vec2(-3.5f, 2));
@@ -1558,8 +1612,12 @@ namespace Game.Client.Tests
         public IEnumerator TheDirtCaveStandsItsPropsAndALampIsLit()
         {
             yield return Start();
+            // In a room of the dirt cave, as the web check (sweep.js biomes): the solo game starts inside the dawn village,
+            // whose bed is the hearth's (the local run of 2026-11-27: "Hearth", not "DirtCave").
+            Playtest.Run(_root, "monsters hold; clear; goto room pack cave 1");
+            yield return new WaitForSecondsRealtime(1.5f);
             var (px, py) = Near(0, 0);
-            Playtest.Run(_root, "monsters hold; scene biomes");
+            Playtest.Run(_root, "scene biomes");
             yield return new WaitForSecondsRealtime(1.5f);
             var view = _root.View;
             int props = 0;
@@ -1656,9 +1714,10 @@ namespace Game.Client.Tests
                     col += Structures.Footprint(kind.Type).W + 1;
                 }
                 yield return Screens.Take($"biomes-{room}");
-                Playtest.Run(_root, "clear; scene places");
-                yield return new WaitForSecondsRealtime(1.5f);
-                foreach (var (dx, dy, type) in new[] { (-9, 3, TileType.Cottage), (-4, 3, TileType.Cabin), (1, 3, TileType.Well), (3, 3, TileType.LampPost), (3, 5, TileType.Crates) })
+                yield return PlacesInARoomOfItsOwn(room, look);
+                px = TileMap.Cell(_root.LocalClient.Position.X);
+                py = TileMap.Cell(_root.LocalClient.Position.Y);
+                foreach (var (dx, dy, type) in PlaceThings)
                 {
                     var stand = view.StandAt(px + dx, py + dy);
                     Assert.AreEqual("Prop", stand.Kind, $"{type} stands apart from the floor");
@@ -1706,9 +1765,10 @@ namespace Game.Client.Tests
                     col += Structures.Footprint(kind.Type).W + 1;
                 }
                 yield return Screens.Take($"biomes-{room}");
-                Playtest.Run(_root, "clear; scene places");
-                yield return new WaitForSecondsRealtime(1.5f);
-                foreach (var (dx, dy, type) in new[] { (-9, 3, TileType.Cottage), (-4, 3, TileType.Cabin), (1, 3, TileType.Well), (3, 3, TileType.LampPost), (3, 5, TileType.Crates) })
+                yield return PlacesInARoomOfItsOwn(room, look);
+                px = TileMap.Cell(_root.LocalClient.Position.X);
+                py = TileMap.Cell(_root.LocalClient.Position.Y);
+                foreach (var (dx, dy, type) in PlaceThings)
                 {
                     var stand = view.StandAt(px + dx, py + dy);
                     Assert.AreEqual("Prop", stand.Kind, $"{type} stands apart from the floor");
@@ -1761,9 +1821,10 @@ namespace Game.Client.Tests
                     col += Structures.Footprint(kind.Type).W + 1;
                 }
                 yield return Screens.Take($"biomes-{room}");
-                Playtest.Run(_root, "clear; scene places");
-                yield return new WaitForSecondsRealtime(1.5f);
-                foreach (var (dx, dy, type) in new[] { (-9, 3, TileType.Cottage), (-4, 3, TileType.Cabin), (1, 3, TileType.Well), (3, 3, TileType.LampPost), (3, 5, TileType.Crates) })
+                yield return PlacesInARoomOfItsOwn(room, look);
+                px = TileMap.Cell(_root.LocalClient.Position.X);
+                py = TileMap.Cell(_root.LocalClient.Position.Y);
+                foreach (var (dx, dy, type) in PlaceThings)
                 {
                     var stand = view.StandAt(px + dx, py + dy);
                     Assert.AreEqual("Prop", stand.Kind, $"{type} stands apart from the floor");

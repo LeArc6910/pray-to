@@ -1302,6 +1302,10 @@ DevTools/Local/setup.sh --commit
   - PlayMode `Screens` 사진 열다섯 장이 `local-screens`에 올라오는지: `shots-elements`·`shots-ends`·`foretold-single-aim`·`mobwarn-together`·`mobwarn-pools`·`blast-ball`·`blast-smoke`·`hazard-warnings`·`hazard-blows`·`hazard-scars`·`bossfx-queen`·`bossfx-general`·`bossfx-elements`·`hits-elements`·`hits-numbers`
   - F3에는 새 `.cs` 파일이 없다(통신 0.114.0, 시트 `item_bases.csv`의 `tint` 넷)
   - (사람) `Docs/HumanChecklist.md` 7절 "이펙트 개편 마무리"
+- [ ] 200단계: 다시 돌려 확인 — 2026-11-27 21:49 보고의 PlayMode 실패 19개 중 시험 쪽 원인을 고친 열하나(`Docs/EffectsRework.md` 17절)
+  - 명령 한 줄을 다시 돌린다(`-NoPull` 없이, 새 파일 없음). 다음이 통과하는지 결과 보고에 적는다: `FeatureTests`의 `MonstersWarnAndStrikeFromTheSheet`·`MonsterWarningsFillAsShapesAndLeavePools`·`APackNoticesTogetherWithMarks`·`ElitesWearTheirNamesAndWarnOfTheirBigAttack`·`EveryKindHasItsOwnAttacks`(들판으로 가서 놓는다), `TheMadGeneralRisesAndGivesOrders`·`TheCaveWardenWakesAndWindsUp`·`TheAntlionBurstsUpAndWindsUp`·`TheCrystalQueenHatchesAndWindsUp`(공허 장비를 입고 싸운다), `TheDirtCaveStandsItsPropsAndALampIsLit`(흙 동굴의 방에서), `TheIceAndSandCavesStandTheirPropsAndThePlacesTakeTheirLooks`·`TheLavaZoneAndTheAbyssStandTheirPropsAndThePlacesTakeTheirLooks`(생물군계가 방 전체를 덮는 방에서)
+  - **실패하면 메시지만이 아니라 Console 로그(그 시험의 전체 메시지와 스택, 앞뒤의 경고·에러)까지** 결과 보고에 붙인다. 고치지 않은 여덟(`RumoursAndSlowRest`, `TheBagAndHudDraw`, `TheEncounterWindowsDraw`, 배치 셋, `TheTestGroundsPanelAndHitLogDraw`)도 실패하면 전체 메시지(여러 줄)와 Console 로그를 붙인다. 지난 보고는 첫 줄만 있어 원인을 다 볼 수 없었다(`Docs/NextTasks.md`)
+  - 감시(`watch.ps1 -Install`)가 켜져 있는지 본다: 11-11 뒤 결과 보고가 11-27 손 실행 한 번뿐이고 `origin`에 `local-screens` 브랜치가 없다
 
 ## 결과 보고
 

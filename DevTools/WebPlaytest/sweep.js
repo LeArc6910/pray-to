@@ -3071,7 +3071,10 @@ async function bossfx(browser) {
     }
     await game.send('warn clear; fxhold 0.14; ' + blowsAt(blows, 0.9) + '; warn land');
     await game.wait(300);
-    const st = await game.state();
+    // A heavy landing holds the picture still for a moment (hit-stop: the knight's hammer, up to 0.23 s and longer
+    // at a headless frame rate). Nothing is drawn while it holds, so the pieces of the last frame drawn are still
+    // those from before the blow (0) though the effects are laid. Read the first frame drawn with them (F4).
+    const st = await pollState(game, t => t.bossFx >= blows.length && t.bossFxPieces > 0, 3000);
     check(st.bossFx >= blows.length, `${Names[key]}: 타격마다 고유 이펙트가 놓인다 (${st.bossFx}개, 타격 ${blows.length})`);
     check(st.bossFxPieces > 0 && st.bossFxPieces <= 72, `${Names[key]}: 이펙트 하나의 조각이 한도 안 (${st.bossFxPieces}조각, 한도 72)`);
     check(st.skillFxLights <= 12, `${Names[key]}: 바닥 빛이 화면 한도 안 (${st.skillFxLights}개, 한도 12)`);

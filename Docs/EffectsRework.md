@@ -185,7 +185,9 @@ E1~E7과 F1(14절)·F2(15절)·F3(16절)이 끝났다. 정말 남은 것만 적�
 - 거미 어미·발두인·광맥 포식자의 한 개짜리 잔 먼지와 독·체액 점(`Kick`): 눈에 띄는 것만 조각으로 바꿨다(16절). 독 색의 원소 램프가 없어 독은 사각 점 그대로다
 - 화염구에 맞은 몸의 불 타격: 이미 폭발 위에 그려진다(타격 조각은 스킬 조각 뒤에 놓여 정렬 순서가 더 높다). 사진에서 구분되지 않는 것은 불 위의 불이라 색이 같아서다. 차례·자리는 그대로 둔다(맞았다는 것은 피해 숫자와 몸의 번쩍임이 알린다)
 
-**로컬 감시가 돌아야 되는 것**(`LOCAL_TASKS.md` 199단계): PlayMode 사진 열다섯 장과 새 `.cs`의 `.meta`
+**로컬 감시가 돌아야 되는 것**(`LOCAL_TASKS.md` 199단계): PlayMode 사진 열다섯 장과 새 `.cs`의 `.meta`. 고친 PlayMode 시험의 다시 돌리기는 200단계(17절). 감시는 돌고 있지 않은 것으로 보인다(11-11 뒤 결과 보고가 11-27 손 실행 한 번뿐이고 `origin`에 `local-screens`가 없다)
+
+**이펙트와 무관하게 남은 것**(17절, `Docs/NextTasks.md`): PlayMode 실패 여덟(소문 목표 줄, 음식 버프 아이콘, 상인 초상화, 배치 셋, 시험판 맞은 기록)
 
 **사람만 알 수 있는 것**(`Docs/HumanChecklist.md` 7절): 타격의 손맛, 여왕 필살기 때 방이 어두워지는 정도, 모르그 불 고리가 과하지 않은지, 섬광·도형 착지·굵어진 조준선이 과하지 않은지, 휴대폰에서의 프레임 느낌
 
@@ -226,3 +228,13 @@ E1~E7과 F1(14절)·F2(15절)·F3(16절)이 끝났다. 정말 남은 것만 적�
 - **확인한 것**: `bossfx`의 흑백 표 다섯(돌·여왕·모르그·개미귀신·원소)을 열어 봤다. 예고(흰 면과 테)와 타격(밝은 심·조각)은 모두 읽힌다. 공허의 장판 타격은 가운데 회색이지만 모양은 읽힌다. `hitfx` 흑백 표에서 공허 덩이가 전보다 밝다
 - **웹 점검의 확인**: `shots`의 보스 사방 사격은 깨어 있는 보스가 제 공격을 이어 하는 것과 겹치지 않게(탄이 없고 예고 중이 아닐 때 시키고, 쏜 뒤의 조준선은 다음 예고의 것이면 센다), 파고들기의 조준선(`landAims`·`landAimAway`, 사진 `shots-burrow-aim`), `mobwarn`의 걷는 대상을 따라가는 조준선(사진 `mobwarn-aim-follows`), `bossfx`의 광맥 포식자·발두인을 제 공격 이름으로(`vein`·`knight`)
 - **시험**: `AimTests`에 넷(파고들기·지진·도약의 각도와 자리, 바위 없는 도약)
+
+## 17. 마무리 F4 (2026-11-27)
+
+- **웹 점검 `bossfx`의 발두인 "조각이 한도 안" 0조각**: 게임이 아니라 점검이 읽는 시점이었다. 발두인의 착지(`WorldView.Knight.cs` `Impact`, 0.23초까지)는 화면 멈춤을 건다. 멈춘 동안 `WorldView.Render`가 일찍 돌아가 `DrawBossFx`가 돌지 않으므로, 이펙트 18개는 놓였는데 조각 수는 착지 전 프레임의 0으로 남는다. 헤드리스의 낮은 프레임에서 멈춤이 0.25~0.47초여서 300ms 읽기와 겹쳤다(배포본에서 `feel hitstop off`면 처음부터 18개·28조각). `sweep.js`가 이펙트가 놓이고 조각이 그려진 첫 프레임을 기다려 읽는다. 확인 식(`> 0 && <= 72`)은 그대로
+- **로컬 PlayMode 실패 19개**(`LOCAL_TASKS.md` 2026-11-27 21:49 보고). 이펙트 개편이 화면을 틀리게 만든 것은 없었다(개편은 UI·HUD·배치 코드를 건드리지 않았다). 시험 쪽 원인 셋을 고쳤다(확인 식은 그대로, 웹 점검이 이미 쓰는 방법을 따랐다):
+  - **마을 안에서 몬스터를 놓음**(다섯: `MonstersWarnAndStrikeFromTheSheet`, `MonsterWarningsFillAsShapesAndLeavePools`, `APackNoticesTogetherWithMarks`, `ElitesWearTheirNamesAndWarnOfTheirBigAttack`, `EveryKindHasItsOwnAttacks`): 혼자 하기는 새벽 마을 안에서 시작하고 `World.KeepOutOfPlaces`가 몬스터를 장소 밖으로 밀어낸다. 도우미 `ToTheWild`(`goto wild`, 둘레 바닥, `clear`)를 먼저 부른다. 근거: 배포본에서 시작 자리 0개 / 들판 기대값, dotnet 재현에서 들판의 무리는 0.45초에 알아채고 다섯 모두 Idle이 아니며 전갈은 묻혀 있다
+  - **맨몸 1레벨이 보스에게 죽음**(넷: 모르그·동굴 수호자·개미귀신·수정 거미 여왕의 장면): 보스의 첫 타격에 쓰러져 보스가 잠들고 `ForceAttack`이 false. 웹 점검의 보스 구역처럼 `Toughen`(`xp 2000000; equip` 공허 장비 넷; `heal`). 근거: dotnet 재현에서 맨몸은 넷 모두 false, 이렇게 하면 넷 모두 두 공격이 true
+  - **장소·방을 잘못 고름**(셋): `TheDirtCaveStandsItsPropsAndALampIsLit`는 마을 안이라 환경음이 `Hearth`(6글자)였다 → 웹 점검처럼 `goto room pack cave 1`에서. 얼음(`LampPost`)·심연(`Well`)은 장소의 것이 그 칸 아래 생물군계의 모습을 따르므로 다른 생물군계 가장자리의 방에서 하나가 다른 모습이었다 → 웹 점검(`places`)처럼 앞 방 넷 중 다 그 모습인 방에서(`PlacesInARoomOfItsOwn`)
+- **남은 여덟**(이펙트 무관, 원인 미확인이거나 배치, `Docs/NextTasks.md`): `RumoursAndSlowRest`, `TheBagAndHudDraw`, `TheEncounterWindowsDraw`, `LayoutTests` 셋, `TitleScreenTests.TheTestGroundsPanelAndHitLogDraw`
+- **확인**: PlayMode는 클라우드에서 돌릴 수 없어 컴파일만 확인했다(`UnityCompileCheck`가 PlayMode 시험을 담는다). 다시 돌리기는 `LOCAL_TASKS.md` 200단계
