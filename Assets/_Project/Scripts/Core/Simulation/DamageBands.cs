@@ -242,6 +242,11 @@ namespace Game.Core
         // The band above's full set (NaN in the last band), and the band's set with health put in (HitTable.TankHealth).
         public float Above { get; internal set; }
         public float Tank { get; internal set; }
+        // The band's better gear (Docs/Gear.md, HitTable.WearingBetter): a hunting set, that with the elites' uniques in,
+        // and that with the boss pieces worn in the band (NaN where the band has none). Stats only, not effects.
+        public float Crafted { get; internal set; }
+        public float Elite { get; internal set; }
+        public float BossGear { get; internal set; }
 
         public DamageBands.Target Target => DamageBands.TargetOf(Kind);
         public float Gate => float.IsNaN(Below) ? float.NaN : Below / Geared;
@@ -276,6 +281,14 @@ namespace Game.Core
                 return tanks[(level, gear)] = PlayerStats.From(Wearing(loot, gear), level: level,
                     blessing: new[] { new Modifier(StatType.MaxHealth, ModifierKind.Flat, extra) });
             }
+            var better = new Dictionary<(int Level, int Band, int Step), PlayerStats>();
+            PlayerStats Better(int level, int band, int step)
+            {
+                if (better.TryGetValue((level, band, step), out var known)) return known;
+                var worn = WearingBetter(loot, band, step);
+                return better[(level, band, step)] = worn == null ? null : PlayerStats.From(worn, level: level);
+            }
+            float Share(PlayerStats stats, float raw, int band, HitKind kind) => stats == null ? float.NaN : DamageBands.Taken(raw, stats.Armor, band, kind) / stats.MaxHealth;
             PlayerStats Player(int level, int gear)
             {
                 if (players.TryGetValue((level, gear), out var known)) return known;
@@ -304,6 +317,9 @@ namespace Game.Core
                     Geared = DamageBands.Taken(raw, geared.Armor, band, kind) / geared.MaxHealth,
                     Above = above == null ? float.NaN : DamageBands.Taken(raw, above.Armor, band, kind) / above.MaxHealth,
                     Tank = DamageBands.Taken(raw, tank.Armor, band, kind) / tank.MaxHealth,
+                    Crafted = Share(Better(level, band, 1), raw, band, kind),
+                    Elite = Share(Better(level, band, 2), raw, band, kind),
+                    BossGear = Share(Better(level, band, 3), raw, band, kind),
                 });
             }
 
@@ -348,6 +364,40 @@ namespace Game.Core
                 Add(DamageBands.Bands, DamageBands.LevelOf(DamageBands.Bands), "균열", monster.Name, "1단계 보통 한 방", HitKind.Normal, true,
                     monster.Damage * DamageBands.UsualPercent(monster) / 100f * World.RiftPowerAt(1, monster));
             return rows;
+        }
+
+        static Item Middle(ItemBase itemBase) => new Item(itemBase, itemBase.Level, itemBase.IsLegendary ? Rarity.Legendary : Rarity.Common,
+            itemBase.Implicits.Select(r => new Modifier(r.Stat, r.Kind, (r.Min + r.Max) / 2, r.Tags)).ToList(), Array.Empty<ItemAffix>(), 0);
+
+        static int BandOfGear(ItemBase itemBase) => DamageBands.BandOfLevel(Math.Min(itemBase.Level, 40));
+
+        static float Guard(ItemBase itemBase) => itemBase.Implicits.Where(m => m.Kind == ModifierKind.Flat && m.Tags == SkillTag.None)
+            .Sum(m => m.Stat == StatType.Armor ? 2 * (m.Min + m.Max) : m.Stat == StatType.MaxHealth ? m.Min + m.Max : 0);
+
+        // The band's better gear at the middle of its rolls (Docs/Gear.md): step 1 its sturdiest hunting set (six pieces
+        // and the set's bonuses), step 2 that with the band's elite uniques where they guard more, step 3 that with the
+        // boss pieces worn in the band (the bosses of the band below) where they guard more. Null where there is none.
+        public static Equipment WearingBetter(LootData loot, int band, int step)
+        {
+            var set = loot.Sets.Where(s => loot.Bases.Any(b => b.Set == s && !b.IsLegendary && BandOfGear(b) == band))
+                .OrderByDescending(s => loot.Bases.Where(b => b.Set == s).Sum(Guard)).FirstOrDefault();
+            if (set == null) return null;
+            var equipment = new Equipment();
+            foreach (var piece in loot.Bases.Where(b => b.Set == set)) equipment.Equip(Middle(piece));
+            var swaps = new List<ItemBase>();
+            if (step >= 2) swaps.AddRange(loot.Bases.Where(b => b.IsEliteUnique && BandOfGear(b) == band));
+            if (step >= 3)
+            {
+                var boss = loot.Bases.Where(b => b.IsLegendary && !b.IsEliteUnique && b.Legendary != "rift" && BandOfGear(b) == band).ToList();
+                if (boss.Count == 0) return null;
+                swaps.AddRange(boss);
+            }
+            foreach (var swap in swaps.OrderBy(Guard))
+            {
+                if (swap.Slot == ItemSlot.Weapon || Guard(swap) <= Guard(equipment[swap.Slot].Base)) continue;
+                equipment.Equip(Middle(swap));
+            }
+            return equipment;
         }
 
         // The band's full common set at the middle of its rolls, rounded down (sword, helmet, chest, boots, ring, amulet); 0 for none.
