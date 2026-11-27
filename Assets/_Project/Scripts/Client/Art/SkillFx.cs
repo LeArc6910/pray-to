@@ -685,7 +685,12 @@ namespace Game.Client
                     // The string let go: air drawn to the bow, a glint, streaks thrown forward (up and forward for the rain).
                     Gather(o, m, t, strong ? 0.1f : 0.05f, strong ? 18 : 10, strong ? 10 : 5, seed, hx, hy);
                     if (In(t, 0.03f, 0.14f)) Put(o, FxShape.Glint, skill == "explosive_arrow" ? FxRamp.Fire : FxRamp.Gold, strong ? 9 : 7, t < 0.09f ? 1 : 0, hx, hy);
-                    if (strong) Ring(o, m, t, 0.08f, 10, 1, 0.06f, 0.18f, hx, hy);
+                    if (strong)
+                    {
+                        Ring(o, m, t, 0.08f, 10, 1, 0.06f, 0.18f, hx, hy);
+                        FxLayers.Shock(o, m, t, 0.08f, 12, hx, hy, 0.2f);
+                        FxLayers.Embers(o, FxRamp.Gold, 5, t, 0.08f, 14, seed, hx, hy, 90, face + 180, 0.2f);
+                    }
                     Fly(o, FxShape.Streak, m, strong ? 10 : 7, 1, skill == "arrow_rain" ? 8 : strong ? 6 : 5, t, 0.04f, 0.2f, 4, strong ? 22 : 16, seed,
                         cx: hx, cy: hy, aimed: true, cone: skill == "arrow_rain" ? 100 : strong ? 40 : 70, toward: face, rise: skill == "arrow_rain" ? 8 : 0);
                     return 0.3f;
@@ -701,6 +706,8 @@ namespace Game.Client
                     }
                     if (In(t, 0.26f, 0.42f)) Put(o, FxShape.Glint, FxRamp.Gold, 9, t < 0.36f ? 2 : 0, (float)Math.Cos(c.Dir) * 2, 14);
                     Float(o, FxShape.Dot, FxRamp.Gold, 1, 2, 5, t, 0.4f, 0.75f, 9, 12, seed, cy: 10);
+                    FxLayers.Embers(o, FxRamp.Gold, 4, t, 0.28f, 11, seed, 0, 14, life: 0.2f);
+                    if (In(t, 0.24f, 0.5f)) FxLayers.Light(o, FxRamp.Gold, 30, 0.6f * (1 - U(t, 0.36f, 0.5f)), 0, 10);
                     return 0.75f;
                 }
 
@@ -981,12 +988,20 @@ namespace Game.Client
                     break;
                 }
                 case "volley":
-                    Put(o, FxShape.Streak, m, 20, 1, -dx * 15, -dy * 15, 0.85f, face);
+                    // A long thin streak and a short bright one close behind the arrow.
+                    Put(o, FxShape.Streak, m, 24, 1, -dx * 18, -dy * 18, 0.7f, face);
+                    Put(o, FxShape.Streak, m, 10, 2, -dx * 9, -dy * 9, 0.9f, face);
                     Put(o, FxShape.Arrow, m, 11, 0, 0, 0, 1, face);
                     break;
                 case "power_shot":
                     // A long bright streak and air winding round it.
+                    Put(o, FxShape.Streak, m, 36, 2, -dx * 30, -dy * 30, 0.6f, face);
                     Put(o, FxShape.Streak, m, 28, 3, -dx * 18, -dy * 18, 0.9f, face);
+                    for (int k = 0; k < 3; k++)
+                    {
+                        float phase = Frac(t * 5 + k / 3f);
+                        Put(o, FxShape.Ember, FxRamp.Gold, 3, phase < 0.5f ? 0 : 1, -dx * (10 + phase * 22) - dy * (k - 1) * 3, -dy * (10 + phase * 22) + dx * (k - 1) * 3, 1 - phase, face);
+                    }
                     for (int k = 1; k <= 5; k++)
                     {
                         float back = 5 + k * 5, aside = (float)Math.Sin(k * 1.4 - t * 40) * 4;
@@ -1001,6 +1016,13 @@ namespace Game.Client
                     // Its charge blinks.
                     bool lit = ((int)(t * 12) & 1) == 0;
                     Put(o, FxShape.Dot, FxRamp.Fire, lit ? 3 : 2, lit ? 3 : 1, dx * 5, dy * 5);
+                    // Sparks off the fuse, and its small light on the floor.
+                    for (int k = 0; k < 2; k++)
+                    {
+                        float phase = Frac(t * 6 + k / 2f);
+                        Put(o, FxShape.Ember, FxRamp.Fire, 3, phase < 0.5f ? 0 : 1, dx * 3 - dx * phase * 12 - dy * (k * 4 - 2) * phase, dy * 3 - dy * phase * 12 + dx * (k * 4 - 2) * phase + 3 * phase, 1 - phase, face);
+                    }
+                    FxLayers.Light(o, FxRamp.Fire, 12, lit ? 0.5f : 0.35f, 0, -6);
                     break;
                 }
                 case "arrow_rain":
@@ -1075,19 +1097,26 @@ namespace Game.Client
                     return FxLayers.Blast(o, t, R, FxRamp.Fire, seed, embers: 16, rubble: 6, linger: 1.38f);
                 }
                 case "volley":
+                    // A small star where it strikes, chips thrown back off it, a puff of dust.
+                    if (In(t, 0, 0.06f)) Put(o, FxShape.Glint, m, 5, 1, 0, 0);
                     Puffs(o, FxRamp.Dust, 1, t, 0, 0.3f, 0, 2, seed, 5, 0.5f);
-                    Fly(o, FxShape.Dot, m, 1, 2, 3, t, 0, 0.2f, 1, 7, seed);
+                    FxLayers.Embers(o, m, 4, t, 0, 8, seed, 0, 0, 150, face + 180, 0.16f);
                     return 0.3f;
                 case "power_shot":
-                    if (In(t, 0, 0.07f)) Put(o, FxShape.Glint, FxRamp.Gold, 9, 2, 0, 0);
+                    // It goes in hard: a star, a wave, gold sparks sprayed on past, dust.
+                    if (In(t, 0, 0.08f)) Put(o, FxShape.Glint, FxRamp.Gold, 11, 2, 0, 0);
                     Ring(o, FxRamp.Steel, t, 0, 7, 1, 0.05f, 0.15f);
-                    Fly(o, FxShape.Streak, FxRamp.Gold, 6, 1, 6, t, 0, 0.2f, 2, 15, seed, aimed: true, cone: 110, toward: face);
-                    return 0.26f;
+                    FxLayers.Shock(o, FxRamp.Gold, t, 0, 11, life: 0.22f);
+                    Fly(o, FxShape.Streak, FxRamp.Gold, 6, 1, 5, t, 0, 0.2f, 2, 15, seed, aimed: true, cone: 110, toward: face);
+                    FxLayers.Embers(o, FxRamp.Gold, 8, t, 0, 17, seed, 0, 0, 120, face, 0.22f);
+                    Puffs(o, FxRamp.Dust, 2, t, 0.04f, 0.36f, 1, 6, seed, 5, 0.45f, rise: 3);
+                    return 0.4f;
                 case "arrow_rain":
                     // The arrow stands in the ground a moment in a puff of dust.
                     if (In(t, 0, 0.5f)) Put(o, FxShape.Arrow, m, 11, 0, 1, 3, t < 0.3f ? 1 : 1 - U(t, 0.3f, 0.5f), -65);
                     Ring(o, FxRamp.Dust, t, 0, 5, 1, 0.05f, 0.18f, ground: true);
                     Puffs(o, FxRamp.Dust, 2, t, 0, 0.35f, 1, 5, seed, 4, 0.5f, rise: 3);
+                    FxLayers.Embers(o, FxRamp.Dust, 3, t, 0, 7, seed, 0, 0, 160, 90, 0.18f);
                     return 0.5f;
                 case "chain_lightning":
                     if (In(t, 0, 0.14f) && (int)(t * 40) % 3 != 2)
