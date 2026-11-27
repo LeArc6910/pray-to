@@ -1283,6 +1283,7 @@ DevTools/Local/setup.sh --commit
 - [ ] 195단계: 개미귀신(둘째 보스) 새 그림과 패턴 — Retro Diffusion 개미지옥 애벌레의 다섯 시점, 공격마다 몸 전체의 전조 자세와 모래 이펙트, 굴 바닥에서 솟는 입장(`arenas.csv` `Ambush`)(`Docs/Bosses.md` 개미귀신 제 그림과 몸짓)
   - 명령 한 줄을 다시 돌린다. 새 파일 `Client/Art/AntlionArt.cs`, `Client/Art/AntlionArt.Rows.cs`, `Client/WorldView.Antlion.cs`의 `.meta`가 생기면 커밋한다(`DevTools/ArtPreview/AntlionMotions.cs`는 DevTools라 없음). 새 PlayMode 사진 `antlion-buried`·`entrance-antlion`·`antlion-bite-windup`·`antlion-sinkholes-windup`(`TheAntlionBurstsUpAndWindsUp`)
   - (클라우드 웹 점검) `sweep.js --only antlion`, `--only arenas`
+  - 클라우드 확인 (2026-11-27, `f88635a` 배포, `9da588b` 포함): [x] `antlion`·`arenas` 106개 모두 통과(입장 이름 카드, 공격 열의 바닥 표시, 함몰에만 경고 표지, 3페이즈, 아레나 열두 곳과 입장 여섯). 사진에서 굴에서 솟는 개미귀신, 턱 벌린 전조, 모래 소용돌이, 함몰의 경고 표지가 보인다
   - (사람) `Docs/HumanChecklist.md`의 개미귀신
 - [ ] 196단계: 수정 거미 여왕 새 그림과 패턴 — Retro Diffusion 결정 거미의 다섯 시점, 공격마다 몸 전체의 전조 자세와 결정 이펙트, 결정 고치가 깨지는 입장(`arenas.csv` `Cocoon`), 결정이 깨지는 쓰러짐, 새끼 수정 거미(`Docs/Bosses.md` 수정 거미 여왕 제 그림과 몸짓)
   - 명령 한 줄을 다시 돌린다. 새 파일 `Client/Art/CrystalQueenArt.cs`, `Client/WorldView.CrystalQueen.cs`의 `.meta`가 생기면 커밋한다(`DevTools/ArtPreview/CrystalQueenMotions.cs`는 DevTools라 없음). 새 PlayMode 사진 `queen-cocoon`·`entrance-queen`·`queen-prism-windup`·`queen-brood-windup`(`TheCrystalQueenHatchesAndWindsUp`)
