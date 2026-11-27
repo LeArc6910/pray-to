@@ -487,10 +487,12 @@ namespace Game.Core
         // where the hit came from, unless a spirit struck it (spirits strike often and would keep it from ever
         // reaching anyone) or lightning jumped to it. Then the elements do their part (World.Elements.cs).
         void HitEnemy(Player player, Enemy enemy, float damage, bool critical, Vec2 from, SkillTag tags, int cause = 0, bool knockback = true,
-            bool chained = false, float push = 1)
+            bool chained = false, float push = 1, bool thorns = false)
         {
             // One under the ground is out of reach; a guard turns most of a blow from its front (World.MonsterAttacks.cs).
             if (enemy.IsDead || enemy.Away) return;
+            // Gear's effects (World.GearEffects.cs); a blow given back by thorns is not grown again.
+            if (!thorns) damage *= GearDealt(player, enemy.Health, enemy.MaxHealth, enemy.Afflictions);
             int amount = Combat.Mitigate(damage * ElementFactor(enemy.Definition, tags) * TakenShare(enemy, from), enemy.Definition.Armor);
             enemy.Health -= amount;
             enemy.LastTags = tags;
@@ -503,17 +505,22 @@ namespace Game.Core
             {
                 _events.Add(new SimEvent(SimEventType.Died, enemy.Id));
                 DropFrom(enemy, player);
+                GearKill(player);
             }
+            else if (!thorns) GearAfterHit(player, enemy.Afflictions, amount, critical);
             Afflict(player, enemy, tags, amount, damage, critical, cause, chained);
             if (enemy.IsDead && (tags & SkillTag.Lightning) != 0 && !chained) Chain(player, enemy.Id, enemy.Position, damage, critical, tags, cause);
         }
 
         // A boss takes the hit less its armor, burns, and passes lightning on; an invulnerable one takes nothing.
-        void HitBoss(Player player, Boss boss, float damage, bool critical, SkillTag tags, int cause = 0)
+        void HitBoss(Player player, Boss boss, float damage, bool critical, SkillTag tags, int cause = 0, bool thorns = false)
         {
             if (boss.IsDead || boss.Invulnerable) return;
+            if (!thorns) damage *= GearDealt(player, boss.Health, boss.MaxHealth, boss.Afflictions);
             int amount = Combat.Mitigate(damage, boss.Definition.Armor);
             DamageBoss(boss, player.Id, amount, critical, cause);
+            if (boss.IsDead) GearKill(player);
+            else if (!thorns) GearAfterHit(player, boss.Afflictions, amount, critical);
             Leech(player, cause, amount);
             AfflictBoss(player, boss, tags, amount, damage, critical, cause);
         }

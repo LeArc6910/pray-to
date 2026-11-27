@@ -99,6 +99,34 @@ namespace Game.Core
             return new LootData(bases, affixes, runes, runewords, consumables, materials, recipes, errors) { Sets = sets };
         }
 
+        static IReadOnlyList<Modifier> ClassBonusOf(CsvRow row)
+        {
+            var bonus = FixedModifiers(row["class_bonus"]);
+            if (bonus.Count > 0 && row["class"].Length == 0) throw new FormatException("class_bonus는 class(클래스 id)와 함께 씁니다.");
+            return bonus;
+        }
+
+        // "cave_beetle:20|big_beetle:50": monster ids and the percent each drops one.
+        static IReadOnlyList<(string, int)> DropsOf(string cell)
+        {
+            if (cell.Length == 0) return Array.Empty<(string, int)>();
+            return cell.Split('|').Select(part =>
+            {
+                var pieces = part.Split(':');
+                if (pieces.Length != 2 || !SheetValues.IsValidId(pieces[0])) throw new FormatException($"drops '{part}'는 '몬스터id:확률'로 적습니다.");
+                int chance = SheetValues.ParseNumber(pieces[1], "drops");
+                if (chance < 1 || chance > 100) throw new FormatException("drops의 확률은 1~100입니다.");
+                return (pieces[0], chance);
+            }).ToList();
+        }
+
+        static string TintOf(string tint)
+        {
+            if (tint.Length == 0) return "";
+            if (tint.Length != 7 || tint[0] != '#' || !tint.Skip(1).All(Uri.IsHexDigit)) throw new FormatException($"tint '{tint}'는 #RRGGBB로 적습니다.");
+            return tint;
+        }
+
         // One row per threshold: the set's id, its name on the first row, how many pieces, and what they give.
         static List<GearSet> ParseSets(string csv, List<string> errors)
         {
@@ -120,7 +148,9 @@ namespace Game.Core
                     }
                     int pieces = SheetValues.ParseNumber(row["pieces"], "pieces");
                     if (pieces < 2) throw new FormatException("pieces는 2 이상이어야 합니다.");
-                    set.Bonuses.Add((pieces, FixedModifiers(row["modifiers"])));
+                    var classBonus = FixedModifiers(row["class_bonus"]);
+                    if (classBonus.Count > 0 && row["class"].Length == 0) throw new FormatException("class_bonus는 class(클래스 id)와 함께 씁니다.");
+                    set.Bonuses.Add(new GearSetBonus(pieces, FixedModifiers(row["modifiers"]), GearEffect.ParseList(row["effects"]), row["class"], classBonus));
                 });
             }
             return sets;
@@ -160,7 +190,14 @@ namespace Game.Core
                         tool,
                         legendary,
                         chance,
-                        require) { SetId = row["set"] });
+                        require)
+                    {
+                        SetId = row["set"],
+                        Effects = GearEffect.ParseList(row["effects"]),
+                        ClassId = row["class"],
+                        ClassBonus = ClassBonusOf(row),
+                        Tint = TintOf(row["tint"]),
+                    });
                 });
             }
             return bases;
@@ -312,7 +349,7 @@ namespace Game.Core
                         _ => throw new FormatException($"quality는 비우거나 yes입니다: '{row["quality"]}'"),
                     };
                     materials.Add(new MaterialDefinition(NewId(row, materials.Select(m => m.Id)), Required(row, "name"), places, row["description"], fish, fuel,
-                        atNight, pot) { HasQuality = quality });
+                        atNight, pot) { HasQuality = quality, Drops = DropsOf(row["drops"]) });
                 });
             }
             // Silver and gold kinds of each that has quality, after all the sheet's, so the sheet's own keep their

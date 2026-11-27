@@ -98,6 +98,8 @@ namespace Game.Core
         public SkillTag AttackTags { get; }
         // Tags buffs add to every attack and skill.
         public SkillTag GrantedTags { get; }
+        // What the worn gear and its sets do besides their stats (Docs/Gear.md).
+        public GearEffects Effects { get; private set; } = GearEffects.None;
         public float MaxHealth { get; }
         // Per second.
         public float HealthRegen { get; }
@@ -157,11 +159,26 @@ namespace Game.Core
                 sheet.Add(new Modifier(StatType.MaxHealth, ModifierKind.Flat, Leveling.HealthAt(level)));
                 sheet.Add(new Modifier(StatType.Damage, ModifierKind.More, Leveling.DamageAt(level)));
             }
-            foreach (var item in equipment.Items) sheet.Add(item.Modifiers());
-            // Sets: what so many pieces worn together give.
-            foreach (var worn in equipment.Items.Where(i => i.Base.Set != null).GroupBy(i => i.Base.Set)) sheet.Add(worn.Key.BonusFor(worn.Count()).ToList());
-            if (food != null) sheet.Add(food.Buff);
             var picked = (classes ?? Enumerable.Empty<ClassDefinition>()).ToList();
+            var effects = new List<GearEffect>();
+            foreach (var item in equipment.Items)
+            {
+                sheet.Add(item.Modifiers());
+                effects.AddRange(item.Base.Effects);
+                // A piece made for one class gives that class more (class, class_bonus).
+                if (item.Base.ClassBonus.Count > 0 && picked.Any(c => c.Id == item.Base.ClassId)) sheet.Add(item.Base.ClassBonus);
+            }
+            // Sets: what so many pieces worn together give, and the more a set's class gets.
+            foreach (var worn in equipment.Items.Where(i => i.Base.Set != null).GroupBy(i => i.Base.Set))
+            {
+                foreach (var bonus in worn.Key.ActiveBonuses(worn.Count()))
+                {
+                    sheet.Add(bonus.Modifiers);
+                    effects.AddRange(bonus.Effects);
+                    if (bonus.ClassBonus.Count > 0 && picked.Any(c => c.Id == bonus.ClassId)) sheet.Add(bonus.ClassBonus);
+                }
+            }
+            if (food != null) sheet.Add(food.Buff);
             float share = ClassRules.PassiveShare(picked.Count);
             foreach (var chosen in picked)
             {
@@ -175,7 +192,10 @@ namespace Game.Core
                 granted |= buff.Grants;
             }
             var weapon = equipment[ItemSlot.Weapon];
-            return new PlayerStats(sheet, weapon?.Base.Tags ?? SkillTag.Melee, granted, weapon != null);
+            return new PlayerStats(sheet, weapon?.Base.Tags ?? SkillTag.Melee, granted, weapon != null)
+            {
+                Effects = effects.Count > 0 ? new GearEffects(effects) : GearEffects.None,
+            };
         }
     }
 

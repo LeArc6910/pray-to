@@ -654,6 +654,8 @@ namespace Game.Core
             if (player.Riding) return 0;
             if (dodge && Dodges(player, source)) return 0;
             int amount = armor ? DamageBands.Taken(damage, player.Stats.Armor, BandOf(source, player), HitKindOf(source, cause)) : Math.Max(1, (int)MathF.Round(damage));
+            // Gear's ward, low-health guard and thorns (World.GearEffects.cs); nothing for a hit that is no attack.
+            if (armor) amount = GearTaken(player, source, amount);
             BreakRecall(player);
             BreakDungeonCharge(player);
             EndFishing(player, FishingReeled);

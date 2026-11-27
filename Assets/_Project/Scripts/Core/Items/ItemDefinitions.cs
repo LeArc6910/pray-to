@@ -102,11 +102,20 @@ namespace Game.Core
         public GearSet Set { get; internal set; }
         public int LegendaryChance { get; }
         public bool IsLegendary => Legendary.Length > 0;
+        // Dropped by the elites of its band rather than a boss (legendary "elite", Docs/Gear.md): named "고유".
+        public bool IsEliteUnique => Legendary == EliteSource;
+        // What it does besides its stats (effects), and what it adds for one class (class, class_bonus).
+        public IReadOnlyList<GearEffect> Effects { get; internal set; } = Array.Empty<GearEffect>();
+        public string ClassId { get; internal set; } = "";
+        public IReadOnlyList<Modifier> ClassBonus { get; internal set; } = Array.Empty<Modifier>();
+        // The colour its art is drawn in ("#RRGGBB", tint), or empty for its tier's.
+        public string Tint { get; internal set; } = "";
         // The character level it takes to wear: five below the base's step (iron, step 10, from level 5), or a
         // legendary's own step, unless the sheet says (require).
         public int RequiredLevel { get; }
 
         public const string Pickaxe = "pickaxe";
+        public const string EliteSource = "elite";
     }
 
     public sealed class Affix
@@ -252,11 +261,35 @@ namespace Game.Core
 
         public string Id { get; }
         public string Name { get; }
-        internal List<(int Pieces, IReadOnlyList<Modifier> Modifiers)> Bonuses { get; } = new List<(int, IReadOnlyList<Modifier>)>();
-        public IReadOnlyList<(int Pieces, IReadOnlyList<Modifier> Modifiers)> AllBonuses => Bonuses;
+        internal List<GearSetBonus> Bonuses { get; } = new List<GearSetBonus>();
+        public IReadOnlyList<GearSetBonus> AllBonuses => Bonuses;
 
         // What wearing so many pieces gives.
         public IEnumerable<Modifier> BonusFor(int worn) => Bonuses.Where(b => b.Pieces <= worn).SelectMany(b => b.Modifiers);
+
+        public IEnumerable<GearSetBonus> ActiveBonuses(int worn) => Bonuses.Where(b => b.Pieces <= worn);
+
+        // The most pieces any bonus asks for.
+        public int MostPieces => Bonuses.Count == 0 ? 0 : Bonuses.Max(b => b.Pieces);
+    }
+
+    // One step of a set: what so many pieces give, the effects they add and what one class gets more (sets.csv).
+    public sealed class GearSetBonus
+    {
+        internal GearSetBonus(int pieces, IReadOnlyList<Modifier> modifiers, IReadOnlyList<GearEffect> effects, string classId, IReadOnlyList<Modifier> classBonus)
+        {
+            Pieces = pieces;
+            Modifiers = modifiers;
+            Effects = effects;
+            ClassId = classId ?? "";
+            ClassBonus = classBonus;
+        }
+
+        public int Pieces { get; }
+        public IReadOnlyList<Modifier> Modifiers { get; }
+        public IReadOnlyList<GearEffect> Effects { get; }
+        public string ClassId { get; }
+        public IReadOnlyList<Modifier> ClassBonus { get; }
     }
 
     // Something gathered to make things with: from walls, monsters and bosses. Some can be placed as a tile.
@@ -296,6 +329,9 @@ namespace Game.Core
         public static int QualityPercent(int quality) => 100 + 25 * quality;
 
         public bool HasQuality { get; internal set; }
+        // Monsters that drop it besides their own material (materials.csv drops, "cave_beetle:20|big_beetle:50"): a
+        // hunting trophy for the crafted sets (Docs/Gear.md). The chance is a percent, shared out like the rest.
+        public IReadOnlyList<(string Monster, int Chance)> Drops { get; internal set; } = Array.Empty<(string, int)>();
         public int Quality { get; internal set; }
         public MaterialDefinition Base { get; internal set; }
         public IReadOnlyList<MaterialDefinition> Variants { get; internal set; } = Array.Empty<MaterialDefinition>();

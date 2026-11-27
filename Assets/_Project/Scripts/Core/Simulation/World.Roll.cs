@@ -40,6 +40,7 @@ namespace Game.Core
             player.Dodged = false;
             player.Rolls++;
             player.AttackCooldown = 0;
+            RaiseWard(player);
             _events.Add(new SimEvent(SimEventType.Rolled, player.Id, direction: player.RollDirection));
             return true;
         }
@@ -49,6 +50,7 @@ namespace Game.Core
             if (player.RollCooldown > 0) player.RollCooldown--;
             if (player.RollTicks > 0) player.RollTicks--;
             if (player.DodgeTicks > 0) player.DodgeTicks--;
+            UpdateWard(player);
         }
 
         static void EndRoll(Player player)

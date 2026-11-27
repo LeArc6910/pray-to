@@ -354,6 +354,7 @@ namespace Game.Core
         void DropFromElite(Enemy enemy, Player killer, int level)
         {
             int rarity = (int)(killer?.Stats.ItemRarity ?? 0);
+            DropEliteUnique(enemy);
             if (enemy.Elite == EliteRank.Leader)
             {
                 DropItem(_lootGenerator.RollItem(level, _random, rarity, Rarity.Rare), Scatter(enemy.Position));
@@ -369,6 +370,20 @@ namespace Game.Core
             }
             if (_random.Chance(ChampionItemChance)) DropItem(_lootGenerator.RollItem(level, _random, rarity, Rarity.Uncommon), Scatter(enemy.Position));
         }
+
+        // The uniques of the elite's band (item_bases.csv legendary "elite", Docs/Gear.md): a leader its chance of one
+        // of them, a champion half that. Rolled only where a band has some, so older sheets keep their random sequence.
+        void DropEliteUnique(Enemy enemy)
+        {
+            var uniques = _lootGenerator.LegendariesOf(ItemBase.EliteSource).Where(b => DamageBands.BandOfLevel(b.Level) == enemy.Band).ToList();
+            if (uniques.Count == 0) return;
+            var pick = uniques[_random.Next(uniques.Count)];
+            float chance = pick.LegendaryChance / 100f * (enemy.Elite == EliteRank.Leader ? 1 : ChampionUniqueShare);
+            if (_random.Chance(chance)) DropItem(_lootGenerator.RollLegendary(pick, _random), Scatter(enemy.Position));
+        }
+
+        // A champion's chance of a unique against a leader's.
+        public const float ChampionUniqueShare = 0.5f;
 
         static int EliteExperience(Enemy enemy) =>
             enemy.Elite == EliteRank.Leader ? enemy.Definition.Size == MonsterSize.XL ? MidBossExperience : LeaderExperience

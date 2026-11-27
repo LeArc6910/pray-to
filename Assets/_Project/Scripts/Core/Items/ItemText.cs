@@ -15,6 +15,23 @@ namespace Game.Core
             _ => rarity.ToString(),
         };
 
+        // The Korean names of the class ids gear names (classes.csv), so the text needs no sheet.
+        public static string ClassName(string id) => id switch
+        {
+            "warrior" => "전사",
+            "fire_mage" => "화염 마법사",
+            "archer" => "궁수",
+            "summoner" => "소환사",
+            "storm_caller" => "폭풍술사",
+            _ => id,
+        };
+
+        static string ClassLine(string classId, IEnumerable<Modifier> bonus, IReadOnlyCollection<string> classes)
+        {
+            string mark = classes == null ? "" : classes.Contains(classId) ? " (적용)" : " (다른 클래스)";
+            return $"{ClassName(classId)} 보너스: {string.Join(", ", bonus.Select(StatText.Describe))}{mark}";
+        }
+
         public static string SlotName(ItemSlot slot) => slot switch
         {
             ItemSlot.Weapon => "무기",
@@ -41,9 +58,14 @@ namespace Game.Core
             return string.Join(" ", new[] { suffix?.Affix.Name, prefix?.Affix.Name, item.Base.Name }.Where(part => part != null));
         }
 
-        public static List<string> Describe(Item item, bool showTiers = false)
+        // "고유" for an elite's unique (Docs/Gear.md); otherwise the rarity's name.
+        public static string GradeName(Item item) => item.Base.IsEliteUnique ? "고유" : RarityName(item.Rarity);
+
+        // worn: what the player has on, so a set says how many of it are worn and which bonuses hold; classes: the
+        // player's class ids, so a class bonus says whether it counts. Both may be left out.
+        public static List<string> Describe(Item item, bool showTiers = false, Equipment worn = null, IReadOnlyCollection<string> classes = null)
         {
-            var lines = new List<string> { $"[{RarityName(item.Rarity)}] {Name(item)} (레벨 {item.Level})", $"  착용 레벨 {item.Base.RequiredLevel}" };
+            var lines = new List<string> { $"[{GradeName(item)}] {Name(item)} (레벨 {item.Level})", $"  착용 레벨 {item.Base.RequiredLevel}" };
             lines.AddRange(item.Implicits.Select(m => "  " + StatText.Describe(m)));
 
             foreach (var affix in item.Affixes.OrderBy(a => a.Affix.Kind))
@@ -52,10 +74,19 @@ namespace Game.Core
                 lines.Add($"  · {StatText.Describe(affix.Modifier)}{tier}");
             }
 
+            lines.AddRange(item.Base.Effects.Select(e => $"  ★ {e.Describe()}"));
+            if (item.Base.ClassBonus.Count > 0) lines.Add("  " + ClassLine(item.Base.ClassId, item.Base.ClassBonus, classes));
             if (item.Base.Set is GearSet set)
             {
-                lines.Add($"  세트: {set.Name}");
-                lines.AddRange(set.AllBonuses.Select(b => $"  · {b.Pieces}개: {string.Join(", ", b.Modifiers.Select(StatText.Describe))}"));
+                int count = worn == null ? -1 : worn.Items.Count(i => i.Base.Set == set);
+                lines.Add(count < 0 ? $"  세트: {set.Name}" : $"  세트: {set.Name} ({count}/{set.MostPieces})");
+                foreach (var bonus in set.AllBonuses)
+                {
+                    var parts = bonus.Modifiers.Select(StatText.Describe).Concat(bonus.Effects.Select(e => e.Describe())).ToList();
+                    if (bonus.ClassBonus.Count > 0) parts.Add(ClassLine(bonus.ClassId, bonus.ClassBonus, classes));
+                    string held = count >= bonus.Pieces ? " (적용)" : "";
+                    lines.Add($"  · {bonus.Pieces}개: {string.Join(", ", parts)}{held}");
+                }
             }
             if (item.Sockets.Count == 0) return lines;
             lines.Add("  룬 소켓 " + string.Join(" ", item.Sockets.Select(rune => rune == null ? "[ ]" : $"[{rune.Name}]")));

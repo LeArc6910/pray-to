@@ -126,8 +126,22 @@ namespace Game.Core
                 var material = Loot.Materials.FirstOrDefault(m => m.Id == definition.MaterialId);
                 if (material != null) DropMaterial(material, Scatter(enemy.Position));
             }
+            DropTrophies(enemy, share);
             DropEgg(enemy, killer);
             if (_random.Chance(CoinChance * share)) DropCoins(1 + level / CoinLevels + _random.Next(level / CoinLevels + 1), Scatter(enemy.Position));
+        }
+
+        // Hunting trophies for the crafted sets (materials.csv drops, Docs/Gear.md): each its own chance, shared out
+        // like the rest. Only rolled for monsters that have one, so older sheets keep their random sequence.
+        void DropTrophies(Enemy enemy, float share)
+        {
+            foreach (var material in Loot.Materials)
+            {
+                foreach (var (monster, chance) in material.Drops)
+                {
+                    if (monster == enemy.Definition.Id && _random.Chance(chance / 100f * share)) DropMaterial(material, Scatter(enemy.Position));
+                }
+            }
         }
 
         // What share of its experience and of its chances of dropping things a monster gives: its sheet's reward for one

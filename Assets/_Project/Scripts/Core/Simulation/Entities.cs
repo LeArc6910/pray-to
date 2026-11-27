@@ -183,6 +183,10 @@ namespace Game.Core
         public int ConsumableCooldown { get; internal set; }
         // Burns and chills from monsters' elements.
         public Afflictions Afflictions { get; } = new Afflictions();
+        // A gear ward (Docs/Gear.md, roll_ward): health it takes blows from before the player's own, for WardTicks more.
+        public float Ward { get; internal set; }
+        internal int WardTicks { get; set; }
+        internal int WardCooldown { get; set; }
         // Ticks until a recall scroll takes the player home, or 0.
         public int RecallTicks { get; internal set; }
         public bool Recalling => RecallTicks > 0;
