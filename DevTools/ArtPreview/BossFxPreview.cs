@@ -91,6 +91,13 @@ namespace Game.Client
             Add("antlion", "sand_trail", BossFx.SandBurst, HazardForm.Circle, 1.1f, 0, 0, sand, r => r.Context.Width = 0);
             Add("antlion", "quicksand", BossFx.Rumble, HazardForm.Donut, 6f, 2.4f, 0, sand, r => { r.Context.Inner = 2.4f * T; (r.Wide, r.Tall, r.AtY) = (216, 216, 0.5f); });
             Add("antlion", "sand", BossFx.Cinders, HazardForm.Circle, 1, 0, 0, sand, r => { r.NoShape = true; r.Tall = 48; r.Context = new BossContext { Ramp = sand, Size = 20, Count = 3, Dir = 120, Seed = 4 }; });
+            foreach (var (name, ramp) in new[] { ("lava", FxRamp.Fire), ("void", FxRamp.Violet), ("water", FxRamp.Cold), ("wraith", FxRamp.Spirit), ("wraith bolt", FxRamp.Bolt) })
+            {
+                Add("elements", name + " circle", BossFx.Element, HazardForm.Circle, 2.2f, 0, 0, ramp, r => r.Tall = 128);
+                Add("elements", name + " wedge", BossFx.Element, HazardForm.Cone, 3.8f, 90, 0, ramp, r => { r.Context.Width = 90; r.Context.Form = HazardForm.Cone; r.AtX = 0.2f; r.AtY = 0.55f; r.Tall = 128; });
+                Add("elements", name + " line", BossFx.Element, HazardForm.Band, 11f, 1.5f, 0, ramp, r => { r.Context.Form = HazardForm.Band; r.Wide = 200; r.Tall = 96; r.AtX = 0.06f; r.AtY = 0.6f; });
+                Add("elements", name + " ring", BossFx.Element, HazardForm.Donut, 6.5f, 2.4f, 0, ramp, r => { r.Context.Form = HazardForm.Donut; r.Context.Inner = 2.4f * T; r.Context.Width = 0; (r.Wide, r.Tall, r.AtY) = (232, 232, 0.5f); });
+            }
             return rows;
         }
 

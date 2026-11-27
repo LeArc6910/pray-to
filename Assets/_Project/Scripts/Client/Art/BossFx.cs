@@ -66,6 +66,13 @@ namespace Game.Client
         // Sand flung up out of the floor in a fan, falling back, over rolling dust. Size its radius; Width, if set,
         // the fan is thrown along Dir over that many degrees instead of straight up.
         SandBurst,
+
+        // ---- the bosses with no effects of their own (the lava titan, the void lord, the tide serpent, the crown wraith) ----
+        // What the blow is made of, laid over the shared landing at a few places in its shape (Form): fire that
+        // bursts and burns on (Ramp Fire), rings and scraps drawn into the middle (Violet), water thrown up in a
+        // column over ripples (Cold), souls scattering (Spirit), a bolt come down (Bolt). Size the reach, Inner a
+        // ring's inner radius, Width a wedge's degrees or a line's width, Dir its way.
+        Element,
     }
 
     // What one of the bosses' effects is told. Lengths in pixels, angles in degrees.
@@ -83,6 +90,8 @@ namespace Game.Client
         // Without the part of the effect something else already draws there.
         public bool Plain;
         public FxRamp Ramp;
+        // The blow's shape, for an effect laid over any of them (BossFx.Element).
+        public HazardForm Form;
     }
 
     // The bosses' own effects as functions of time that add pieces to a list, as the skills' (SkillFx) and the
@@ -132,6 +141,7 @@ namespace Game.Client
                 case BossFx.SandJet: life = SandJet(c, t, o); break;
                 case BossFx.Whirl: life = Whirl(c, t, o); break;
                 case BossFx.SandBurst: life = SandBurst(c, t, o); break;
+                case BossFx.Element: life = Element(c, t, o); break;
                 default: return false;
             }
             return t < life;
@@ -723,6 +733,160 @@ namespace Game.Client
             else Dust(o, m, 5, t, 0.02f, R * 0.4f, R * 0.5f + 4, c.Seed, 0, 360, 0.5f);
             if (!thrown && R * 2.2f <= 160) FxLayers.Shock(o, m, t, 0, R, 0, 0, 0.3f, true);
             return 0.56f;
+        }
+
+        // ---- the bosses with no effects of their own ----
+
+        static float Element(in BossContext c, float t, List<FxStamp> o)
+        {
+            float life = 0;
+            switch (c.Form)
+            {
+                case HazardForm.Donut:
+                {
+                    // Four places round the band.
+                    float mid = (c.Inner + c.Size) / 2, r = Math.Min(28, (c.Size - c.Inner) * 0.45f);
+                    for (int i = 0; i < 4; i++) life = Math.Max(life, Puff(c, t - 0.03f * i, o, Cos(45 + 90 * i) * mid, Sin(45 + 90 * i) * mid, r, i, false));
+                    break;
+                }
+                case HazardForm.Cone:
+                {
+                    // Three across the wedge.
+                    float wide = Math.Min(300, c.Width);
+                    for (int i = 0; i < 3; i++)
+                    {
+                        float dir = c.Dir + (i - 1) * wide * 0.3f;
+                        life = Math.Max(life, Puff(c, t - 0.03f * i, o, Cos(dir) * c.Size * 0.62f, Sin(dir) * c.Size * 0.62f, Math.Min(26, c.Size * 0.3f), i, false));
+                    }
+                    break;
+                }
+                case HazardForm.Band:
+                {
+                    // Up to four along the line, one after another.
+                    int n = Math.Clamp((int)(c.Size / 48), 2, 4);
+                    for (int i = 0; i < n; i++)
+                    {
+                        float along = c.Size * (i + 0.5f) / n;
+                        life = Math.Max(life, Puff(c, t - 0.04f * i, o, Cos(c.Dir) * along, Sin(c.Dir) * along, Math.Clamp(c.Width * 0.7f, 10, 24), i, false));
+                    }
+                    break;
+                }
+                default:
+                    life = Puff(c, t, o, 0, 0, c.Size, 0, true);
+                    break;
+            }
+            return life + 0.12f;
+        }
+
+        // One place of an element's blow: whole (a circle's own) or one of several, which is lighter. Returns its life.
+        static float Puff(in BossContext c, float t, List<FxStamp> o, float x, float y, float r, int n, bool whole)
+        {
+            if (t < 0) return 1;
+            var m = c.Ramp;
+            int seed = c.Seed + n * 13;
+            switch (m)
+            {
+                case FxRamp.Fire:
+                    // Lava: an explosion, and fire left burning.
+                    if (whole)
+                    {
+                        FxLayers.Blast(o, t, r, m, seed, 10, r >= 28 ? 4 : 0, true, 1.0f, x, y);
+                        SkillFx.Flames(o, 4, t, 0.25f, 1.1f, r, seed, x, y);
+                        return 1.1f;
+                    }
+                    if (n < 3 && t < 0.4f) FxLayers.Light(o, m, r * 2.4f, 0.8f * (1 - t / 0.4f), x, y);
+                    FxLayers.Ball(o, m, t, 0, r, seed, x, y);
+                    FxLayers.Embers(o, m, 5, t, 0, r, seed, x, y);
+                    SkillFx.Flames(o, 2, t, 0.2f, 0.95f, r, seed, x, y);
+                    return 0.95f;
+                case FxRamp.Violet:
+                {
+                    // The void: rings closing on the middle, scraps drawn in after them, a glint where they meet.
+                    if (n < 3 && t < 0.45f) FxLayers.Light(o, m, r * 2.2f, 0.7f * (1 - t / 0.45f), x, y, 2);
+                    for (int ring = 0; ring < (whole ? 3 : 2); ring++)
+                    {
+                        float p = (t - 0.07f * ring) / 0.36f;
+                        if (p < 0 || p >= 1) continue;
+                        Put(o, FxShape.Edge, m, SkillFxArt.Even(2 * r * (1.1f - 0.9f * p * p)), p < 0.5f ? 1 : 2, x, y, 0.5f + 0.5f * p, 0, true);
+                    }
+                    int scraps = whole ? 8 : 4;
+                    for (int i = 0; i < scraps; i++)
+                    {
+                        float p = (t - 0.02f * i) / 0.4f;
+                        if (p < 0 || p >= 1) continue;
+                        float dir = (i + Rnd(seed, i, 33)) * 360f / scraps + 140 * p, far = r * 1.15f * (1 - p * p);
+                        Put(o, FxShape.Lump, m, Even(7 - 4 * p), 4 * (2 + (i & 1)) + (i & 3), x + Cos(dir) * far, y + Sin(dir) * far * 0.9f, Math.Min(1, 3 * p));
+                    }
+                    if (In(t, 0.36f, 0.52f))
+                    {
+                        Put(o, FxShape.Glint, m, Odd(Math.Min(21, r * 0.9f)), 1, x, y, 1 - (t - 0.36f) / 0.16f);
+                        Put(o, FxShape.Lump, m, Even(r * 0.45f), 16 + ((int)(t * 20) & 3), x, y);
+                    }
+                    return 0.52f;
+                }
+                case FxRamp.Cold:
+                {
+                    // Water: a column thrown up that falls back, drops flung out, ripples over the floor.
+                    for (int ring = 0; ring < 2; ring++)
+                    {
+                        float p = (t - 0.12f * ring) / 0.5f;
+                        if (p < 0 || p >= 1) continue;
+                        Put(o, FxShape.Edge, m, SkillFxArt.Even(2 * r * (0.4f + 0.8f * Out(p))), 1, x, y, 0.8f * (1 - p), 0, true);
+                    }
+                    float rise = t / 0.42f;
+                    if (rise < 1)
+                    {
+                        float high = (whole ? 30 : 20) * (float)Math.Sin(rise * Math.PI);
+                        int lumps = whole ? 4 : 3;
+                        for (int i = 0; i < lumps; i++)
+                        {
+                            float up = high * (i + 0.6f) / lumps;
+                            Put(o, FxShape.Lump, m, Even(Math.Max(4, r * (whole ? 0.75f : 0.6f) * (1 - 0.6f * i / lumps))), 4 * (i == lumps - 1 ? 0 : 1 + (i & 1)) + ((int)(t * 14) + i & 3), x, y + 2 + up, 1 - 0.5f * rise * rise);
+                        }
+                    }
+                    int drops = whole ? 8 : 4;
+                    for (int i = 0; i < drops; i++)
+                    {
+                        float p = t / (0.42f + 0.14f * Rnd(seed, i, 34));
+                        if (p >= 1) continue;
+                        float dir = 25 + (i + 0.5f) * 130f / drops, go = r * (0.5f + 0.7f * Rnd(seed, i, 35));
+                        float px = x + Cos(dir) * go * p, py = y + 3 + Sin(dir) * (28 + 10 * Rnd(seed, i, 36)) * p - 34 * p * p;
+                        Put(o, FxShape.Ember, m, 3, 0, px, py, 1 - p * p, p < 0.5f ? dir : -dir);
+                    }
+                    return 0.62f;
+                }
+                case FxRamp.Bolt:
+                {
+                    // Lightning: a thick bolt down onto it, drawn anew three times, a star, sparks, a singed spot.
+                    if (t < 0.16f)
+                    {
+                        if (n < 3) FxLayers.Light(o, m, r * 3, 1, x, y, 3);
+                        Put(o, FxShape.Bolt, m, 72, 8 + 16 + ((int)(t / 0.04f) + n) % 6, x, y + 36, 1, 90);
+                        Put(o, FxShape.Glint, m, Odd(Math.Min(25, r * 1.2f)), 1, x, y);
+                    }
+                    FxLayers.Scorch(o, t, 0.04f, 0.9f, r * 0.5f, seed, x, y);
+                    FxLayers.Shock(o, m, t, 0, r, x, y);
+                    FxLayers.Embers(o, m, whole ? 8 : 5, t, 0, r, seed, x, y);
+                    return 0.9f;
+                }
+                default:
+                {
+                    // A wraith's: souls torn loose, curling up and away, a ring left thinning.
+                    if (n < 3 && t < 0.45f) FxLayers.Light(o, m, r * 2.2f, 0.7f * (1 - t / 0.45f), x, y, 2);
+                    SkillFx.Ring(o, m, t, 0, r, 2, 0.12f, 0.34f, x, y, true);
+                    int souls = whole ? 8 : 4;
+                    for (int i = 0; i < souls; i++)
+                    {
+                        float own = 0.5f + 0.2f * Rnd(seed, i, 37), p = (t - 0.02f * i) / own;
+                        if (p < 0 || p >= 1) continue;
+                        float dir = (i + 0.5f) * 360f / souls, far = r * (0.3f + 0.8f * Out(p)), sway = 4 * Sin(p * 500 + i * 70);
+                        float px = x + Cos(dir) * far + sway, py = y + Sin(dir) * far * 0.6f + 22 * p;
+                        Put(o, FxShape.Wisp, m, whole ? 5 : 4, (int)(t * 10) + i, px, py, 1 - p * p, 90 + (Cos(dir) > 0 ? -35 : 35) * (1 - p));
+                    }
+                    if (t < 0.08f) Put(o, FxShape.Glint, m, Odd(Math.Min(21, r)), 1, x, y);
+                    return 0.72f;
+                }
+            }
         }
     }
 }

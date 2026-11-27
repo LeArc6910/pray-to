@@ -177,7 +177,42 @@ namespace Game.Client
         void BossBlow(HazardState hazard)
         {
             if (VeinEaterLanded(hazard) || KnightLanded(hazard) || SpiderLanded(hazard) || WardenLanded(hazard) || AntlionLanded(hazard) || CrystalQueenLanded(hazard) || GeneralLanded(hazard)) return;
+            if (ElementLanded(hazard)) return;
             BlastLanded(hazard);
+        }
+
+        // What a boss with no effects of its own is made of (the table the shots use, ShotArt.ElementOf), as an
+        // element's colours; the crown wraith's bolts are lightning.
+        static FxRamp? ElementOf(string boss, string attack) => ShotArt.ElementOf(boss) switch
+        {
+            ShotElement.Lava => FxRamp.Fire,
+            ShotElement.Void => FxRamp.Violet,
+            ShotElement.Water => FxRamp.Cold,
+            ShotElement.Wraith => attack == "lightning_fall" || attack == "storm_brand" ? FxRamp.Bolt : FxRamp.Spirit,
+            _ => (FxRamp?)null,
+        };
+
+        // The lava titan's, the void lord's, the tide serpent's and the crown wraith's blows: the shared landing in
+        // their element's colours and, over it, what the element does (fire bursts and burns on, the void draws in,
+        // water is thrown up, souls scatter). False for anyone else's.
+        bool ElementLanded(HazardState hazard)
+        {
+            var (boss, attack) = BlowOf(hazard);
+            if (boss == null && hazard.Id < StagedIds) boss = _bossInView?.Id;
+            var element = boss == null ? null : ElementOf(boss, attack);
+            if (!element.HasValue) return false;
+            var field = FieldOf(hazard);
+            // A place to gather burns gold as it warned; fire and lightning and the void bring their own light.
+            bool own = element == FxRamp.Fire || element == FxRamp.Bolt;
+            BlastLanded(hazard, hazard.Shape == HazardShape.Share ? (FxRamp?)null : element, sparks: !own && element != FxRamp.Cold, chunks: element != FxRamp.Cold && element != FxRamp.Spirit,
+                light: !(own && field.Form == HazardForm.Circle));
+            AddBossFx(BossFx.Element, new Vector3(hazard.Position.X, hazard.Position.Y, 0), new BossContext
+            {
+                Ramp = element.Value, Form = field.Form, Dir = hazard.Direction.Angle * Mathf.Rad2Deg, Size = hazard.Size * Ppu,
+                Inner = field.Form == HazardForm.Donut ? hazard.Width * Ppu : 0,
+                Width = field.Form == HazardForm.Cone ? hazard.Width : hazard.Width * Ppu,
+            });
+            return true;
         }
 
         // The blow lands in the warning's own shape: a white flash, the shape burning the way it reads, a shockwave,
