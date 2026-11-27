@@ -1075,7 +1075,6 @@ namespace Game.Client
             if (back) DrawSword(canvas, sword.Hilt, sword.Tip, frame, mad);
             if (held && back) DrawBanner(canvas, heldFoot, heldTop, view == BossView.Back ? 1 : -1, frame);
             if (armB.Empty && Far(bx, by)) Arm(Part.ArmA, armA, bx - 4, by - 1, 0.55f);
-            var vacated = new bool[canvas.Width, canvas.Height];
             bool Moved(Part part) => part == Part.ArmA ? ax != 0 || ay != 0 : part == Part.ArmB ? bx != 0 || by != 0 : part == Part.LegA ? la != 0 || lay != 0 : part == Part.LegB ? lb != 0 || lby != 0 : false;
             for (int y = 0; y < h; y++)
             {
@@ -1090,7 +1089,6 @@ namespace Game.Client
                         continue;
                     }
                     // Where a part has moved away from inside the body, the body behind it in shade.
-                    vacated[x + Margin, y + Headroom] = true;
                     int left = -1, right = -1;
                     for (int k = x - 1; k >= 0 && left < 0; k--) if (Body(k)) left = k;
                     for (int k = x + 1; k < w && right < 0; k++) if (Body(k)) right = k;
@@ -1153,9 +1151,6 @@ namespace Game.Client
             if (!back) DrawSword(canvas, sword.Hilt, sword.Tip, frame, mad);
             Arm(Part.ArmA, armA, ax, ay, 1);
             if (!held && back) DrawBanner(canvas, banner.Foot, banner.Top, banner.Behind, frame);
-            // A narrow gap left between an arm and the body where it stood (2026-11-27, Docs/Bosses.md 몸의 틈) closed
-            // in shade.
-            canvas.CloseGaps(vacated, Shade, 4);
             return canvas;
         }
 

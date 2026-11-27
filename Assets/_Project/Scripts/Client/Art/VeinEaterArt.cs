@@ -742,7 +742,6 @@ namespace Game.Client
             var moves = MovesOf(view, pose);
             int w = image.Width, h = image.Height;
             var canvas = new PixelImage(w + 2 * Margin, h + Headroom);
-            var vacated = new bool[canvas.Width, canvas.Height];
             // The body first; where a part that has moved was inside the body, shadow.
             for (int y = 0; y < h; y++)
             {
@@ -755,8 +754,7 @@ namespace Game.Client
                     else
                     {
                         // The nearest body on each side of the gap; between them, the nearer one's colour in shade.
-                        vacated[x + Margin, y + Headroom] = true;
-                        int left = -1, right = -1;
+                            int left = -1, right = -1;
                         for (int k = x - 1; k >= 0 && left < 0; k--) if (Body(k)) left = k;
                         for (int k = x + 1; k < w && right < 0; k++) if (Body(k)) right = k;
                         if (left >= 0 && right >= 0)
@@ -791,9 +789,6 @@ namespace Game.Client
             Lay(Part.ArmB, moves.ArmBX, moves.ArmBY);
             Reach(Part.ArmA, moves.ArmAX, moves.ArmAY);
             Lay(Part.ArmA, moves.ArmAX, moves.ArmAY);
-            // A narrow gap left between a part and the body where it stood (2026-11-27, Docs/Bosses.md 몸의 틈) closed
-            // in shadow.
-            canvas.CloseGaps(vacated, Shadow, 4);
             return canvas;
         }
 

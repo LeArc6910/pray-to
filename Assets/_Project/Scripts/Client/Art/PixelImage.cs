@@ -153,8 +153,9 @@ namespace Game.Client
 
         // The body's own pixel for a spot just off its edge (2026-11-27, the person: a flat shade looked wrong, fill it
         // like the real part): mirrored across the edge into the body along the row (or column), so the gap carries
-        // on the body's texture. The dark outline is skipped: further into the body until a pixel that is not.
-        public Rgba MirrorInto(int x, int y, int edge, System.Func<int, bool> body, bool down = false)
+        // on the body's texture. The dark outline is skipped: further into the body until a pixel that is not; so is
+        // anything avoid says (a glowing core that must not be doubled), giving instead if nothing else is found.
+        public Rgba MirrorInto(int x, int y, int edge, System.Func<int, bool> body, bool down = false, System.Func<Rgba, bool> avoid = null, Rgba instead = default)
         {
             int dir = edge > (down ? y : x) ? 1 : -1;
             int from = edge + (edge - (down ? y : x));
@@ -163,9 +164,10 @@ namespace Game.Client
                 int s = from + dir * k;
                 if (!body(s)) break;
                 var c = down ? this[x, s] : this[s, y];
-                if (0.3f * c.R + 0.59f * c.G + 0.11f * c.B >= 22) return c;
+                if (0.3f * c.R + 0.59f * c.G + 0.11f * c.B >= 22 && (avoid == null || !avoid(c))) return c;
             }
-            return down ? this[x, edge] : this[edge, y];
+            var last = down ? this[x, edge] : this[edge, y];
+            return avoid != null && avoid(last) ? instead : last;
         }
 
         // Where parts of a body posed in code have moved away (left), the floor must not show through a narrow gap

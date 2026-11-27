@@ -484,21 +484,20 @@ namespace Game.Client
         {
             BossView.Front => (new Box(7, 26, 21, 50), new Box(43, 25, 57, 50), new Box(17, 46, 30, 57), new Box(34, 45, 47, 56)),
             BossView.FrontSide => (new Box(11, 26, 24, 50), new Box(40, 25, 50, 44), new Box(21, 45, 32, 57), new Box(33, 45, 45, 55)),
-            BossView.Side => (new Box(30, 23, 42, 46), None, new Box(22, 47, 32, 58), new Box(33, 47, 41, 55)),
+            // From the side the near arm is the big mossy mass at the back of the picture, under the shoulder; the strip
+            // ahead of it with the core is the chest (2026-11-27: the box was the chest before, and the chest went
+            // with the arm).
+            BossView.Side => (new Box(18, 24, 30, 46), None, new Box(22, 47, 32, 58), new Box(33, 47, 41, 55)),
             BossView.BackSide => (new Box(12, 25, 24, 44), new Box(36, 23, 52, 47), new Box(20, 45, 31, 54), new Box(32, 47, 45, 56)),
             _ => (new Box(8, 26, 22, 49), new Box(41, 26, 56, 49), new Box(18, 45, 29, 55), new Box(34, 45, 46, 55)),
         };
 
-        // The trunk behind the arms in each view: where an arm leaves from in front of it, the trunk is drawn in shade
-        // there (not the floor showing through the chest).
-        static Box TrunkOf(BossView view) => view switch
-        {
-            BossView.Front => new Box(20, 20, 44, 48),
-            BossView.FrontSide => new Box(19, 20, 42, 48),
-            BossView.Side => new Box(19, 20, 39, 48),
-            BossView.BackSide => new Box(20, 20, 44, 47),
-            _ => new Box(20, 22, 44, 47),
-        };
+        // The trunk behind the arm, where the Retro Diffusion picture shows it must be though the arm hides it: from the
+        // side the hips and legs under the arm reach back to column 23, so with the arm moved ahead the trunk is there
+        // (filled with its own pixels mirrored in from the chest, MirrorInto). From the front, behind and the
+        // three-quarter views the arms hang beside the trunk, so nothing is filled but a gap with body on both sides
+        // (2026-11-27, the person: fill only what is clearly missing, judged by the picture, not guessed).
+        static Box TrunkOf(BossView view) => view == BossView.Side ? new Box(23, 22, 30, 46) : None;
 
         static readonly Dictionary<BossView, Part[,]> PartMaps = new Dictionary<BossView, Part[,]>();
 
@@ -1030,7 +1029,6 @@ namespace Game.Client
 
             var canvas = new PixelImage(w + 2 * Margin, h + Headroom);
             var trunk = TrunkOf(view);
-            var left = new bool[canvas.Width, canvas.Height];
             bool Far(int dx, int dy) => System.Math.Abs(dx) >= 5 || System.Math.Abs(dy) >= 5;
             // The far arm seen from the side, when it comes out from behind: drawn first, the body over it.
             if (armB.Empty && Far(bx, by)) Arm(Part.ArmA, armA, bx - 4, by - 1, 0.55f);
@@ -1048,14 +1046,13 @@ namespace Game.Client
                         continue;
                     }
                     // Where a part has moved away from inside the body, the body behind it in shade.
-                    left[x + Margin, y + Headroom] = true;
                     int before = -1, after = -1;
                     for (int k = x - 1; k >= 0 && before < 0; k--) if (Body(k)) before = k;
                     for (int k = x + 1; k < w && after < 0; k++) if (Body(k)) after = k;
                     if (before >= 0 && after >= 0 || trunk.Holds(x, y) && (before >= 0 || after >= 0))
                     {
                         int edge = before < 0 ? after : after < 0 ? before : x - before <= after - x ? before : after;
-                        canvas[x + Margin, y + Headroom] = image.MirrorInto(x, y, edge, Body);
+                        canvas[x + Margin, y + Headroom] = image.MirrorInto(x, y, edge, Body, avoid: IsAmber, instead: StoneDark);
                     }
                 }
             }
@@ -1108,18 +1105,6 @@ namespace Game.Client
             Lay(Part.LegA, la, lay, 1);
             if (!armB.Empty) Arm(Part.ArmB, armB, bx, by, 1);
             Arm(Part.ArmA, armA, ax, ay, 1);
-            // A narrow gap left between a part and the body where the part stood (a fist moved a little off the trunk)
-            // closed with the body's own pixels. Only there and only narrow: the room beside the hips once the arms
-            // are up is left open, or the golem looks fat from the front and back (2026-11-27).
-            canvas.CloseGaps(left, Shade, 3);
-            // And inside the trunk, only a crack (the notch beside the hip a hanging fist hid at rest, two pixels wide
-            // at most) is closed too.
-            var crack = new bool[canvas.Width, canvas.Height];
-            for (int y = trunk.Y0; y <= trunk.Y1; y++)
-                for (int x = trunk.X0; x <= trunk.X1; x++)
-                    crack[x + Margin, y + Headroom] = true;
-            canvas.CloseGaps(crack, Shade, 2);
-            canvas.FillHoles(40);
             return canvas;
         }
 
