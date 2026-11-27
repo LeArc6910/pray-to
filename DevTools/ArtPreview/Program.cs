@@ -38,6 +38,12 @@ namespace Game.Client
                 // --only fxmock: the effects rework's now-and-new mock-ups (out/fxmock/, FxMockPreview, Docs/EffectsRework.md).
                 return WriteFxMock(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out")) ? 0 : 1;
             }
+            if (args.Length == 2 && args[0] == "--only" && args[1] == "hazard")
+            {
+                // --only hazard: the boss's warnings and the blow that lands in their shape (out/hazard/, HazardPreview).
+                return HazardPreview.Write(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out", "hazard"),
+                    TileArt.Ground(TileArt.Index(GroundKind.Floor, 0, 0))) ? 0 : 1;
+            }
             if (args.Length == 2 && args[0] == "--only" && args[1] == "monsterfx")
             {
                 // --only monsterfx: just the ordinary monsters' warnings and effects (out/monsterfx/, MonsterFxPreview).

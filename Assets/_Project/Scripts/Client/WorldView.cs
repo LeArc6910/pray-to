@@ -205,6 +205,8 @@ namespace Game.Client
             public SpriteRenderer Rock;
             // A monster's trap, once it has been heard arming (WorldView.MonsterFx.cs).
             public bool Armed;
+            // A boss's warning is one picture of its shape, drawn again as it fills (WorldView.Hazards.cs).
+            public ShapeLayer Warn;
         }
 
         // A player's pet (Pets.cs): its monster drawn small, trotting after them a little behind, hopping or bobbing.
@@ -651,6 +653,7 @@ namespace Game.Client
             foreach (var e in _client.TakeEvents()) Show(e);
             _rendered = 4;
             UpdateFlashes(deltaTime);
+            UpdateBlasts(deltaTime);
             DrawMonsterFx(deltaTime);
             UpdateSkillFx(deltaTime);
             UpdateWaves(deltaTime);
@@ -978,6 +981,7 @@ namespace Game.Client
         {
             if (_root != null) Object.Destroy(_root);
             if (_darkTexture != null) Object.Destroy(_darkTexture);
+            FreeHazardPictures();
         }
 
         void DrawEntities(float deltaTime)
@@ -1303,9 +1307,10 @@ namespace Game.Client
         void DrawMarks()
         {
             _seen.Clear();
+            WarnCount = 0;
             // With them, the marks of monsters' attacks that start at the monster, made here from the sheet
             // (WorldView.MonsterFx.cs): those are not sent.
-            foreach (var view in _client.Hazards().Concat(_attachedMarks))
+            foreach (var view in _client.Hazards().Concat(_attachedMarks).Concat(_stagedMarks))
             {
                 var hazard = view.State;
                 _seen.Add(hazard.Id);
@@ -1320,7 +1325,7 @@ namespace Game.Client
                 if (!_marks.TryGetValue(hazard.Id, out var mark))
                 {
                     // What a blow left on the floor (a web, a pool of venom) is no warning: it is drawn as itself.
-                    mark = IsPool(hazard) ? MakePool(hazard) : MakeMark(hazard);
+                    mark = IsPool(hazard) ? MakePool(hazard) : MakeWarn(hazard);
                     _marks[hazard.Id] = mark;
                     if (hazard.Warning != AttackWarning.Hidden && !IsPool(hazard)) Hear(Sound.Warning, new Vector3(hazard.Position.X, hazard.Position.Y, 0));
                 }
@@ -1331,39 +1336,9 @@ namespace Game.Client
                     continue;
                 }
                 if (!FlyingGob(mark, hazard, view.Progress)) FallingRock(mark, hazard, view.Progress);
-                // An attack only the boss's wind-up announces lays nothing to see: its mark is kept (for its blast
-                // when it lands) but clear (AttackWarning.Hidden, 2026-11-12).
-                if (hazard.Warning == AttackWarning.Hidden)
-                {
-                    mark.Edge.color = Color.clear;
-                    mark.Fill.color = Color.clear;
-                    continue;
-                }
-
-                var color = hazard.Shape == HazardShape.Share ? ShareColor : hazard.Harmful ? DangerColor : PathColor;
-                // A shared circle's edge pulses, so it reads as a place to gather rather than to flee.
-                float edge = hazard.Shape == HazardShape.Share ? 0.35f + 0.25f * Mathf.Sin(Time.time * 8) : 0.22f;
-                mark.Edge.color = new Color(color.r, color.g, color.b, edge);
-                mark.Fill.color = new Color(color.r, color.g, color.b, 0.25f + 0.3f * view.Progress);
-                switch (hazard.Shape)
-                {
-                    case HazardShape.Circle:
-                    case HazardShape.Share:
-                        mark.Fill.transform.localScale = Vector3.one * (hazard.Size * 2 * view.Progress);
-                        break;
-                    case HazardShape.Ring:
-                        // The whole ring darkens; its hole stays clear.
-                        mark.Fill.transform.localScale = Vector3.one * (hazard.Size * 2);
-                        mark.Fill.color = new Color(color.r, color.g, color.b, 0.1f + 0.4f * view.Progress);
-                        break;
-                    case HazardShape.Cone:
-                        mark.Fill.transform.localScale = Vector3.one * (hazard.Size * 2 * view.Progress);
-                        break;
-                    default:
-                        mark.Fill.transform.localScale = new Vector3(hazard.Size * view.Progress, hazard.Width, 1);
-                        mark.Fill.transform.localPosition = new Vector3(hazard.Size * view.Progress * 0.5f, 0, 0);
-                        break;
-                }
+                // The shape itself on the pixel grid: a two-pixel edge from the start, stripes over what has filled,
+                // the whole of it blinking at the last (E1, WorldView.Hazards.cs). Its size is the judged size.
+                DrawWarn(mark, hazard, view.Progress);
             }
 
             _gone.Clear();
@@ -1371,6 +1346,7 @@ namespace Game.Client
             {
                 if (_seen.Contains(pair.Key)) continue;
                 if (pair.Value.Rock != null) Object.Destroy(pair.Value.Rock.gameObject);
+                Free(pair.Value.Warn);
                 Object.Destroy(pair.Value.Root.gameObject);
                 _gone.Add(pair.Key);
                 _landed[pair.Key] = (pair.Value.State, Time.time);
@@ -1397,36 +1373,10 @@ namespace Game.Client
             // A web or a pool of venom running out is no blow.
             if (!hazard.Harmful || IsPool(hazard)) return;
             if (VeinEaterLanded(hazard) || KnightLanded(hazard) || SpiderLanded(hazard) || WardenLanded(hazard) || AntlionLanded(hazard) || CrystalQueenLanded(hazard) || GeneralLanded(hazard)) return;
-            var at = new Vector3(hazard.Position.X, hazard.Position.Y, 0);
-            var along = new Vector3(hazard.Direction.X, hazard.Direction.Y, 0);
-            switch (hazard.Shape)
-            {
-                case HazardShape.Circle:
-                    AddFlash(at, hazard.Size, BlastColor, FlashKind.Burst);
-                    break;
-                case HazardShape.Share:
-                    AddFlash(at, hazard.Size, ShareColor, FlashKind.Burst);
-                    AddFlash(at, hazard.Size * 1.2f, ShareColor, FlashKind.Ring);
-                    break;
-                case HazardShape.Ring:
-                    // A shockwave out to the edge, and blasts round the band itself.
-                    AddFlash(at, hazard.Size, BlastColor, FlashKind.Ring);
-                    float band = (hazard.Size + hazard.Width) / 2;
-                    for (int i = 0; i < 8; i++)
-                    {
-                        float angle = i * Mathf.PI / 4;
-                        AddFlash(at + new Vector3(Mathf.Cos(angle), Mathf.Sin(angle), 0) * band, Mathf.Max(0.5f, (hazard.Size - hazard.Width) / 2), BlastColor, FlashKind.Burst);
-                    }
-                    break;
-                case HazardShape.Line:
-                    for (float d = 0.6f; d < hazard.Size; d += 1.4f) AddFlash(at + along * d, Mathf.Max(0.45f, hazard.Width / 2 + 0.2f), BlastColor, FlashKind.Burst);
-                    break;
-                case HazardShape.Cone:
-                    AddFlash(at + along * (hazard.Size * 0.55f), hazard.Size * 0.5f, BlastColor, FlashKind.Burst);
-                    break;
-            }
+            BlastLanded(hazard);
         }
 
+        // The smooth shapes of an ordinary monster's mark (WorldView.MonsterFx.cs); a boss's is MakeWarn.
         Mark MakeMark(HazardState hazard)
         {
             var root = new GameObject("Telegraph").transform;
@@ -3950,6 +3900,7 @@ namespace Game.Client
             AddNightLights(left, bottom, size);
             AddPoiLights(left, bottom, size);
             AddFxLights();
+            AddBlastLights();
             foreach (var shot in _projectiles.Values)
             {
                 if (shot.sprite == ArrowSprite) continue;

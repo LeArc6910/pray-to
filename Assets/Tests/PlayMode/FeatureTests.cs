@@ -739,6 +739,39 @@ namespace Game.Client.Tests
             Assert.IsTrue(_root.Playing);
         }
 
+        // A boss's warnings and the blow that lands in their shape (E1 of Docs/EffectsRework.md, WorldView.Hazards.cs):
+        // every shape laid beside the player and held part filled, then landed. The blow stays within its pieces, the
+        // floor keeps a scar for each harmful one (a charge's path leaves none) and gives them up in time.
+        [UnityTest, Category(Screens.Category)]
+        public IEnumerator BossWarningsFillAndLandInTheirShape()
+        {
+            yield return Start();
+            World.MonstersHold = true;
+            var view = _root.View;
+            var right = new Vec2(1, 0);
+            view.StageWarning(HazardShape.Ring, Player.Position, right, 3.4f, 1.7f, true, 0.6f);
+            view.StageWarning(HazardShape.Circle, Player.Position + new Vec2(-6.5f, 2.6f), right, 2, 0, true, 0.6f);
+            view.StageWarning(HazardShape.Share, Player.Position + new Vec2(6.5f, 2.6f), right, 1.8f, 0, true, 0.6f);
+            view.StageWarning(HazardShape.Cone, Player.Position + new Vec2(-8, -3.2f), right, 4, 80, true, 0.6f);
+            view.StageWarning(HazardShape.Line, Player.Position + new Vec2(1.5f, -4), new Vec2(0.98f, -0.2f).Normalized, 6, 1.3f, true, 0.93f);
+            view.StageWarning(HazardShape.Line, Player.Position + new Vec2(-3, 4.6f), right, 6, 1.2f, false, 0.6f);
+            yield return new WaitForSecondsRealtime(0.3f);
+            Assert.AreEqual(6, _root.WarnsShown, "Ring, circle, shared circle, wedge, line and a charge's path are all drawn.");
+            yield return Screens.Take("hazard-warnings");
+            view.EndStagedWarnings(land: true);
+            yield return new WaitForSecondsRealtime(0.1f);
+            Assert.That(_root.BlastPieces, Is.InRange(1, 72), "A blow stays within the pieces an effect may have.");
+            Assert.AreEqual(5, _root.FloorScars, "Each harmful warning scars the floor; the path does not.");
+            yield return Screens.Take("hazard-blows");
+            yield return new WaitForSecondsRealtime(0.5f);
+            yield return Screens.Take("hazard-scars");
+            yield return new WaitForSecondsRealtime(1.4f);
+            Assert.AreEqual(0, _root.FloorScars, "The floor's scars are gone within 1.6 seconds.");
+            Assert.AreEqual(0, _root.WarnsShown);
+            World.MonstersHold = false;
+            Assert.IsTrue(_root.Playing);
+        }
+
         // A pack notices together (2026-11-22, Docs/WorldRework.md 무리): five slimes as one pack, most further off than
         // they see; one notices the player and the rest come too, each with a mark over its head.
         [UnityTest, Category(Screens.Category)]

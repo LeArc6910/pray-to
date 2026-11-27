@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu title testground hunt harvest zones towns time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight warden antlion queen general spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
+// Sections: menu title testground hunt harvest zones towns time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight warden antlion queen general spider arenas world farm life npc factory defense gear skills skillfx monsterfx hazards map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -2942,6 +2942,79 @@ async function monsterfx(browser) {
   const onPhone = (id, attack) => MobAttacks.find(row => row[0] === id && row[2] === attack);
   for (const row of [onPhone('frost_wisp', 'frost_ring'), onPhone('void_wisp', 'gravity_well'), onPhone('abyss_stalker', 'cleave'), onPhone('demon_caster', 'rune_trap')])
     await mobAttack(phone, row, 'monsterfx-phone');
+  await phone.send('monsters go');
+  await phone.context.close();
+}
+
+// ---------------------------------------------------------------- 보스 예고 도형과 공용 착지 (이펙트 개편 E1)
+// Every shape of a boss's warning laid beside the player ('warn', WorldView.Hazards.cs) and held at three moments of
+// its filling, then the blow landing in the same shapes and what it leaves; one warning left lying while its neighbour
+// lands, to see that dust does not cover it; the limits (72 pieces a blow, 24 scars); and a phone held upright.
+const WarnShapes = [
+  'warn ring 0 0 3.4 1.7 0', 'warn circle -6.5 2.6 2 0 0', 'warn share 6.5 2.6 1.8 0 0',
+  'warn cone -8 -3.2 4 80 0', 'warn line 1.5 -4 6 1.3 -12', 'warn path -3 4.6 6 1.2 0',
+];
+
+async function hazards(browser) {
+  note('\n## 보스 예고 도형과 공용 착지 (PC)\n');
+  const game = await open(browser, run, Profiles.pc, url);
+  await game.startSolo();
+  await game.wait(1200);
+  await game.send('goto wild');
+  await clearRoom(game, 12, 7);
+  await game.send('monsters hold; heal; face 1 0');
+  for (const [filled, text] of [[0.2, '막 깔림(20%)'], [0.6, '차오르는 중(60%)'], [0.93, '착지 직전(깜빡임)']]) {
+    await game.send('warn clear; ' + WarnShapes.map(w => `${w} ${filled}`).join('; '));
+    await game.wait(350);
+    const st = await game.state();
+    check(st.warnsShown === WarnShapes.length, `예고 ${WarnShapes.length}개가 그려진다: 고리·원·모이기·부채꼴·선·돌진 길 (${st.warnsShown}개, ${text})`);
+    await game.shot(`hazards-warn-${Math.round(filled * 100)}`, `예고 도형 여섯: ${text}`);
+  }
+  await game.send('warn land');
+  await game.wait(90);
+  await game.shot('hazards-blast-1', '착지: 예고와 같은 모양으로 번쩍이고 타오름');
+  const hit = await game.state();
+  check(hit.blastPieces > 0 && hit.blastPieces <= 72, `착지 하나의 조각이 한도 안 (${hit.blastPieces}조각, 한도 72)`);
+  check(hit.floorScars === WarnShapes.length - 1, `해로운 예고마다 바닥 흔적 (${hit.floorScars}개, 돌진 길은 남기지 않는다)`);
+  check(hit.warnsShown === 0, `착지하면 예고는 사라진다 (${hit.warnsShown}개)`);
+  await game.wait(160);
+  await game.shot('hazards-blast-2', '착지 0.3초: 불티·파편·먼지');
+  await game.wait(350);
+  await game.shot('hazards-scar', '착지 0.7초: 바닥 흔적(그을음·균열)');
+  const gone = await pollState(game, st => st.floorScars === 0, 3000);
+  check(gone.floorScars === 0, `바닥 흔적은 1.6초 안에 사라진다 (${gone.floorScars}개)`);
+
+  // Dust and smoke stay under a warning that is still lying.
+  await game.send('warn circle -1.6 1 1.8 0 0 0.5; warn circle 1.6 1 1.8 0 0 0.5; warn land 1');
+  await game.wait(200);
+  check((await game.state()).warnsShown === 1, '옆 예고가 착지해도 남은 예고는 그대로 보인다');
+  await game.shot('hazards-dust-under', '왼쪽이 착지한 순간의 오른쪽 예고(먼지가 예고를 가리지 않는다)');
+  await game.send('warn clear');
+
+  // Thirty at once: the floor keeps twenty-four scars.
+  const many = [];
+  for (let i = 0; i < 30; i++) many.push(`warn circle ${-7 + (i % 10) * 1.5} ${-2 + Math.floor(i / 10) * 2} 0.7 0 0 0.9`);
+  await game.send(many.join('; ') + '; warn land');
+  await game.wait(120);
+  const crowd = await game.state();
+  check(crowd.floorScars === 24, `한꺼번에 30개가 떨어져도 바닥 흔적은 24개까지 (${crowd.floorScars}개)`);
+  await game.shot('hazards-many', '작은 원 30개가 한꺼번에 착지');
+  await game.send('monsters go');
+  await game.context.close();
+
+  note('\n## 보스 예고 도형과 공용 착지 (휴대폰 세로)\n');
+  const phone = await open(browser, run, Profiles.phone, url);
+  await phone.startSolo();
+  await phone.wait(1200);
+  await phone.send('goto wild');
+  await clearRoom(phone, 9, 6);
+  await phone.send('monsters hold; heal; face 1 0; warn ring 0 0 3 1.5 0 0.6; warn cone 0 4 3.5 80 90 0.6; warn line -3 -4.5 6 1.2 0 0.93');
+  await phone.wait(350);
+  check((await phone.state()).warnsShown === 3, '휴대폰 세로에서도 예고가 그려진다');
+  await phone.shot('hazards-phone-warn', '휴대폰 세로: 고리·부채꼴·선 예고');
+  await phone.send('warn land');
+  await phone.wait(110);
+  await phone.shot('hazards-phone-blast', '휴대폰 세로: 착지');
   await phone.send('monsters go');
   await phone.context.close();
 }
@@ -8086,7 +8159,7 @@ async function towns(browser) {
   }
 }
 
-const Sections = { menu, title, testground, hunt, harvest, zones, towns, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, warden, antlion, queen, general, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
+const Sections = { menu, title, testground, hunt, harvest, zones, towns, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, warden, antlion, queen, general, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, hazards, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

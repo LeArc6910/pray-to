@@ -130,6 +130,10 @@ namespace Game.Client
         internal bool DungeonCardShowing => _view != null && _view.DungeonCardShowing;
         internal int MonsterFxAlive => _view?.MonsterFxAlive ?? 0;
         internal int MonsterFxPieces => _view?.MonsterFxPieces ?? 0;
+        // The boss's warnings and the blow in their shape (WorldView.Hazards.cs), for the playtest.
+        internal int WarnsShown => _view?.WarnCount ?? 0;
+        internal int BlastPieces => _view?.LastBlastPieces ?? 0;
+        internal int FloorScars => _view?.ScarCount ?? 0;
         internal int MonsterShotsDrawn => _view?.MonsterShotsDrawn ?? 0;
         internal int MonsterBlowsShown => _view?.MonsterBlowsShown ?? 0;
         internal int AlertsShown => _view?.AlertsShown ?? 0;

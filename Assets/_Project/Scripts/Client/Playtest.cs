@@ -265,6 +265,29 @@ namespace Game.Client
                     // feel <piece|all> <on|off>: one piece of a blow's feedback (Feel, Docs/Feel.md).
                     if (!Feel.Set(words[1], words.Length < 3 || words[2] != "off")) return $"no feel '{words[1]}' (all, {string.Join(", ", Feel.Names)})";
                     return $"ok feel off: {Feel.Off}";
+                case "warn":
+                    // warn <circle|share|ring|cone|line|path> <dx> <dy> <size> <width> <degrees> <filled 0..1>: a boss's
+                    // warning laid beside the player and held at that moment of its filling, for a picture
+                    // (WorldView.Hazards.cs, E1 of Docs/EffectsRework.md). warn land [n]: the blow of the first n lands. warn clear.
+                    if (root.View == null) return "no view";
+                    if (words[1] == "land" || words[1] == "clear")
+                    {
+                        root.View.EndStagedWarnings(words[1] == "land", words.Length > 2 ? Int(words[2]) : int.MaxValue);
+                        return null;
+                    }
+                    var warnShape = words[1] switch
+                    {
+                        "share" => HazardShape.Share,
+                        "ring" => HazardShape.Ring,
+                        "cone" => HazardShape.Cone,
+                        "line" => HazardShape.Line,
+                        "path" => HazardShape.Line,
+                        _ => HazardShape.Circle,
+                    };
+                    float warnTurn = Float(words[6]) * Mathf.Deg2Rad;
+                    root.View.StageWarning(warnShape, player.Position + new Vec2(Float(words[2]), Float(words[3])), new Vec2(Mathf.Cos(warnTurn), Mathf.Sin(warnTurn)),
+                        Float(words[4]), Float(words[5]), words[1] != "path", Float(words[7]));
+                    return null;
                 case "fxhold":
                     // fxhold <seconds|off>: skill effects stop at that age, for a picture of one phase (Docs/SkillEffects.md).
                     Feel.SkillFxHold = words[1] == "off" ? -1 : Float(words[1]);
@@ -2859,6 +2882,9 @@ namespace Game.Client
                 json.Field("mobPoolsShown", root.MonsterPoolsShown);
                 json.Field("mobFx", root.MonsterFxAlive);
                 json.Field("mobFxPieces", root.MonsterFxPieces);
+                json.Field("warnsShown", root.WarnsShown);
+                json.Field("blastPieces", root.BlastPieces);
+                json.Field("floorScars", root.FloorScars);
                 json.Field("mobShots", root.MonsterShotsDrawn);
                 json.Field("rooted", player.Afflictions.Rooted);
                 // The rest of the kinds (2026-11-22): blows shown so far (a count that only grows), those under the
