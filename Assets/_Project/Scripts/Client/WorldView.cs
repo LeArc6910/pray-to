@@ -1016,7 +1016,11 @@ namespace Game.Client
                 }
                 body.Name = view.IsPlayer ? view.Name : view.Kind == EntityKind.Boss && view.BossState != BossState.Dormant ? view.Boss.Name : null;
                 if (view.IsPlayer) body.Style = _client.KnowsLookOf(view.Id) ? view.Look : (CharacterLook?)null;
-                if (view.Kind == EntityKind.Boss) TrackBoss(body, view);
+                if (view.Kind == EntityKind.Boss)
+                {
+                    TrackBoss(body, view);
+                    AimOf(body, view);
+                }
                 if (view.Kind == EntityKind.Monster)
                 {
                     // Its voice: a cry on coming for someone (not more than every CrySeconds), a sound as it winds up.
@@ -2095,8 +2099,10 @@ namespace Game.Client
 
         void DrawProjectiles(float deltaTime)
         {
+            EndAim();
+            EnemyShotCount = 0;
             _seen.Clear();
-            foreach (var projectile in _client.Projectiles())
+            foreach (var projectile in ProjectilesToDraw())
             {
                 _seen.Add(projectile.Id);
                 bool isNew = !_projectiles.TryGetValue(projectile.Id, out var renderer);
@@ -2112,11 +2118,15 @@ namespace Game.Client
                     bool crescent = !projectile.Friendly && _bossInView?.Id == "shrine_samurai";
                     // The silk mother's are gobs of venom (2026-11-13).
                     bool venom = !projectile.Friendly && _bossInView?.Id == "silk_mother";
-                    var sprite = arrow ? ArrowSprite : projectile.Friendly ? OrbSprite : rock ? RockSprite : crescent ? CrescentSprite : venom ? VenomGlobSprite : SporeSprite;
-                    renderer = Renderer(_root.transform, "Projectile", sprite, arrow ? Color.Lerp(Color.white, color, 0.3f) : rock || venom ? Color.white : crescent ? SteelColor : color);
+                    // Every other enemy's is drawn in what it is made of, at its size and angle, tail and all
+                    // (WorldView.Shots.cs, E2); the three above keep their picture and only end as the others do.
+                    bool own = !projectile.Friendly && !rock && !crescent && !venom;
+                    var enemy = projectile.Friendly ? null : MakeEnemyShot(projectile, own);
+                    var sprite = arrow ? ArrowSprite : projectile.Friendly ? OrbSprite : rock ? RockSprite : crescent ? CrescentSprite : venom ? VenomGlobSprite : EnemyShotSprite(enemy, 0);
+                    renderer = Renderer(_root.transform, "Projectile", sprite, arrow ? Color.Lerp(Color.white, color, 0.3f) : own || rock || venom ? Color.white : crescent ? SteelColor : color);
                     float across = sprite.rect.height / Sprites.PixelsPerUnit;
-                    renderer.transform.localScale = Vector3.one * (arrow ? 1 : Mathf.Max(1, projectile.Radius * (projectile.Friendly ? 2.6f : 2) / across));
-                    renderer.transform.localRotation = Quaternion.Euler(0, 0, projectile.Velocity.Angle * Mathf.Rad2Deg);
+                    renderer.transform.localScale = Vector3.one * (arrow || own ? 1 : Mathf.Max(1, projectile.Radius * (projectile.Friendly ? 2.6f : 2) / across));
+                    if (!own) renderer.transform.localRotation = Quaternion.Euler(0, 0, projectile.Velocity.Angle * Mathf.Rad2Deg);
                     renderer.sortingOrder = 20000;
                     _projectiles[projectile.Id] = renderer;
                 }
@@ -2126,6 +2136,7 @@ namespace Game.Client
                 renderer.enabled = !DrawSkillShot(projectile, isNew, deltaTime);
                 // A monster's shot from the sheet likewise, in its monster's colours (WorldView.MonsterFx).
                 if (!projectile.Friendly && DrawMonsterShot(projectile, isNew)) renderer.enabled = false;
+                if (!projectile.Friendly) BeatEnemyShot(projectile.Id, renderer);
                 // The silk mother's venom sheds drops as it flies.
                 if (!projectile.Friendly && _bossInView?.Id == "silk_mother" && UnityEngine.Random.value < 0.3f)
                     Drip(new Vector3(projectile.Position.X, projectile.Position.Y, 0), VenomColor);
@@ -2138,6 +2149,8 @@ namespace Game.Client
             foreach (var pair in _projectiles)
             {
                 if (_seen.Contains(pair.Key)) continue;
+                // An enemy's ends in a ring and bits, the rocks too; venom, crescents and a monster's own end their way.
+                EnemyShotGone(pair.Key, pair.Value.transform.localPosition, !_mobShots.ContainsKey(pair.Key) && pair.Value.sprite != CrescentSprite && pair.Value.sprite != VenomGlobSprite);
                 Object.Destroy(pair.Value.gameObject);
                 _gone.Add(pair.Key);
             }
@@ -2147,13 +2160,12 @@ namespace Game.Client
                 SkillShotGone(id);
                 MonsterShotGone(id);
             }
+            UpdateShotPops(deltaTime);
         }
 
         static Sprite ArrowSprite => Sprites.Centered("shot/arrow", () => ItemArt.Arrow);
 
         static Sprite OrbSprite => Sprites.Centered("shot/orb", () => ItemArt.Orb);
-
-        static Sprite SporeSprite => Sprites.Centered("shot/spore", () => ItemArt.Spore);
 
         void Show(SimEvent e)
         {
@@ -3901,11 +3913,12 @@ namespace Game.Client
             AddPoiLights(left, bottom, size);
             AddFxLights();
             AddBlastLights();
-            foreach (var shot in _projectiles.Values)
+            foreach (var pair in _projectiles)
             {
+                var shot = pair.Value;
                 if (shot.sprite == ArrowSprite) continue;
                 var at = shot.transform.localPosition;
-                _lights.Add(new LightSource(new Vec2(at.x, at.y), ShotLight, 0.8f, Sprites.ToRgba(shot.color), tints: true));
+                _lights.Add(new LightSource(new Vec2(at.x, at.y), ShotLight, 0.8f, ShotLightColor(pair.Key, shot), tints: true));
             }
             // The abyss swallows light (B4b, LavaVoidLight).
             AbyssLightsDimmed = LavaVoidLight.Dim(_lights, _biomeAt, carried);

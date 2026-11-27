@@ -739,6 +739,37 @@ namespace Game.Client.Tests
             Assert.IsTrue(_root.Playing);
         }
 
+        // The enemies' shots (E2 of Docs/EffectsRework.md, WorldView.Shots.cs): every element hung beside the player,
+        // each drawn in its own picture; when they go each leaves its ring, which is gone within a quarter second; and
+        // the dotted lines of an aimed volley stay within their dots and go with it.
+        [UnityTest, Category(Screens.Category)]
+        public IEnumerator EnemyShotsFlyInTheirElementAndEndInARing()
+        {
+            yield return Start();
+            World.MonstersHold = true;
+            var view = _root.View;
+            for (int e = 0; e < 9; e++)
+                for (int i = 0; i < 3; i++)
+                    view.StageShot(Player.Position + new Vec2(-8 + (e % 3) * 6 + i * 1.2f, 3 - (e / 3) * 2.4f), new Vec2(8, i - 1), 0.3f, e);
+            view.StageShot(Player.Position + new Vec2(-3, -4), new Vec2(8, 0), 0.3f, -1);
+            view.StageAim(Player.Position + new Vec2(2, -4), new Vec2(1, 0), 1.2f, 50, 5, 0.6f);
+            yield return new WaitForSecondsRealtime(0.3f);
+            Assert.AreEqual(27, _root.EnemyShots, "Nine elements, three of each, drawn here; the player's is not one of them.");
+            Assert.That(_root.AimDots, Is.InRange(10, 72), "Five dotted lines, within their dots.");
+            yield return Screens.Take("shots-elements");
+            view.EndStagedShots();
+            yield return null;
+            yield return null;
+            Assert.AreEqual(27, _root.ShotEnds, "Each enemy's shot ends in its ring.");
+            Assert.AreEqual(0, _root.EnemyShots);
+            Assert.AreEqual(0, _root.AimDots);
+            yield return Screens.Take("shots-ends");
+            yield return new WaitForSecondsRealtime(0.4f);
+            Assert.AreEqual(0, _root.ShotEnds, "The rings are gone in a quarter of a second.");
+            World.MonstersHold = false;
+            Assert.IsTrue(_root.Playing);
+        }
+
         // A boss's warnings and the blow that lands in their shape (E1 of Docs/EffectsRework.md, WorldView.Hazards.cs):
         // every shape laid beside the player and held part filled, then landed. The blow stays within its pieces, the
         // floor keeps a scar for each harmful one (a charge's path leaves none) and gives them up in time.

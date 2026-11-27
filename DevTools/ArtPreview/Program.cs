@@ -44,6 +44,12 @@ namespace Game.Client
                 return HazardPreview.Write(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out", "hazard"),
                     TileArt.Ground(TileArt.Index(GroundKind.Floor, 0, 0))) ? 0 : 1;
             }
+            if (args.Length == 2 && args[0] == "--only" && args[1] == "shot")
+            {
+                // --only shot: the enemies' shots by element, flying and ending (out/shot/, ShotPreview).
+                return ShotPreview.Write(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out", "shot"),
+                    TileArt.Ground(TileArt.Index(GroundKind.Floor, 0, 0))) ? 0 : 1;
+            }
             if (args.Length == 2 && args[0] == "--only" && args[1] == "monsterfx")
             {
                 // --only monsterfx: just the ordinary monsters' warnings and effects (out/monsterfx/, MonsterFxPreview).

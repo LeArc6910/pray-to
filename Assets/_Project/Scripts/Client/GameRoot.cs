@@ -134,6 +134,10 @@ namespace Game.Client
         internal int WarnsShown => _view?.WarnCount ?? 0;
         internal int BlastPieces => _view?.LastBlastPieces ?? 0;
         internal int FloorScars => _view?.ScarCount ?? 0;
+        // The enemies' shots drawn in their element, the rings where they ended, and the dots of the aim lines (E2).
+        internal int EnemyShots => _view?.EnemyShotCount ?? 0;
+        internal int ShotEnds => _view?.ShotPopCount ?? 0;
+        internal int AimDots => _view?.AimDotCount ?? 0;
         internal int MonsterShotsDrawn => _view?.MonsterShotsDrawn ?? 0;
         internal int MonsterBlowsShown => _view?.MonsterBlowsShown ?? 0;
         internal int AlertsShown => _view?.AlertsShown ?? 0;

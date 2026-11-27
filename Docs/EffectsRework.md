@@ -95,3 +95,13 @@
 - **한도**: 착지 하나 31조각 안팎(한도 72, `LastBlastPieces`로 잰다), 바닥 흔적 24개(넘으면 오래된 것부터 지운다), 가산 혼합·방 어둡게 없음. 먼지는 정렬을 예고 아래(`DarkOrder + 8`)에 두어 남아 있는 예고를 가리지 않는다. 연기는 넣지 않았다
 - **그대로 둔 것**: 보스별 고유 `*Landed`(E6), 일반 몬스터의 예고(`MakeMark`와 `Shapes`의 매끈한 도형을 그대로 쓴다, E5), 웅덩이
 - **확인**: `--only hazard`(`out/hazard/warn.png`·`blast.png`와 흑백 `_gray`, `pieces.png`), 명령 `warn`, `sweep.js --only hazards`, PlayMode `BossWarningsFillAndLandInTheirShape`(사진 `hazard-warnings`·`hazard-blows`·`hazard-scars`)
+
+## 7. E2 적용: 적의 탄 (2026-11-27)
+
+- **그림**은 `Client/Art/ShotArt.cs`(UnityEngine 없음). 탄 하나 = 어두운 테 1px + **붉은 테** 1px + 원소 껍질 + 밝은 핵(2프레임 맥동, 12.5fps) + 줄어드는 꼬리 4마디. 테 2px은 판정 반지름 **바깥**에 그려 판정보다 작지 않다(반지름 0.3칸 → 지름 15px). 날아가는 각도(32방향)로 직접 그려 돌리지 않고, 꼬리까지 한 장이라 **탄 하나가 1조각**이다(32발 폭풍도 32조각)
+- **원소 아홉**(`ShotElement`, `ShotArt.ElementOf`): 동굴 수호자·흑철 기사 = 돌(깎인 바위), 수정 거미 여왕 = 결정(뾰족한 가시), 개미귀신 = 모래(부서지는 흙덩이), 모르그 = 불(뒤로 늘어진 불꽃), 용암 거인 = 용암(갈라진 껍질 속 불빛), 공허의 군주 = 공허(어두운 속 + 밝은 고리), 물살 뱀 = 물(반짝이는 물방울), 왕관의 망령 = 망령(청록 불꽃. 지금 시트에는 망령의 탄 공격이 없어 쓰이지 않는다), 그 밖(보스 없이 쏜 적) = 불씨(옛 주황 공의 새 모습)
+- **소멸**: 사라진 자리(맞음·벽·수명 모두)에 흰 불꽃 → 열리며 흩어지는 고리 + 원소색 파편 여섯, 5프레임 0.24초, 한 장짜리 그림 1조각. 동시에 40개까지
+- **빛**: 이미 있던 `ShotLight` 길 그대로, 색만 원소색(`ShotArt.Glow`)
+- **조준선**: 대상 쪽으로 펼쳐 쏘는 부채 사격(`burst`에 `angle`이 있는 것: 그룸 바위 던지기, 시구레 월광참, 아라네 독액 뿜기)의 예고 동안 탄마다 붉은 점선(3px 점, 0.6칸 간격, 7칸까지, 예고가 찰수록 길고 진하게, 72점까지). 방향은 화면이 아는 보스의 방향과 시트의 각도·수로 정한다(`World.Burst`와 같은 식). **넣지 못한 것**: 사방으로 쏘는 `burst`와 `spiral`은 쏘는 순간 호스트가 시작 각도를 무작위로 정해 화면이 미리 알 수 없다(Core를 바꿔야 한다)
+- **그대로 둔 것**: 그룸의 바위는 제 그림 그대로 + 소멸만 돌 파편으로. 시구레의 월광참(꽃잎)·아라네의 독액(방울)은 제 연출이 있어 그대로. 일반 몬스터의 시트 탄(`WorldView.MonsterFx`)은 E5. 플레이어 탄은 E4
+- **확인**: `--only shot`(`out/shot/shots.png`와 흑백 `_gray`, `report.txt`), 명령 `shots`, `sweep.js --only shots`, PlayMode `EnemyShotsFlyInTheirElementAndEndInARing`(사진 `shots-elements`·`shots-ends`)

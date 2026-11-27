@@ -288,6 +288,32 @@ namespace Game.Client
                     root.View.StageWarning(warnShape, player.Position + new Vec2(Float(words[2]), Float(words[3])), new Vec2(Mathf.Cos(warnTurn), Mathf.Sin(warnTurn)),
                         Float(words[4]), Float(words[5]), words[1] != "path", Float(words[7]));
                     return null;
+                case "shots":
+                    // shots <element 0..8|-1 for a player's> <dx> <dy> <degrees> <count> <spread degrees> [radius]: shots hung
+                    // in the air beside the player, flying that way, for a picture (WorldView.Shots.cs, E2 of
+                    // Docs/EffectsRework.md). shots aim <dx> <dy> <degrees> <count> <spread degrees> <filled 0..1>: the
+                    // dotted lines before an aimed volley. shots clear: they end where they hang, each with its ring.
+                    if (root.View == null) return "no view";
+                    if (words[1] == "clear")
+                    {
+                        root.View.EndStagedShots();
+                        return null;
+                    }
+                    if (words[1] == "aim")
+                    {
+                        float aimTurn = Float(words[4]) * Mathf.Deg2Rad;
+                        root.View.StageAim(player.Position + new Vec2(Float(words[2]), Float(words[3])), new Vec2(Mathf.Cos(aimTurn), Mathf.Sin(aimTurn)), 1.2f,
+                            Float(words[6]), Int(words[5]), Float(words[7]));
+                        return null;
+                    }
+                    int shotCount = Mathf.Max(1, Int(words[5]));
+                    for (int i = 0; i < shotCount; i++)
+                    {
+                        float turn = (Float(words[4]) + (shotCount == 1 ? 0 : Float(words[6]) * (i / (shotCount - 1f) - 0.5f))) * Mathf.Deg2Rad;
+                        var shotWay = new Vec2(Mathf.Cos(turn), Mathf.Sin(turn));
+                        root.View.StageShot(player.Position + new Vec2(Float(words[2]), Float(words[3])) + shotWay * (1.2f + 0.9f * (i % 3)), shotWay * 8, words.Length > 7 ? Float(words[7]) : 0.3f, Int(words[1]));
+                    }
+                    return null;
                 case "fxhold":
                     // fxhold <seconds|off>: skill effects stop at that age, for a picture of one phase (Docs/SkillEffects.md).
                     Feel.SkillFxHold = words[1] == "off" ? -1 : Float(words[1]);
@@ -2885,6 +2911,9 @@ namespace Game.Client
                 json.Field("warnsShown", root.WarnsShown);
                 json.Field("blastPieces", root.BlastPieces);
                 json.Field("floorScars", root.FloorScars);
+                json.Field("enemyShots", root.EnemyShots);
+                json.Field("shotEnds", root.ShotEnds);
+                json.Field("aimDots", root.AimDots);
                 json.Field("mobShots", root.MonsterShotsDrawn);
                 json.Field("rooted", player.Afflictions.Rooted);
                 // The rest of the kinds (2026-11-22): blows shown so far (a count that only grows), those under the

@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu title testground hunt harvest zones towns time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight warden antlion queen general spider arenas world farm life npc factory defense gear skills skillfx monsterfx hazards map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
+// Sections: menu title testground hunt harvest zones towns time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight warden antlion queen general spider arenas world farm life npc factory defense gear skills skillfx monsterfx hazards shots map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -3022,6 +3022,79 @@ async function hazards(browser) {
   await phone.wait(250);
   await phone.shot('hazards-phone-blast', '휴대폰 세로: 착지 0.11초');
   await phone.send('fxhold off; monsters go');
+  await phone.context.close();
+}
+
+// ---------------------------------------------------------------- 적의 탄 (E2, Docs/EffectsRework.md 7절)
+// Nine elements a row of three flying right, over a warning; a player's orbs beside them to tell them from.
+const ShotRows = [0, 1, 2, 3, 4, 5, 6, 7, 8].map(e => `shots ${e} ${-9 + (e % 3) * 6.5} ${3.4 - Math.floor(e / 3) * 2.6} ${e % 3 === 1 ? 20 : e % 3 === 2 ? -25 : 0} 3 0`);
+
+async function shots(browser) {
+  note('\n## 적의 탄: 원소별 모습·꼬리·소멸·조준선 (PC)\n');
+  const game = await open(browser, run, Profiles.pc, url);
+  await game.startSolo();
+  await game.wait(1200);
+  await game.send('goto wild');
+  await clearRoom(game, 12, 7);
+  await game.send('monsters hold; heal; face 1 0');
+  await game.send('warn circle -2.2 0.8 2.2 0 0 0.6; warn line 2 -1.8 6 1.3 0 0.6; ' + ShotRows.join('; ') + '; shots -1 -8 -4.2 0 3 0; shots 0 -8 -5.4 0 3 0');
+  await game.wait(400);
+  let st = await game.state();
+  check(st.enemyShots === 30, `적의 탄 서른 발이 원소 그림으로 그려진다 (${st.enemyShots}발: 불씨·돌·결정·모래·불·용암·공허·물·망령, 예고 위 포함)`);
+  await game.shot('shots-elements', '원소 아홉(왼쪽 위부터 불씨·돌·결정 / 모래·불·용암 / 공허·물·망령), 아래 두 줄은 플레이어 구슬(위)과 적의 탄(아래)');
+  await game.send('fxhold 0.07; shots clear');
+  st = await pollState(game, t => t.shotEnds > 0 && t.enemyShots === 0, 2000);
+  check(st.shotEnds === 30 && st.enemyShots === 0, `탄이 사라진 자리마다 고리와 파편 (${st.shotEnds}개, 남은 탄 ${st.enemyShots})`);
+  await game.shot('shots-ends', '사라진 0.07초: 고리와 파편');
+  await game.send('fxhold off');
+  st = await pollState(game, t => t.shotEnds === 0, 2000);
+  check(st.shotEnds === 0, `소멸 이펙트는 0.24초 뒤 남지 않는다 (${st.shotEnds}개)`);
+  await game.send('warn clear; shots aim -4 1 0 5 50 0.35; shots aim 3 -1 200 3 40 0.9');
+  await game.wait(300);
+  st = await game.state();
+  check(st.aimDots > 20 && st.aimDots <= 72, `조준선 점선이 깔린다 (${st.aimDots}점, 한도 72)`);
+  await game.shot('shots-aim', '조준선: 왼쪽은 예고 35%(다섯 갈래), 오른쪽은 90%(세 갈래)');
+  await game.send('shots clear');
+  st = await pollState(game, t => t.aimDots === 0, 1500);
+  check(st.aimDots === 0, `예고가 끝나면 조준선이 사라진다 (${st.aimDots}점)`);
+
+  // The real ones: a boss's volley in its own element, the largest storm, and the lines before an aimed throw.
+  await game.send('monsters go; equip void_sword void_helmet void_armor void_boots; heal');
+  for (const [id, attack, name, least] of [['cave_warden', 'rock_burst', '동굴 수호자의 돌 파편', 6], ['lava_titan', 'magma_ring', '용암 거인의 용암 고리', 8], ['void_lord', 'void_ring', '공허의 군주의 공허 고리', 12]]) {
+    await game.send(`heal; goto boss ${id}`);
+    await game.until(t => has(t.banner, '등장') || has(t.entrance, '등장'), 6000, game.texts);
+    await game.wait(1500);
+    await game.send(`heal; boss ${id} use ${attack}`);
+    const flying = await pollState(game, t => t.enemyShots >= least, 3000);
+    check(flying.enemyShots >= least, `${name}: 탄이 원소 그림으로 난다 (화면 ${flying.enemyShots}발, 호스트 ${flying.bossShots}발)`);
+    await game.shot(`shots-${id}`, `${name}이 날아가는 중`);
+    const ended = await pollState(game, t => t.shotEnds > 0, 5000);
+    check(ended.shotEnds > 0, `${name}: 벽·수명에서 고리와 파편으로 사라진다 (${ended.shotEnds}개)`);
+  }
+  await game.send('heal; goto boss vein_eater');
+  await game.until(t => has(t.banner, '등장') || has(t.entrance, '등장'), 9000, game.texts);
+  await game.wait(1500);
+  await game.send('heal; boss vein_eater use rock_throw');
+  const aimed = await pollState(game, t => t.aimDots > 0, 2000);
+  check(aimed.aimDots > 0, `그룸의 바위 던지기: 쏘기 전에 세 갈래 조준선 (${aimed.aimDots}점)`);
+  await game.wait(350);
+  await game.shot('shots-vein-aim', '그룸의 바위 던지기 예고: 조준선 세 갈래');
+  const thrown = await pollState(game, t => t.bossShots > 0, 3000);
+  check(thrown.bossShots > 0 && thrown.enemyShots === 0, `그룸의 바위는 제 그림 그대로다 (호스트 ${thrown.bossShots}발, 원소 그림 ${thrown.enemyShots}발)`);
+  await game.context.close();
+
+  note('\n## 적의 탄 (휴대폰 세로)\n');
+  const phone = await open(browser, run, Profiles.phone, url);
+  await phone.startSolo();
+  await phone.wait(1200);
+  await phone.send('goto wild');
+  await clearRoom(phone, 9, 6);
+  await phone.send('monsters hold; heal; face 1 0; warn circle 0 2.5 2 0 0 0.6; shots 2 -3 4 0 3 0; shots 5 -3 2.5 0 3 0; shots 6 -3 1 0 3 0; shots 7 -3 -1.5 0 3 0; shots -1 -3 -3 0 3 0; shots aim 0 -5.5 90 3 40 0.7');
+  await phone.wait(400);
+  st = await phone.state();
+  check(st.enemyShots === 12 && st.aimDots > 0, `휴대폰 세로에서도 탄과 조준선이 그려진다 (탄 ${st.enemyShots}, 점 ${st.aimDots})`);
+  await phone.shot('shots-phone', '휴대폰 세로: 결정·용암·공허·물 탄과 플레이어 구슬, 조준선');
+  await phone.send('shots clear; warn clear; monsters go');
   await phone.context.close();
 }
 
@@ -8165,7 +8238,7 @@ async function towns(browser) {
   }
 }
 
-const Sections = { menu, title, testground, hunt, harvest, zones, towns, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, warden, antlion, queen, general, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, hazards, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
+const Sections = { menu, title, testground, hunt, harvest, zones, towns, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, warden, antlion, queen, general, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, hazards, shots, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });
