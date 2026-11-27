@@ -2970,6 +2970,19 @@ namespace Game.Client
                 json.Field("lastHitElement", view != null ? view.LastHitElement.ToString() : "-");
                 json.Field("namedHits", view?.NamedHits ?? 0);
                 json.Field("mobShots", root.MonsterShotsDrawn);
+                // F2 (Docs/EffectsRework.md 15): monsters' blows landed as their warning's shape and shots drawn in a
+                // kind's own colour; bands of pools drawn; flashes where shots were let fly and how many shots the last
+                // was for; bits thrown as pieces where square dots were; explosions in place of plain bursts; the
+                // general's white blade through blows other than the cleave; a spiral's later volleys lined up.
+                json.Field("mobShapeBlows", view?.MobShapeBlows ?? 0);
+                json.Field("mobOwnShots", view?.MobOwnShots ?? 0);
+                json.Field("poolBands", view?.PoolBands ?? 0);
+                json.Field("muzzleFlashes", view?.MuzzleFlashes ?? 0);
+                json.Field("muzzleShots", view?.LastMuzzleShots ?? 0);
+                json.Field("bitsThrown", view?.BitsThrown ?? 0);
+                json.Field("explosions", view?.Explosions ?? 0);
+                json.Field("whiteBlades", view?.WhiteBlades ?? 0);
+                json.Field("spiralAims", view?.SpiralAims ?? 0);
                 // E5: monsters' marks drawn as pictures of their shape, and bodies drawn rushing (dust, lines of speed).
                 json.Field("mobWarnsShown", root.MonsterWarnsShown);
                 json.Field("mobRushes", root.MonsterRushesShown);

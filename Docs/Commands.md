@@ -64,6 +64,7 @@ dotnet run --project DevTools/ArtPreview -- --only fxmock
 dotnet run --project DevTools/ArtPreview -- --only hazard
 # 스킬 이펙트(E3 공용 폭발·층 조각, E4 스킬 30종): out/skillfx/<클래스>.png·_gray·report.txt(조각 수), pieces.png. 웹 점검은 sweep.js --only blast(폭발), layers(범위 스킬 여섯 나란히·유성 낙하), skillfx(서른 가지 하나씩)
 dotnet run --project DevTools/ArtPreview -- --only skillfx
+# F2: monsterfx의 pieces.png에 띠 장판 네 줄과 도형 착지 열한 줄, bossfx의 muzzle.png(쏘는 순간의 섬광), shot의 맨 아래 줄에 조준선 두 안(전·지금)
 # 일반 몬스터의 예고·탄·장판(E5): out/monsterfx/<종>.png·_gray, pieces.png(장판 다섯, 예고, 탄 열 줄, 돌진, 원소 터짐). 한 이펙트 24조각·빛 3개를 넘으면 실패. 웹 점검은 sweep.js --only mobwarn
 dotnet run --project DevTools/ArtPreview -- --only monsterfx
 # 적의 탄(out/shot/: shots.png 원소 열넷(보스 아홉 + 몬스터 다섯)의 맥동·각도·큰 것·멈춘 것·소멸 5프레임과 옛 공·플레이어 탄·조준선, 흑백 _gray, report.txt. Docs/EffectsRework.md 7절)

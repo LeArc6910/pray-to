@@ -43,6 +43,8 @@
 
 일반 몬스터의 예고·탄·장판(2026-11-27, `Docs/EffectsRework.md` 9절, E5): 예고 그림은 `HazardArt.Warn`의 `light`·`arrows`(모양은 `MonsterFx.Field`·`Tone`·`WarnStep`), 화면은 `WorldView.MonsterFx.cs`의 `DrawMonsterMark`(표시마다 텍스처 하나, `Mark.WarnKey`). 탄은 `ShotArt`의 원소(`MonsterFx.ShotOf`)와 `DrawMonsterShot`, 조준선은 `LayAim`. 새 조각 `FxShape.Puddle`·`Dashes`(`SkillFxArt.Layers.cs`), 착지의 원소별 터짐 `MonsterFx.Burst`, 돌진 `MobFx.Rush`, 예고 아래에 그리는 연기 `FxStamp.Low`.
 
+그림만 더한 것(2026-11-27, `Docs/EffectsRework.md` 15절, F2): 일반 몬스터의 도형 착지(`MonsterFx.ShapeBlow`·`BlowRamp`·`ShapeLand`, 화면은 `WorldView.MonsterBlow`가 보스와 같은 `Blast` 층을 옅게), 종의 색 탄(`MonsterFx.ShotTint`·`OwnRamp`), 띠 장판(`WorldView.GroupPools`, 조각 `Strip`·`StripDashes`), 쏘는 순간의 섬광(`BossFx.Muzzle`, `WorldView.Shots.cs`의 `FlashFired`·`Muzzle`), 사각 점 대신 조각(`WorldView.BossFx.cs`의 `Bits`), 폭발(`Explode`·`BossFx.Blast`), 나선 뒤 발사의 조준선(`SpiralAim`), 굵은 조준 점(`ShotArt.AimDot`·`AimStep`).
+
 공용 층 조각과 폭발(2026-11-27, `Docs/EffectsRework.md` 8절, E3): 조각 그림은 `Client/Art/SkillFxArt.Layers.cs`(`Burst`·`Pall`·`Plume`·`Ember`·`Shock`·`Glow`, 5색 `Ramp5`), 쌓는 법은 `Client/Art/FxLayers.cs`(`Blast`, `Embers`, `Plumes`, `Light` 등. 스킬·몬스터·보스 공용). 바닥 빛은 `FxShape.Light` 조각을 `WorldView.EmitFx`가 모아 빛 지도에 넣는다(이펙트당 3, 화면 12).
 
 플레이어 스킬의 층(2026-11-27, `Docs/EffectsRework.md` 10절, E4): 스킬마다의 조각은 `Client/Art/SkillFx.cs`(`Cast`·`Shot`·`Hit`·`Chain`·`Loop`, 도우미 `Comet`·`Crystals`·`Floor`·`Flames`), 새 조각 `Lump`·`Wash`·`Smear`와 번개 후광은 `SkillFxArt.Layers.cs`. 투사체의 비행 시간은 `FxContext.Span`(유성이 내려오는 그림). 시험용으로 시전 이펙트를 놓는 `WorldView.StageCast`(명령 `castfx`).
