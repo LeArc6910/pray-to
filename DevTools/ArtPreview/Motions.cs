@@ -406,13 +406,16 @@ namespace Game.Client
                 case "warden":
                     Warden(folder, arena);
                     return true;
+                case "antlion":
+                    Antlion(folder, arena);
+                    return true;
                 case "entrances":
                     Entrances(folder, arena);
                     return true;
                 case "hero":
                     return HeroPreview.Write(folder, TileArt.Ground(TileArt.Index(GroundKind.Floor, 0, 0))) == 0;
                 default:
-                    Console.Error.WriteLine($"--only {name}: warden, spider, knight, samurai, vein_eater, hero, entrances or arenas");
+                    Console.Error.WriteLine($"--only {name}: warden, antlion, spider, knight, samurai, vein_eater, hero, entrances or arenas");
                     return false;
             }
         }
@@ -436,6 +439,7 @@ namespace Game.Client
             Knight(Path.Combine(folder, "knight.gif"), arena);
             Spider(folder, arena);
             Warden(folder, arena);
+            Antlion(folder, arena);
             Entrances(folder, arena);
             Critters(Path.Combine(folder, "monsters.gif"), monsters, floor);
             People(Path.Combine(folder, "people.gif"), npcs, floor);
