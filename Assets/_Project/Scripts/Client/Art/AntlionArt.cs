@@ -274,7 +274,7 @@ namespace Game.Client
         // Head low and far ahead, half in the sand.
         static readonly Pose Plowed = P(5, -6, 10, abdAhead: 2, stepA: 2, stepB: -2, stretch: -0.1f, sink: 2);
         // Down to the jaws.
-        static readonly Pose Dived = P(2, -3, -4, stretch: -0.05f, sink: 34);
+        static readonly Pose Dived = P(2, -3, -4, stretch: -0.05f, sink: 38);
         // Sunk to the middle, jaws wide, the sand round it starting to turn.
         static readonly Pose Sunk = P(0, 2, 30, swell: 0.04f, sink: 18, shake: 0.5f);
         // Reared up on the abdomen: head and jaws high and wide, the front legs off the sand.
@@ -321,7 +321,7 @@ namespace Game.Client
 
         // Up out of the sand where the run ends, the jaws snapping.
         static readonly (Pose[] Frames, Stage[] Stages) EmergeBlow = Expand(Dived,
-            (Stage.Swing, 3, P(4, 6, 30, stretch: 0.06f, sink: 8)),
+            (Stage.Swing, 4, P(4, 6, 30, stretch: 0.06f, sink: 8)),
             (Stage.Strike, 1, P(5, 8, -4, stretch: 0.08f, sand: 1)),
             (Stage.Rebound, 1, P(4, 5, 0, stretch: 0.03f, sand: 0.5f)),
             (Stage.Held, 2, P(3, 3, 0)),
@@ -333,7 +333,7 @@ namespace Game.Client
             (Stage.Strike, 1, P(0, 3, 36, swell: 0.08f, sink: 16, shake: 1, sand: 1)),
             (Stage.Rebound, 1, P(1, 1, 10, sink: 16, shake: 1, sand: 0.6f)),
             (Stage.Held, 2, P(0, 2, 26, sink: 15, shake: 1, sand: 0.4f)),
-            (Stage.Pull, 3, P(0, 1, 10, sink: 6)),
+            (Stage.Pull, 5, P(0, 1, 10, sink: 6)),
             (Stage.Recover, 6, Rest));
 
         // Down from high, the whole front crashing onto the sand.
@@ -358,7 +358,7 @@ namespace Game.Client
         static readonly (Pose[] Frames, Stage[] Stages) EruptBlow = Expand(Submerged,
             (Stage.Swing, 3, P(2, 6, 40, sink: 18)),
             (Stage.Strike, 1, P(2, 10, 24, lift: 4, stretch: 0.12f, sand: 1)),
-            (Stage.Rebound, 1, P(1, 6, 10, lift: 2, stretch: 0.05f, sand: 0.6f)),
+            (Stage.Rebound, 3, P(1, 6, 10, lift: 2, stretch: 0.05f, sand: 0.6f)),
             (Stage.Held, 2, P(1, 3, 6, stretch: -0.06f)),
             (Stage.Recover, 8, Rest));
 
@@ -391,7 +391,7 @@ namespace Game.Client
             (Stage.Slow, 6, P(2, 0, 8, sink: 40, shake: 1)),
             (Stage.Swing, 3, P(3, 8, 36, sink: 12)),
             (Stage.Strike, 1, P(2, 12, 30, lift: 3, stretch: 0.1f, sand: 1)),
-            (Stage.Rebound, 1, P(1, 6, 14, lift: 1, stretch: 0.03f, sand: 0.5f)),
+            (Stage.Rebound, 3, P(1, 6, 14, lift: 1, stretch: 0.03f, sand: 0.5f)),
             (Stage.Slow, 6, P(0, 2, 6, shake: 1)),
             (Stage.Slow, 3, P(3, 0, 34)),
             (Stage.Strike, 1, P(5, -2, -8, abdAhead: 1, stretch: -0.06f)),
@@ -432,12 +432,12 @@ namespace Game.Client
             AntlionPose.Scoop => 10,
             AntlionPose.Dig => 12,
             AntlionPose.Plow => 10,
-            AntlionPose.Dive => 12,
+            AntlionPose.Dive => 18,
             AntlionPose.Burrow => 6,
             AntlionPose.Sink => 12,
             AntlionPose.Rear => 14,
             AntlionPose.Spread => 12,
-            AntlionPose.Submerge => 14,
+            AntlionPose.Submerge => 20,
             AntlionPose.Roar => RoarRise + 4,
             _ => BlowOf(pose)?.Frames.Length ?? 4,
         };
@@ -673,8 +673,10 @@ namespace Game.Client
             var result = new PixelImage(Width, Height);
             int sandLine = ground - R(p.Sink);
             float middle = data.MiddleX + Margin + shake;
-            float half = data.HalfWidth * (p.Sink > 0 ? System.Math.Min(1, 0.6f + p.Sink / 30) : 0);
-            if (p.Sink > 0.5f) Rim(result, middle, sandLine, half, false);
+            // The rim shows once it is well in, and widens as it goes deeper.
+            bool rim = p.Sink >= 6;
+            float half = data.HalfWidth * System.Math.Min(1, 0.45f + p.Sink / 40);
+            if (rim) Rim(result, middle, sandLine, half, false);
             for (int y = 0; y < Height; y++)
                 for (int x = 0; x < Width; x++)
                 {
@@ -687,7 +689,7 @@ namespace Game.Client
                     joints.Left = System.Math.Min(joints.Left, x);
                     joints.Right = System.Math.Max(joints.Right, x);
                 }
-            if (p.Sink > 0.5f) Rim(result, middle, sandLine, half, true);
+            if (rim) Rim(result, middle, sandLine, half, true);
             if (p.Sand > 0.05f) Sand(result, joints.HeadX, joints.HeadY, ax, ay, p.Sand, frame);
             return result;
         }

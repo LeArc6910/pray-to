@@ -920,7 +920,21 @@ namespace Game.Client
             // The crown wraith under the harbour's lake (2026-11-11): the robed build drowned, sea-green and pale, a cold
             // orb, the sunken crown on its hood.
             "crown_wraith" => VoidLord(frame, view, pose, "#1E4A4E", "#7AD8C8", "#A8F0FF", "#E8FFFF", crown: true),
-            "antlion" => Antlion(frame, view, pose),
+            // The antlion of the sand cave (2026-11-27): its own picture posed in code (AntlionPose in WorldView).
+            "antlion" => AntlionArt.Draw(view, pose switch
+            {
+                BossPose.Windup => AntlionPose.Gape,
+                BossPose.Strike => AntlionPose.Snap,
+                BossPose.Charge => AntlionPose.Burrow,
+                BossPose.Roar => AntlionPose.Roar,
+                _ => AntlionPose.Idle,
+            }, pose switch
+            {
+                BossPose.Windup => AntlionArt.FramesOf(AntlionPose.Gape) - 1,
+                BossPose.Strike => AntlionArt.StrikeFrame(AntlionPose.Snap),
+                BossPose.Roar => AntlionArt.RoarRise + frame % 4,
+                _ => frame,
+            }, 1),
             // The vein eater of the mining village (2026-11-12): a Retro Diffusion picture posed in code. WorldView draws
             // its own wind-up for each attack (VeinPose); these are its plain poses for everywhere else.
             "vein_eater" => VeinEaterArt.Draw(view, pose switch
@@ -1362,132 +1376,6 @@ namespace Game.Client
                 Line(image, nearArmX + 5 + ox + lean, 18 + bob - armUp + oy, new[] { (-1, 1), (0, 1), (-1, 1) }, Rgba.Hex("#FF7A1E"));
             }
             return image.Outlined(stone.Outline);
-        }
-
-        // The antlion (2026-11-09): a sand-brown abdomen in dark bands, a small head with two great sickle jaws, six
-        // legs. It lifts its jaws wide to wind up, snaps them shut lunging to strike, drops its head low in a charge
-        // and throws its jaws open with sand flying to roar. The head is toward the way it faces: below the body
-        // facing the viewer, hidden above it from behind, out to the side side on.
-        static PixelImage Antlion(int frame, BossView view, BossPose pose)
-        {
-            const int width = 46;
-            const int height = 42;
-            const int ox = 2;
-            const int oy = 4;
-            var image = new PixelImage(width, height);
-            var body = Ramp.Of("#9C7A4A");
-            var leg = Ramp.Of("#6E5232");
-            var head = Ramp.Of("#7E6038");
-            var jaw = Rgba.Hex("#EADCB8");
-            var jawShade = Rgba.Hex("#B8A27A");
-            var eye = Rgba.Hex("#1E140A");
-            int shift = frame % 2;
-            bool behind = Behind(view);
-            int turn = Turn(view);
-            int lunge = pose == BossPose.Strike || pose == BossPose.Charge ? 3 : pose == BossPose.Windup ? -2 : 0;
-            int low = pose == BossPose.Charge ? 2 : 0;
-            int bx = 21 - turn * 2;
-            int by = behind ? 16 : 13;
-            int hx = 21 + turn * 6 + (turn > 0 ? lunge : 0);
-            int hy = (behind ? 6 : 21 - turn * 3) + (turn == 0 ? (behind ? -lunge : lunge) : 0) + low;
-            void Leg(int x0, int y0, int x1, int y1, Rgba color, Rgba light) => Thick(image, x0 + ox, y0 + oy, x1 + ox, y1 + oy, color, light);
-            void Put(int x, int y, Rgba color) => image[x + ox, y + oy] = color;
-
-            // Six legs, three a side, stepping pair by pair; the roar lifts them and a wind-up braces the front pair.
-            for (int i = 0; i < 3; i++)
-            {
-                int lift = (i + shift) % 2 == 0 ? -1 : 1;
-                if (pose == BossPose.Roar) lift -= 2;
-                int startY = by + 3 + i * 4;
-                int kneeY = by - 3 + i * 6 + lift;
-                int footY = by + 4 + i * 6 + lift + (pose == BossPose.Windup && i == 0 ? 2 : 0);
-                foreach (int side in new[] { -1, 1 })
-                {
-                    bool far = turn == 2 && side < 0;
-                    int spread = far ? 10 : 13;
-                    int startX = bx + side * 7;
-                    int kneeX = bx + side * (spread + i);
-                    int footX = bx + side * (spread + 3 + i) + (pose == BossPose.Strike ? side * 2 : 0);
-                    Leg(startX, startY, kneeX, kneeY, far ? leg.Shade : leg.Main, far ? leg.Main : leg.Light);
-                    Leg(kneeX, kneeY, footX, footY, far ? leg.Dark : leg.Shade, far ? leg.Shade : leg.Main);
-                }
-            }
-
-            void Oval(int cx, int cy, int rx, int ry, Ramp ramp)
-            {
-                var part = new PixelImage(width, height);
-                Ellipse(part, cx + ox, cy + oy, rx, ry, ramp);
-                for (int y = 0; y < height; y++)
-                {
-                    for (int x = 0; x < width; x++)
-                    {
-                        if (part[x, y].A > 0) image[x, y] = part[x, y];
-                    }
-                }
-            }
-
-            // The jaws: two sickles out of the head, open by the pose. Facing the viewer they curve down and in; side
-            // on they point ahead, one over the other.
-            int open = pose == BossPose.Windup || pose == BossPose.Roar ? 6 : pose == BossPose.Strike ? 0 : 3;
-            void Jaws()
-            {
-                if (turn == 2)
-                {
-                    // Upper and lower jaw ahead of the head, parted by the pose.
-                    Thick(image, hx + 4 + ox, hy - 2 + oy, hx + 9 + ox, hy - 3 - open / 2 + oy, jawShade, jaw);
-                    Thick(image, hx + 9 + ox, hy - 3 - open / 2 + oy, hx + 12 + ox, hy - 1 + oy, jawShade, jaw);
-                    Thick(image, hx + 4 + ox, hy + 1 + oy, hx + 9 + ox, hy + 2 + open / 2 + oy, jawShade, jaw);
-                    Thick(image, hx + 9 + ox, hy + 2 + open / 2 + oy, hx + 12 + ox, hy + 1 + oy, jawShade, jaw);
-                    return;
-                }
-                foreach (int s in new[] { -1, 1 })
-                {
-                    // A sickle: out from the head, round, and its point turned back in.
-                    int x0 = hx + s * 3, y0 = hy + 2;
-                    int x1 = hx + s * (5 + open), y1 = hy + 5;
-                    int x2 = hx + s * (4 + open), y2 = hy + 9;
-                    int x3 = hx + s * (2 + open / 2), y3 = hy + 11;
-                    Thick(image, x0 + ox, y0 + oy, x1 + ox, y1 + oy, jawShade, jaw);
-                    Thick(image, x1 + ox, y1 + oy, x2 + ox, y2 + oy, jawShade, jaw);
-                    Thick(image, x2 + ox, y2 + oy, x3 + ox, y3 + oy, jawShade, jaw);
-                }
-            }
-
-            if (behind) Oval(hx, hy, 6, 4, head);
-            // The abdomen, banded.
-            Oval(bx, by, turn == 2 ? 11 : 12, 9, body);
-            for (int band = -6; band <= 6; band += 3)
-            {
-                int y = by + band;
-                int half = (int)((turn == 2 ? 11 : 12) * System.Math.Sqrt(System.Math.Max(0, 1 - band * band / 81.0))) - 1;
-                for (int x = bx - half; x <= bx + half; x++)
-                {
-                    if (image[x + ox, y + oy].A > 0) image[x + ox, y + oy] = body.Shade;
-                }
-            }
-            if (!behind)
-            {
-                Jaws();
-                Oval(hx, hy, turn == 2 ? 6 : 7, 5, head);
-                // Two small black eyes.
-                if (turn == 2) Put(hx + 2, hy - 2, eye);
-                else
-                {
-                    Put(hx - 2, hy - 2, eye);
-                    Put(hx + 2, hy - 2, eye);
-                }
-            }
-            // Roaring, sand thrown up round it.
-            if (pose == BossPose.Roar)
-            {
-                var sand = Rgba.Hex("#D8B878");
-                foreach (var (x, y) in new[] { (bx - 14, by - 10), (bx - 9, by - 13), (bx + 10, by - 12), (bx + 15, by - 8), (bx - 4, by - 15), (bx + 4, by - 14) })
-                {
-                    Put(x, y + shift, sand);
-                    Put(x + 1, y + 1 + shift, sand.Scale(0.8f));
-                }
-            }
-            return image.Outlined(body.Outline);
         }
 
         // The crystal spider queen: a dark round body grown over with crystals, a head with a row of pink eyes, and

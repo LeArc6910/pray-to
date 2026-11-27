@@ -621,6 +621,36 @@ namespace Game.Client.Tests
             Assert.IsTrue(_root.Playing);
         }
 
+        // The antlion (Docs/Bosses.md 개미귀신, 2026-11-27): buried at the bottom of its pit with the jaw tips showing,
+        // bursting up out of the sand, then mid wind-up of its bite (the jaws spread wide) and of its sinkholes (gone
+        // under the sand, the warning sign).
+        [UnityTest, Category(Screens.Category)]
+        public IEnumerator TheAntlionBurstsUpAndWindsUp()
+        {
+            yield return Start();
+            var boss = World.Bosses.FirstOrDefault(b => b.Definition.Id == "antlion");
+            Assert.IsNotNull(boss, "No antlion.");
+            Assert.AreEqual(BossEntrance.Ambush, boss.Definition.Arena.Entrance, "arenas.csv gives the antlion its own entrance.");
+            World.BossesHold = true;
+            Player.Position = boss.Home + new Vec2(0, -4);
+            Player.Corrections++;
+            yield return new WaitForSecondsRealtime(SceneSeconds);
+            yield return Screens.Take("antlion-buried");
+            World.BossesHold = false;
+            yield return new WaitForSecondsRealtime(2.6f);
+            Assert.AreEqual(BossState.Enter, boss.State, "Woken, the antlion comes in first.");
+            yield return Screens.Take("entrance-antlion");
+            yield return new WaitForSecondsRealtime(4f);
+            Assert.IsTrue(World.ForceAttack(boss, "bite"), "The bite can be forced once it fights.");
+            yield return new WaitForSecondsRealtime(0.45f);
+            yield return Screens.Take("antlion-bite-windup");
+            yield return new WaitForSecondsRealtime(2.5f);
+            Assert.IsTrue(World.ForceAttack(boss, "sinkholes"));
+            yield return new WaitForSecondsRealtime(1.0f);
+            yield return Screens.Take("antlion-sinkholes-windup");
+            Assert.IsTrue(_root.Playing);
+        }
+
         // Ordinary monsters' attacks from monster_attacks.csv (Docs/Combat.md 몬스터의 공격 시트, 2026-11-21): a slime's
         // pounce is marked where it will land, a frost wisp rings itself (a mark the screen makes from the monster's
         // state), and both draw their pieces; after they land nothing is left.

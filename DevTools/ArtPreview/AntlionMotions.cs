@@ -130,7 +130,8 @@ namespace Game.Client
                             int top = Math.Abs(j.Top - l.Top), bottom = Math.Abs(j.Bottom - l.Bottom);
                             bool swing = AntlionArt.Swinging(step.Item1, step.Item2);
                             bool strike = step.Item2 == AntlionArt.StrikeFrame(step.Item1);
-                            bool jump = head > (swing ? 14 : 5) || bottom > (strike ? 8 : 4) || top > (strike || swing ? 14 : 6);
+                            // A lunge or a burst up out of the sand is too fast to see: the body may move far in it.
+                            bool jump = head > (swing ? 14 : 5) || bottom > (swing ? 16 : 4) || top > (swing ? 16 : 6);
                             line += $"   move head {head,4:0.0} top {top} bottom {bottom}" + (jump ? "   <<< JUMP" : "");
                             if (jump) jumps++;
                         }

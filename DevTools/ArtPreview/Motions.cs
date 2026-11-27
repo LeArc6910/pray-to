@@ -1249,6 +1249,8 @@ namespace Game.Client
                     (w, f) => Flip(KnightArt.Draw(ways[w].View, KnightPose.Enter, f, 1), ways[w].Flip), p => KnightArt.EnterFrameAt(p, false)),
                 ("warden", WardenArt.Width, WardenArt.Height, WardenArt.FramesOf(WardenPose.Enter), 4.0f,
                     (w, f) => Flip(WardenArt.Draw(ways[w].View, WardenPose.Enter, f, 1), ways[w].Flip), p => WardenArt.EnterFrameAt(p, false)),
+                ("antlion", AntlionArt.Width, AntlionArt.Height, AntlionArt.FramesOf(AntlionPose.Enter), 3.8f,
+                    (w, f) => Flip(AntlionArt.Draw(ways[w].View, AntlionPose.Enter, f, 1), ways[w].Flip), p => AntlionArt.EnterFrameAt(p, false)),
             };
             PixelImage Over(PixelImage image)
             {

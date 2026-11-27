@@ -4,7 +4,7 @@ crystal_queen,Nest,Descend,,2.2,1,수정 둥지의 여왕
 lava_titan,Caldera,Lurk,,2.2,1,끓는 분지의 거인
 void_lord,Altar,Summon,,2.4,1,제단이 부른 것
 tide_serpent,Flooded,Lurk,,2.2,1,잠긴 홀의 주인
-antlion,Pit,Lurk,,2.2,1,모래 구덩이의 턱
+antlion,Pit,Lurk,Ambush,3.8,1.3,모래 구덩이의 턱
 mad_general,Warcamp,March,,2.2,1,끝나지 않은 전쟁
 crown_wraith,Chapel,Summon,,2.4,1,가라앉은 왕관
 vein_eater,Mine,Lurk,Burrow,3.2,1.2,갱도를 삼킨 무쇠 두더지

@@ -66,6 +66,9 @@ namespace Game.Core
         Stride,
         // A heap of stone that wakes: eyes and core lit, up on its feet, the floor pounded (the cave warden).
         Awaken,
+        // Buried at the bottom of its pit with the jaw tips showing: sand flicked out, then up out of the sand, the
+        // jaws snapping (the antlion).
+        Ambush,
     }
 
     public sealed class ArenaDefinition

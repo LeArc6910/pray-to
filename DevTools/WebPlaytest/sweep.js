@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu title testground hunt harvest zones towns time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight warden spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
+// Sections: menu title testground hunt harvest zones towns time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight warden antlion spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -1085,6 +1085,67 @@ async function warden(browser) {
   check(!/cave_warden:[1-9]/.test(after.bosses || ''), `쓰러뜨리면 체력 0 (${(after.bosses || '').split(' ')[0]})`);
   await game.wait(2500);
   await game.shot('warden-gone', '바위 더미가 바래 사라진 뒤');
+  await game.context.close();
+}
+
+// ---------------------------------------------------------------- 개미귀신 (2026-11-27, Docs/Bosses.md)
+// The second boss, a pit-trap larva: every attack has its own wind-up of the whole body (the jaws spread before a bite,
+// the head shoved into the sand before a jet, rocking to dig a pit, rearing for the sandstorm, sinking for the
+// quicksand, gone under for the cave-in); it burrows for its charge and bursts up where the run ends. Only the
+// sinkholes (함몰) show a warning sign. A picture mid wind-up and one just as the blow lands, for each attack, its
+// entrance and its phases.
+async function antlion(browser) {
+  note('\n## 개미귀신 (PC)\n');
+  const game = await open(browser, run, Profiles.pc, url);
+  await game.startSolo();
+  await game.wait(1200);
+  await game.send('equip void_sword void_helmet void_armor void_boots; heal');
+  await game.send('heal; goto boss antlion');
+  await game.wait(700);
+  await game.shot('antlion-entrance', '입장: 굴 바닥에 턱 끝만 내놓고 숨어 있다');
+  const woke = await game.until(t => has(t.banner, '개미귀신') || has(t.entrance, '개미귀신'), 8000, game.texts);
+  check(!!woke, `모래 구덩이 아레나에서 깨면 "개미귀신" 이름 카드나 배너 (${woke ? woke.banner || woke.entrance : '없음'})`);
+  await game.wait(1500);
+  await game.shot('antlion-burst', '입장: 모래를 뚫고 솟아오른다');
+  await game.wait(2600);
+  await game.shot('antlion-awake', '깨어난 개미귀신');
+  // [attack, name, telegraph seconds, strong, marked]
+  const uses = [
+    ['bite', '물어뜯기(턱을 크게 벌림)', 0.6, false, true],
+    ['sand_jet', '모래 분사(머리를 모래에 묻음)', 0.7, false, true],
+    ['pit', '개미지옥(몸을 흔들며 모래를 긁음)', 0.9, false, true],
+    ['sand_trail', '모래 물결(머리를 낮게 앞으로)', 0.6, false, true],
+    ['burrow', '파고들기(땅속으로)', 0.8, false, true],
+    ['quicksand', '모래늪(반쯤 가라앉음)', 1.0, false, true],
+    ['sandstorm', '모래 폭풍(일어섬)', 1.1, false, true],
+    ['sand_cross', '모래 십자(턱을 양옆으로)', 0.9, false, true],
+    ['sand_spiral', '모래 나선(가라앉아 돈다)', 0.5, false, false],
+    ['sinkholes', '함몰(필살기, 경고)', 1.4, true, true],
+  ];
+  for (const [attack, name, telegraph, strong, marked] of uses) {
+    await game.send('heal; clear');
+    await game.wait(1500);
+    await game.send(`heal; boss antlion use ${attack}`);
+    await game.wait(Math.round(telegraph * 700));
+    const s = await game.state();
+    if (marked) check((s.marksShown || 0) > 0, `${name}: 전조 동안 바닥 표시가 보인다 (표시 ${s.marksShown})`);
+    check(!!s.warningSign === strong, `${name}: 경고 표지 ${strong ? '있음' : '없음'} (${s.warningSign})`);
+    await game.shot(`antlion-${attack}`, `${name} 전조`);
+    await game.wait(Math.round(telegraph * 300) + 160);
+    await game.shot(`antlion-${attack}-hit`, `${name} 떨어진 순간`);
+    if (attack === 'burrow') {
+      await game.wait(250);
+      await game.shot('antlion-burrow-run', '파고들기: 모래 둔덕이 바닥을 달린다');
+    }
+  }
+  await game.send('heal; clear; boss antlion hurt 0.36');
+  await game.wait(800);
+  await game.shot('antlion-phase2', '2페이즈 포효(턱을 높이 벌린다)');
+  await game.send('heal; clear; boss antlion hurt 0.33');
+  await game.wait(2500);
+  const last = await game.state();
+  check((last.bosses || '').includes('antlion') && (last.bosses || '').includes(':p3:'), `체력을 깎으면 3페이즈 (${last.bosses})`);
+  await game.shot('antlion-phase3', '3페이즈(턱 끝이 붉게 물든다)');
   await game.context.close();
 }
 
@@ -3989,6 +4050,7 @@ const ArenaList = [
 // [boss, whole entrance seconds, short seconds, what it does]
 const OwnEntrances = [
   ['cave_warden', 4.2, 1.4, '바위 더미가 눈과 핵을 밝히고 일어나 두 주먹으로 바닥을 내려찍는다'],
+  ['antlion', 3.8, 1.3, '굴 바닥에 턱 끝만 내놓고 숨어 모래를 튕기다 솟아올라 턱을 닫는다'],
   ['vein_eater', 3.2, 1.2, '흙더미가 들썩이다 바닥을 뚫고 솟는다'], ['silk_mother', 3.4, 1.2, '천장에서 실을 타고 내려와 다리를 편다'],
   ['shrine_samurai', 3.6, 1.2, '정좌에서 일어나 칼자루에 손을 얹는다'], ['black_knight', 4.6, 1.4, '무릎을 펴고 망치를 끌며 나와 바닥을 내려찍는다'],
 ];
@@ -7891,7 +7953,7 @@ async function towns(browser) {
   }
 }
 
-const Sections = { menu, title, testground, hunt, harvest, zones, towns, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, warden, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
+const Sections = { menu, title, testground, hunt, harvest, zones, towns, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, warden, antlion, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

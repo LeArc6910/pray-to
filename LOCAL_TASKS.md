@@ -1280,6 +1280,10 @@ DevTools/Local/setup.sh --commit
   - (클라우드 웹 점검) `sweep.js --only warden`
   - 클라우드 확인 (2026-11-27, `372f1be`): [x] 22개 모두 통과. 사진에서 앞으로 무너진 몸 → 균열과 함께 바위 더미 → 바랜 더미가 보인다(드랍 아이템과 겹친다)
   - (사람) `Docs/HumanChecklist.md` 193의 쓰러짐
+- [ ] 195단계: 개미귀신(둘째 보스) 새 그림과 패턴 — Retro Diffusion 개미지옥 애벌레의 다섯 시점, 공격마다 몸 전체의 전조 자세와 모래 이펙트, 굴 바닥에서 솟는 입장(`arenas.csv` `Ambush`)(`Docs/Bosses.md` 개미귀신 제 그림과 몸짓)
+  - 명령 한 줄을 다시 돌린다. 새 파일 `Client/Art/AntlionArt.cs`, `Client/Art/AntlionArt.Rows.cs`, `Client/WorldView.Antlion.cs`의 `.meta`가 생기면 커밋한다(`DevTools/ArtPreview/AntlionMotions.cs`는 DevTools라 없음). 새 PlayMode 사진 `antlion-buried`·`entrance-antlion`·`antlion-bite-windup`·`antlion-sinkholes-windup`(`TheAntlionBurstsUpAndWindsUp`)
+  - (클라우드 웹 점검) `sweep.js --only antlion`, `--only arenas`
+  - (사람) `Docs/HumanChecklist.md`의 개미귀신
 
 ## 결과 보고
 

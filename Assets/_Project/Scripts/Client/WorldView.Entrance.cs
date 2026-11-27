@@ -156,7 +156,7 @@ namespace Game.Client
         {
             // Under the floor or up in the roof it casts no shadow: asleep, and under the floor until it breaks through.
             var entrance = view.Boss.Arena?.Entrance ?? BossEntrance.Common;
-            bool hidden = entrance == BossEntrance.Burrow || entrance == BossEntrance.Thread;
+            bool hidden = entrance == BossEntrance.Burrow || entrance == BossEntrance.Thread || entrance == BossEntrance.Ambush;
             if (view.BossState == BossState.Dormant && hidden && !view.IsDead) body.Shadow.enabled = false;
             if (view.BossState != BossState.Enter)
             {
@@ -164,6 +164,7 @@ namespace Game.Client
                 return;
             }
             if (entrance == BossEntrance.Burrow && body.EnterFrame < VeinEaterArt.EmergeBreak) body.Shadow.enabled = false;
+            if (entrance == BossEntrance.Ambush && body.EnterFrame < AntlionArt.EnterBurst) body.Shadow.enabled = false;
             var feet = body.Position;
             float since = Time.time - body.BossSince;
             bool puff = Time.time >= body.DustAt;
@@ -259,6 +260,41 @@ namespace Game.Client
                         Impact(feet, 1);
                         Cracks(feet, 2.6f, 7);
                         Hear(Sound.Roar, feet, 0.8f);
+                    }
+                    break;
+
+                case BossEntrance.Ambush:
+                    // Sand trickling down into its pit; the jaws flick sand out twice; it bursts up out of the sand,
+                    // shakes it off and snaps its jaws (AntlionArt.Enter).
+                    if (frame < AntlionArt.EnterBurst && puff)
+                    {
+                        body.DustAt = Time.time + 0.12f;
+                        var from = feet + (Vector3)(Random.insideUnitCircle.normalized * 1.6f);
+                        Kick(from, feet - from, SandColor, 1);
+                    }
+                    foreach (int flick in new[] { AntlionArt.EnterFlick, AntlionArt.EnterFlick + 6 })
+                        if (Reached(flick))
+                        {
+                            Kick(feet + new Vector3(0, 0.4f, 0), Vector3.up + new Vector3(Random.Range(-0.6f, 0.6f), 0, 0), SandColor, 6);
+                            Hear(Sound.Dig, feet, 0.8f);
+                        }
+                    if (Reached(AntlionArt.EnterBurst - 4) && Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.12f);
+                    if (Reached(AntlionArt.EnterBurst))
+                    {
+                        AddFlash(feet, 3f, SandColor, FlashKind.Burst);
+                        for (int i = 0; i < 10; i++)
+                        {
+                            var way = Quaternion.Euler(0, 0, i * 36 + Random.Range(-12f, 12f)) * Vector3.right;
+                            Kick(feet + way * 0.5f, way + Vector3.up, SandColor, 2);
+                        }
+                        Thud(body, 0.08f, 0.7f);
+                        Hear(Sound.Break, feet, 0.8f);
+                        Hear(Sound.Roar, feet, 0.8f);
+                    }
+                    if (!body.EntersAgain && Reached(AntlionArt.EnterSnap))
+                    {
+                        AddFlash(feet + new Vector3(0, 0.3f, 0), 1.2f, Color.white, FlashKind.Impact);
+                        Hear(Sound.Bite, feet, 1);
                     }
                     break;
 
