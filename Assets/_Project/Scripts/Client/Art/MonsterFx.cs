@@ -1355,65 +1355,105 @@ namespace Game.Client
         {
             float fade = Math.Clamp(c.Progress, 0, 1);
             float r = c.Size;
+            // What a blow along a line left is one band (F2): Width its length between its ends' middles, Dir the way
+            // it lies; the pieces in it are spread along it, more of them the longer it is.
+            float along = c.Area == HazardShape.Balm ? 0 : Math.Max(0, c.Width);
+            bool band = along >= 4;
+            float dir = c.Dir * Deg, ax = SkillFx.Cos(dir), ay = SkillFx.Sin(dir);
+            int seed = c.Seed;
             int count = Math.Clamp((int)(r / 4) + 2, 3, 7);
+            if (band) count = Math.Min(10, (int)(count * (1 + along / (2.5f * r))));
+            // A place along the band for the i-th piece (the middle of a round pool).
+            (float X, float Y) At(int i, int salt)
+            {
+                if (!band) return (0, 0);
+                float d = (SkillFx.Rnd(seed, i, salt) - 0.5f + i - (count - 1) / 2f) / count * along;
+                return (ax * d, ay * d);
+            }
+            void Floor(FxRamp ramp, int heave, float alpha)
+            {
+                if (band) Put(o, FxShape.Strip, ramp, SkillFxArt.Even(2 * r), SkillFxArt.StripFrame(along, heave), 0, 0, alpha, dir, true);
+                else Put(o, FxShape.Puddle, ramp, SkillFxArt.Even(2 * r), heave & 3, 0, 0, alpha, 0, true);
+            }
+            void Lights(FxRamp ramp, float radius, float strength)
+            {
+                if (!band) FxLayers.Light(o, ramp, radius, strength);
+                else for (int i = -1; i <= 1; i += 2) FxLayers.Light(o, ramp, radius, strength, ax * along * 0.28f * i, ay * along * 0.28f * i);
+            }
             switch (c.Area)
             {
                 case HazardShape.Fire:
                     // Soot under it, tongues of flame that leap and lean, embers going up, its light on the floor.
-                    Put(o, FxShape.Scorch, FxRamp.Smoke, SkillFxArt.Step4(r * 1.7f), 4 + (c.Seed & 3), 0, 0, 0.75f * fade, 0, true);
-                    FxLayers.Light(o, FxRamp.Fire, r * 2.2f, (0.5f + 0.08f * (float)Math.Sin(t * 20 + c.Seed)) * fade);
+                    if (band) Floor(FxRamp.Smoke, seed, 0.7f * fade);
+                    else Put(o, FxShape.Scorch, FxRamp.Smoke, SkillFxArt.Step4(r * 1.7f), 4 + (seed & 3), 0, 0, 0.75f * fade, 0, true);
+                    Lights(FxRamp.Fire, r * 2.2f, (0.5f + 0.08f * (float)Math.Sin(t * 20 + seed)) * fade);
                     for (int i = 0; i < count; i++)
                     {
-                        float a = SkillFx.Rnd(c.Seed, i, 1) * 360, d = r * 0.7f * (float)Math.Sqrt(SkillFx.Rnd(c.Seed, i, 2));
+                        float a = SkillFx.Rnd(seed, i, 1) * 360, d = r * 0.7f * (float)Math.Sqrt(SkillFx.Rnd(seed, i, 2));
                         int tall = 8 + 3 * (i & 1) + (int)(2 * Math.Sin(t * 7 + i * 2.1f));
-                        Put(o, FxShape.Flame, FxRamp.Fire, tall, (int)(t * 9 + i * 1.7f) & 3, SkillFx.Cos(a) * d, SkillFx.Sin(a) * d * 0.7f + tall / 2f - 1, fade);
+                        var (x, y) = At(i, 21);
+                        Put(o, FxShape.Flame, FxRamp.Fire, tall, (int)(t * 9 + i * 1.7f) & 3, x + SkillFx.Cos(a) * d, y + SkillFx.Sin(a) * d * 0.7f + tall / 2f - 1, fade);
                     }
-                    for (int i = 0; i < 3; i++)
+                    for (int i = 0; i < (band ? 4 : 3); i++)
                     {
-                        float u = SkillFx.Frac(t * 1.5f + SkillFx.Rnd(c.Seed, i, 6));
-                        Put(o, FxShape.Dot, FxRamp.Fire, 1, u < 0.5f ? 3 : 2, (SkillFx.Rnd(c.Seed, i, 7) - 0.5f) * r * 1.2f + (float)Math.Sin(u * 6) * 2, 6 + 20 * u, fade * (1 - u));
+                        float u = SkillFx.Frac(t * 1.5f + SkillFx.Rnd(seed, i, 6));
+                        float d = band ? (SkillFx.Rnd(seed, i, 8) - 0.5f) * along : 0;
+                        Put(o, FxShape.Dot, FxRamp.Fire, 1, u < 0.5f ? 3 : 2, ax * d + (SkillFx.Rnd(seed, i, 7) - 0.5f) * r * 1.2f + (float)Math.Sin(u * 6) * 2, ay * d + 6 + 20 * u, fade * (1 - u));
                     }
                     break;
                 case HazardShape.Ice:
                     // A sheet of ice with crystals standing in it, one glinting now and then.
-                    Put(o, FxShape.Puddle, FxRamp.Cold, SkillFxArt.Even(2 * r), c.Seed & 3, 0, 0, 0.6f * fade, 0, true);
-                    FxLayers.Light(o, FxRamp.Cold, r * 1.5f, 0.25f * fade);
+                    Floor(FxRamp.Cold, seed, 0.6f * fade);
+                    Lights(FxRamp.Cold, r * 1.5f, 0.25f * fade);
                     for (int i = 0; i < count - 1; i++)
                     {
-                        float a = SkillFx.Rnd(c.Seed, i, 3) * 360, d = r * 0.6f * (float)Math.Sqrt(SkillFx.Rnd(c.Seed, i, 4));
+                        float a = SkillFx.Rnd(seed, i, 3) * 360, d = r * 0.6f * (float)Math.Sqrt(SkillFx.Rnd(seed, i, 4));
                         int tall = 5 + 2 * (i % 3);
-                        Put(o, FxShape.Shard, FxRamp.Cold, tall, 0, SkillFx.Cos(a) * d, SkillFx.Sin(a) * d * 0.7f + tall / 2f - 1, 0.95f * fade, 90 + (i - 2) * 9);
+                        var (x, y) = At(i, 22);
+                        Put(o, FxShape.Shard, FxRamp.Cold, tall, 0, x + SkillFx.Cos(a) * d, y + SkillFx.Sin(a) * d * 0.7f + tall / 2f - 1, 0.95f * fade, 90 + (i % 5 - 2) * 9);
                     }
-                    if (SkillFx.Frac(t * 0.8f) < 0.25f) Put(o, FxShape.Glint, FxRamp.Cold, 7, 1, SkillFx.Cos(t * 40) * r * 0.3f, 4, fade);
+                    if (SkillFx.Frac(t * 0.8f) < 0.25f)
+                    {
+                        var (x, y) = At((int)(t * 0.8f) % count, 23);
+                        Put(o, FxShape.Glint, FxRamp.Cold, 7, 1, x + SkillFx.Cos(t * 40) * r * 0.3f, y + 4, fade);
+                    }
                     break;
                 case HazardShape.Spore:
+                {
                     // A pool that heaves: bubbles swell on it and pop, motes drift up out of it.
-                    Put(o, FxShape.Puddle, FxRamp.Violet, SkillFxArt.Even(2 * r), (int)(t * 1.5f) & 3, 0, 0, 0.8f * fade, 0, true);
-                    FxLayers.Light(o, FxRamp.Violet, r * 1.7f, 0.3f * fade);
-                    for (int i = 0; i < 4; i++)
+                    Floor(FxRamp.Violet, (int)(t * 1.5f), 0.8f * fade);
+                    Lights(FxRamp.Violet, r * 1.7f, 0.3f * fade);
+                    int bubbles = band ? 6 : 4;
+                    for (int i = 0; i < bubbles; i++)
                     {
-                        float u = SkillFx.Frac(t * 1.1f + SkillFx.Rnd(c.Seed, i, 9));
-                        float a = SkillFx.Rnd(c.Seed, i, 10) * 360, d = r * 0.6f * SkillFx.Rnd(c.Seed, i, 11);
-                        float x = SkillFx.Cos(a) * d, y = SkillFx.Sin(a) * d * 0.8f;
+                        float u = SkillFx.Frac(t * 1.1f + SkillFx.Rnd(seed, i, 9));
+                        float a = SkillFx.Rnd(seed, i, 10) * 360, d = r * 0.6f * SkillFx.Rnd(seed, i, 11);
+                        float off = band ? (SkillFx.Rnd(seed, i, 12) - 0.5f) * along : 0;
+                        float x = ax * off + SkillFx.Cos(a) * d, y = ay * off + SkillFx.Sin(a) * d * 0.8f;
                         if (u < 0.75f) Put(o, FxShape.Edge, FxRamp.Violet, u < 0.4f ? 4 : 6, 1, x, y, fade, 0, true);
                         else Put(o, FxShape.Broken, FxRamp.Violet, 8, SkillFxArt.BrokenFrame(1, 4, i), x, y, fade * (1 - u) * 4, 0, true);
                     }
-                    SkillFx.Float(o, FxShape.Dot, FxRamp.Violet, 2, 3, 4, SkillFx.Frac(t * 0.7f), 0, 1, r * 0.75f, 13, c.Seed, alpha: fade);
+                    if (!band) SkillFx.Float(o, FxShape.Dot, FxRamp.Violet, 2, 3, 4, SkillFx.Frac(t * 0.7f), 0, 1, r * 0.75f, 13, seed, alpha: fade);
+                    else
+                        for (int i = -1; i <= 1; i++)
+                            SkillFx.Float(o, FxShape.Dot, FxRamp.Violet, 2, 3, 2, SkillFx.Frac(t * 0.7f + i * 0.3f), 0, 1, r * 0.75f, 13, seed + i, cx: ax * along * 0.33f * i, cy: ay * along * 0.33f * i, alpha: fade);
                     break;
+                }
                 case HazardShape.Sand:
-                    // Loose sand, grains turning round and down to its middle.
-                    Put(o, FxShape.Puddle, FxRamp.Dust, SkillFxArt.Even(2 * r), (int)(t * 2) & 3, 0, 0, 0.6f * fade, 0, true);
+                    // Loose sand, grains turning round and down to its middle (along a band, in toward its middle line).
+                    Floor(FxRamp.Dust, (int)(t * 2), 0.6f * fade);
                     for (int i = 0; i < count + 2; i++)
                     {
                         float u = SkillFx.Frac(t * 0.5f + i / (float)(count + 2));
                         float a = i * 360f / (count + 2) + t * 200;
-                        Put(o, FxShape.Dot, FxRamp.Dust, 2, u > 0.5f ? 0 : 3, SkillFx.Cos(a) * r * 0.85f * (1 - u), SkillFx.Sin(a) * r * 0.6f * (1 - u), fade, 0, true);
+                        var (x, y) = At(i, 24);
+                        Put(o, FxShape.Dot, FxRamp.Dust, 2, u > 0.5f ? 0 : 3, x + SkillFx.Cos(a) * r * (band ? 0.55f : 0.85f) * (1 - u), y + SkillFx.Sin(a) * r * (band ? 0.45f : 0.6f) * (1 - u), fade, 0, true);
                     }
                     break;
                 case HazardShape.Balm:
                     // A soft green cloud: it harms no one, so no red.
                     Put(o, FxShape.Smoke, FxRamp.Heal, SkillFxArt.Even(r * 1.3f), 2, 0, 2, 0.3f * fade, 0, true);
-                    SkillFx.Float(o, FxShape.Dot, FxRamp.Heal, 2, 2, count + 2, SkillFx.Frac(t * 0.6f), 0, 1, r * 0.8f, 12, c.Seed, alpha: fade);
+                    SkillFx.Float(o, FxShape.Dot, FxRamp.Heal, 2, 2, count + 2, SkillFx.Frac(t * 0.6f), 0, 1, r * 0.8f, 12, seed, alpha: fade);
                     for (int i = 0; i < 2; i++)
                     {
                         float u = SkillFx.Frac(t * 0.8f + i * 0.5f);
@@ -1422,8 +1462,10 @@ namespace Game.Client
                     break;
             }
             // An enemy's, so while it hurts it wears a dotted red rim at its true reach whatever it is made of, its
-            // dots stepping round; a cloud that only fills monsters does not.
-            if (c.Area != HazardShape.Balm) Put(o, FxShape.Dashes, FxRamp.Danger, SkillFxArt.Even(2 * r), (int)(t * 4) & 1, 0, 0, 0.9f * fade, 0, true);
+            // dots stepping round (a band's round the whole band); a cloud that only fills monsters does not.
+            if (c.Area == HazardShape.Balm) return;
+            if (band) Put(o, FxShape.StripDashes, FxRamp.Danger, SkillFxArt.Even(2 * r), SkillFxArt.StripFrame(along, (int)(t * 4) & 1), 0, 0, 0.9f * fade, dir, true);
+            else Put(o, FxShape.Dashes, FxRamp.Danger, SkillFxArt.Even(2 * r), (int)(t * 4) & 1, 0, 0, 0.9f * fade, 0, true);
         }
 
         // ---- A shot ----

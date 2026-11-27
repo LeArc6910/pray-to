@@ -361,9 +361,11 @@ namespace Game.Client
                             float fade = Math.Min(1, (t - lands) / 0.2f);
                             if (area == HazardShape.Line)
                             {
+                                // One band from the first's middle to the last's, as the view joins them (F2).
                                 int along = Math.Min(World.MaxPools, Math.Max(1, (int)Math.Round(_attack.Length / _attack.Width)));
-                                for (int k = 0; k < along; k++)
-                                    Take(MobFx.Pool, new MobContext { Area = PoolShape(_attack.Pool), Size = _attack.Width / 2 * Tile, Progress = fade, Seed = 3 + k }, t, x + _attack.Length * Tile * (k + 0.5f) / along, y);
+                                float span = _attack.Length * Tile * (along - 1) / along;
+                                int laid = Take(MobFx.Pool, new MobContext { Area = PoolShape(_attack.Pool), Size = _attack.Width / 2 * Tile, Width = span, Progress = fade, Seed = 3 }, t, x + _attack.Length * Tile / 2, y);
+                                if (count) MostLand = Math.Max(MostLand, laid);
                             }
                             else
                             {
@@ -388,9 +390,14 @@ namespace Game.Client
                         int pieces = Take(MobFx.Rush, rush, t, bx, by + Feet);
                         if (count) MostLand = Math.Max(MostLand, pieces);
                     }
-                    if (_attack.Pool != MonsterPool.None)
-                        for (float at = _attack.Width; at <= ran; at += _attack.Width)
-                            Take(MobFx.Pool, new MobContext { Area = PoolShape(_attack.Pool), Size = _attack.Width / 2 * Tile, Progress = 1, Seed = (int)(at * 10) }, t, _mx + at * Tile, _my);
+                    if (_attack.Pool != MonsterPool.None && ran >= _attack.Width)
+                    {
+                        // Its trail so far: one band from the first pool to the latest (F2).
+                        int laid = (int)(ran / _attack.Width);
+                        float span = (laid - 1) * _attack.Width * Tile;
+                        int pieces = Take(MobFx.Pool, new MobContext { Area = PoolShape(_attack.Pool), Size = _attack.Width / 2 * Tile, Width = span, Progress = 1, Seed = 3 }, t, _mx + _attack.Width * Tile + span / 2, _my);
+                        if (count) MostLand = Math.Max(MostLand, pieces);
+                    }
                 }
                 return all;
             }
@@ -550,6 +557,9 @@ namespace Game.Client
             uint green = MonsterFx.TintOf(Rgba.Hex("#8CD94D"));
             foreach (var pool in new[] { HazardShape.Fire, HazardShape.Ice, HazardShape.Spore, HazardShape.Sand, HazardShape.Balm })
                 rows.Add(Row(MobFx.Pool, new MobContext { Area = pool, Size = 1.2f * Tile, Seed = 3 }, 3, true, (c, u) => { c.Progress = Math.Min(1, Math.Min(u * 6, (1 - u) * 6)); return c; }));
+            // F2: the four that hurt, left along a line: one band, its dotted red rim round the whole of it.
+            foreach (var pool in new[] { HazardShape.Fire, HazardShape.Ice, HazardShape.Spore, HazardShape.Sand })
+                rows.Add(Row(MobFx.Pool, new MobContext { Area = pool, Size = 0.6f * Tile, Width = 2.6f * Tile, Dir = 0.3f, Seed = 3 }, 3, true, (c, u) => { c.Progress = Math.Min(1, Math.Min(u * 6, (1 - u) * 6)); return c; }));
             // Marks: a pull, a trap (armed halfway), a ring, a rush's path, the flash of the fallen, a wide sweep.
             MobContext Growing(MobContext c, float u) { c.Progress = u; c.Armed = u > 0.4f; return c; }
             rows.Add(Row(MobFx.Mark, new MobContext { Shape = MonsterAttackShape.Pull, Area = HazardShape.Pull, Ramp = FxRamp.Violet, Size = 2.0f * Tile, Seed = 5 }, 2, false, Growing));

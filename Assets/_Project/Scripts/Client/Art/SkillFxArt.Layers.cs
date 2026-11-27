@@ -346,6 +346,75 @@ namespace Game.Client
             return image;
         }
 
+        // How deep a point lies inside a band with round ends along x (half its middles' distance apart, reach its
+        // ends' radius), and how far round its edge the nearest point of that edge is, 0 to 1.
+        static float Capsule(float u, float v, float half, float reach, out float round)
+        {
+            float cu = Math.Clamp(u, -half, half), du = u - cu;
+            float whole = 4 * half + 2 * (float)Math.PI * reach, at;
+            // Along the top from the left end, round the right end, back along the bottom, round the left end.
+            if (du == 0) at = v < 0 ? cu + half : 2 * half + (float)Math.PI * reach + (half - cu);
+            else if (du > 0) at = 2 * half + reach * ((float)Math.Atan2(v, du) + (float)Math.PI / 2);
+            else at = 4 * half + (float)Math.PI * reach + reach * ((float)Math.Atan2(-v, -du) + (float)Math.PI / 2);
+            round = at / whole;
+            return reach - (float)Math.Sqrt(du * du + v * v);
+        }
+
+        // A pool along a line (F2): Puddle's colours in a band, its edge heaving round its whole length.
+        static PixelImage Strip(Rgba[] r, int diameter, int frame)
+        {
+            int length = (frame >> 2) * 4;
+            var image = new PixelImage(length + diameter, diameter);
+            float half = length / 2f, reach = diameter / 2f - 1, phase = (frame & 3) * 1.5708f;
+            float cx = image.Width / 2f, cy = diameter / 2f;
+            float whole = 2 * length + 2 * (float)Math.PI * reach;
+            int waves = Math.Max(3, (int)Math.Round(whole / (reach * 2.1f)));
+            for (int y = 0; y < image.Height; y++)
+            {
+                for (int x = 0; x < image.Width; x++)
+                {
+                    float u = x + 0.5f - cx, v = y + 0.5f - cy;
+                    float depth = Capsule(u, v, half, reach, out float round);
+                    float a = round * 2 * (float)Math.PI;
+                    depth -= reach * (0.11f - 0.06f * (float)Math.Sin(a * waves + phase) - 0.05f * (float)Math.Sin(a * (waves + 2) - phase + 1.3f));
+                    if (depth < 0) continue;
+                    if (depth < 1.5f)
+                    {
+                        image[x, y] = A(r[4], 230);
+                        continue;
+                    }
+                    // Lighter within, a little off its middle line; pale flecks along that.
+                    float inner = Capsule(u + reach * 0.12f, v + reach * 0.1f, half, reach * (0.52f + 0.07f * (float)Math.Sin(u * 0.4f - phase)), out _);
+                    if (inner > reach * 0.26f && Noise(x, y, 31 + (frame & 3)) > 0.82f) image[x, y] = r[1];
+                    else if (inner > 0) image[x, y] = A(r[2], 215);
+                    else image[x, y] = A(r[3], 215);
+                }
+            }
+            return image;
+        }
+
+        // Dots round a band, as Dashes round a circle.
+        static PixelImage StripDashes(Rgba[] r, int diameter, int frame)
+        {
+            int length = (frame >> 2) * 4;
+            var image = new PixelImage(length + diameter, diameter);
+            float half = length / 2f, outer = diameter / 2f - 0.5f;
+            float cx = image.Width / 2f, cy = diameter / 2f;
+            int dots = Math.Max(6, (int)Math.Round((2 * length + Math.PI * diameter) / 8));
+            for (int y = 0; y < image.Height; y++)
+            {
+                for (int x = 0; x < image.Width; x++)
+                {
+                    float depth = Capsule(x + 0.5f - cx, y + 0.5f - cy, half, outer, out float round);
+                    if (depth < 0 || depth >= 2) continue;
+                    double along = round * dots + (frame & 1) * 0.5;
+                    if (along - Math.Floor(along) > 0.5) continue;
+                    image[x, y] = depth < 1 ? r[2] : A(r[0], 190);
+                }
+            }
+            return image;
+        }
+
         // ---- the players' skills (E4) ----
 
         // One colour, an edge that wavers with the frame.

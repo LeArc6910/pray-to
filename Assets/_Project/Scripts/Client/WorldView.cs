@@ -1327,6 +1327,7 @@ namespace Game.Client
             WarnCount = 0;
             // With them, the marks of monsters' attacks that start at the monster, made here from the sheet
             // (WorldView.MonsterFx.cs): those are not sent.
+            GroupPools(_client.Hazards().Concat(_stagedMarks));
             foreach (var view in _client.Hazards().Concat(_attachedMarks).Concat(_stagedMarks))
             {
                 var hazard = view.State;

@@ -91,6 +91,12 @@ namespace Game.Client
         // dots stepping round.
         Dashes,
 
+        // A pool lying along a line (F2): Puddle drawn out into a band with round ends, along +x. Size how wide it is
+        // (its ends' diameter), frame its length between the ends' middles and one of four heaves (StripFrame).
+        Strip,
+        // Dashes round such a band, at its true reach: the same size and frame (two steps of the dots).
+        StripDashes,
+
         // ---- the players' skills (E4, Docs/EffectsRework.md 10; drawn in SkillFxArt.Layers) ----
 
         // A lump with a wavering edge in one of the element's five colours: a comet's tail, a mote of frost. Size its
@@ -173,6 +179,10 @@ namespace Game.Client
         // Ring sizes in steps (two pixels while small, four when large), so a growing ring makes few pictures.
         public static int Even(float diameter) => diameter <= 48 ? Math.Max(4, 2 * (int)Math.Round(diameter / 2)) : Math.Min(160, 4 * (int)Math.Round(diameter / 4));
 
+        // A band's frame: its length between its ends' middles in pixels (kept to steps of four, up to 508) and which
+        // of four heaves (two steps, of its dashes).
+        public static int StripFrame(float length, int heave) => Math.Clamp((int)Math.Round(length / 4), 0, 127) * 4 + (heave & 3);
+
         public static int Step4(float length) => Math.Clamp(4 * (int)Math.Round(length / 4), 4, 128);
 
         public static PixelImage Draw(FxShape shape, FxRamp ramp, int size, int frame)
@@ -213,6 +223,8 @@ namespace Game.Client
                 case FxShape.Glow: return Glow(r, size);
                 case FxShape.Puddle: return Puddle(Ramp5(ramp), size, frame);
                 case FxShape.Dashes: return Dashes(r, size, frame);
+                case FxShape.Strip: return Strip(Ramp5(ramp), size, frame);
+                case FxShape.StripDashes: return StripDashes(r, size, frame);
                 case FxShape.Lump: return Lump(Ramp5(ramp), size, frame);
                 case FxShape.Wash: return Wash(Ramp5(ramp), size, frame);
                 case FxShape.Smear: return Smear(Ramp5(ramp), size, frame);

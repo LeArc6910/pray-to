@@ -396,6 +396,60 @@ namespace Game.Client
             return look;
         }
 
+        // Pools that lie in a row (F2): what a blow along a line left (World.LeaveMonsterPool lays a few circles its
+        // width along it) and a charge's trail. The screen is not told they belong together, so it finds them: the
+        // same kind and size, laid one after another within a second, each within reach of the last and all on one
+        // line. The first draws one band from the first's middle to the last's; the rest draw nothing. The band is
+        // the circles' hull, so it never shows less than what hurts.
+        readonly Dictionary<int, (Vector3 Mid, float Dir, float Length, float Fade, bool Lead)> _poolBands = new Dictionary<int, (Vector3, float, float, float, bool)>();
+        readonly List<HazardView> _poolRow = new List<HazardView>();
+        int _poolBandsDrawn;
+        // For the playtest: bands drawn this frame (and the last whole frame's).
+        public int PoolBandsShown { get; private set; }
+        public int PoolBands => _poolBandsDrawn;
+
+        void GroupPools(IEnumerable<HazardView> views)
+        {
+            _poolBandsDrawn = PoolBandsShown;
+            PoolBandsShown = 0;
+            _poolBands.Clear();
+            _poolRow.Clear();
+            if (!Feel.MonsterFx) return;
+            foreach (var view in views)
+                if (view.State.FromMonster && IsMonsterPool(view.State.Shape) && view.State.Shape != HazardShape.Balm) _poolRow.Add(view);
+            if (_poolRow.Count < 2) return;
+            _poolRow.Sort((a, b) => a.State.Id.CompareTo(b.State.Id));
+            for (int from = 0; from < _poolRow.Count;)
+            {
+                int to = from;
+                while (to + 1 < _poolRow.Count && InRow(_poolRow[from].State, _poolRow[to].State, _poolRow[to + 1].State, to > from)) to++;
+                if (to > from)
+                {
+                    var first = _poolRow[from];
+                    var last = _poolRow[to];
+                    var span = last.State.Position - first.State.Position;
+                    var mid = first.State.Position + span * 0.5f;
+                    // It comes in with its first and goes out with its last.
+                    float fade = Mathf.Clamp01(Mathf.Min(first.Progress * first.State.Duration / World.TicksPerSecond / 0.2f, (1 - last.Progress) * last.State.Duration / World.TicksPerSecond / 0.35f));
+                    for (int i = from; i <= to; i++)
+                        _poolBands[_poolRow[i].State.Id] = (new Vector3(mid.X, mid.Y, 0), span.Angle, span.Length, fade, i == from);
+                }
+                from = to + 1;
+            }
+        }
+
+        static bool InRow(HazardState first, HazardState last, HazardState next, bool started)
+        {
+            if (next.Shape != last.Shape || Mathf.Abs(next.Size - last.Size) > 0.01f) return false;
+            if (Mathf.Abs(next.TicksLeft - last.TicksLeft) > World.TicksPerSecond) return false;
+            var step = next.Position - last.Position;
+            float far = step.Length;
+            if (far < last.Size * 0.5f || far > last.Size * 3.2f) return false;
+            if (!started) return true;
+            var way = last.Position - first.Position;
+            return Vec2.Dot(way, step) > 0.96f * way.Length * far;
+        }
+
         // One of a monster's marks this frame: the picture of its shape (HazardArt.Warn, fainter inside than a boss's)
         // and what goes with it as MonsterFx's pieces. What a blow left on the floor is all pieces.
         void DrawMonsterMark(Mark mark, HazardView view)
@@ -418,6 +472,14 @@ namespace Game.Client
                 }
                 float seconds = hazard.Duration / (float)World.TicksPerSecond;
                 float fade = Mathf.Clamp01(Mathf.Min(p * seconds / 0.2f, (1 - p) * seconds / 0.35f));
+                // Pools laid in a row (a blow along a line, a charge's trail) are one band, drawn by the first (F2).
+                if (_poolBands.TryGetValue(hazard.Id, out var row))
+                {
+                    if (!row.Lead) return;
+                    PoolBandsShown++;
+                    QueueMob(MobFx.Pool, row.Mid, new MobContext { Area = hazard.Shape, Size = hazard.Size * Ppu, Width = row.Length * Ppu, Dir = row.Dir, Progress = row.Fade, Seed = hazard.Id & 0xFFFF }, Time.time);
+                    return;
+                }
                 QueueMob(MobFx.Pool, at, new MobContext { Area = hazard.Shape, Size = hazard.Size * Ppu, Progress = fade, Seed = hazard.Id & 0xFFFF }, Time.time);
                 return;
             }
