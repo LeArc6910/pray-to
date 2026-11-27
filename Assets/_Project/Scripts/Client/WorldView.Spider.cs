@@ -742,6 +742,8 @@ namespace Game.Client
             public BossView View;
             public bool Turned;
             public int Frame = -1;
+            // The cave warden's fall (WorldView.Warden.cs) rather than the silk mother's.
+            public bool Warden;
         }
 
         readonly System.Collections.Generic.List<Fall> _falls = new System.Collections.Generic.List<Fall>();
@@ -771,6 +773,11 @@ namespace Game.Client
             for (int i = _falls.Count - 1; i >= 0; i--)
             {
                 var fall = _falls[i];
+                if (fall.Warden)
+                {
+                    if (!UpdateWardenFall(fall)) _falls.RemoveAt(i);
+                    continue;
+                }
                 float age = Time.time - fall.Since;
                 int frames = SpiderArt.FramesOf(SpiderPose.Die);
                 float curled = frames * FallFrameSeconds;

@@ -1275,6 +1275,10 @@ DevTools/Local/setup.sh --commit
   - (클라우드 웹 점검) `sweep.js --only warden`, `--only arenas`
   - 클라우드 확인 (2026-11-27, `aaf51ac`): [x] `warden` 21개 모두 통과(입장 이름 카드, 공격 열의 바닥 표시, 천장 붕괴에만 경고 표지, 3페이즈). 사진에서 골렘·두 주먹 들기·팔 벌림·떨어지는 바위가 보인다. `arenas`는 돌리지 않음
   - (사람) `Docs/HumanChecklist.md` 193
+- [ ] 194단계: 동굴 수호자의 쓰러짐 — 핵이 꺼지고 무릎을 꿇고 바위 더미로 무너진다(`Docs/Bosses.md` 동굴 수호자 쓰러짐)
+  - 명령 한 줄을 다시 돌린다(새 파일 없음)
+  - (클라우드 웹 점검) `sweep.js --only warden`
+  - (사람) `Docs/HumanChecklist.md` 193의 쓰러짐
 
 ## 결과 보고
 

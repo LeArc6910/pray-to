@@ -1031,7 +1031,8 @@ async function warden(browser) {
   const game = await open(browser, run, Profiles.pc, url);
   await game.startSolo();
   await game.wait(1200);
-  await game.send('equip copper_sword copper_helmet copper_armor copper_boots; heal');
+  // Sturdy gear so the pictures are of the warden, not of the player down.
+  await game.send('equip void_sword void_helmet void_armor void_boots; heal');
   await game.send('heal; goto boss cave_warden');
   await game.wait(700);
   await game.shot('warden-entrance', '입장: 바위 더미가 눈과 핵을 밝히며 일어난다');
@@ -1072,6 +1073,18 @@ async function warden(browser) {
   const last = await game.state();
   check((last.bosses || '').includes('cave_warden') && (last.bosses || '').includes(':p3:'), `체력을 깎으면 3페이즈 (${last.bosses})`);
   await game.shot('warden-phase3', '3페이즈(핵이 붉게 달아오른다)');
+  // Its fall (2026-11-27): staggered, the core going out, on its knees, slumped, crumbled into rubble, then gone.
+  await game.send('heal; clear; boss cave_warden hurt 1');
+  await game.wait(900);
+  await game.shot('warden-fall', '쓰러지는 수호자(핵이 꺼지며 무릎을 꿇는다)');
+  await game.wait(900);
+  await game.shot('warden-fall-crumble', '바위 더미로 무너진다');
+  await game.wait(1200);
+  await game.shot('warden-fallen', '무너진 바위 더미');
+  const after = await game.state();
+  check(!/cave_warden:[1-9]/.test(after.bosses || ''), `쓰러뜨리면 체력 0 (${(after.bosses || '').split(' ')[0]})`);
+  await game.wait(2500);
+  await game.shot('warden-gone', '바위 더미가 바래 사라진 뒤');
   await game.context.close();
 }
 

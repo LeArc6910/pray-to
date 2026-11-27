@@ -37,6 +37,9 @@ namespace Game.Client
         // Its entrance (Docs/Bosses.md 동굴 수호자): crouched still as a heap of mossy stone among the ruins; its eyes
         // light, then the core in its chest; it pushes itself up, hauls both fists overhead and pounds the floor.
         Enter,
+        // Its fall (WorldView.WardenFalls): staggered back, the core flickering out, down on its knees, slumped forward
+        // onto its fists, and crumbling into a heap of rubble.
+        Die,
     }
 
     // The cave warden of the fallen shrine (2026-11-26): a hulking golem of mossy cave rock with an amber crystal core
@@ -528,6 +531,8 @@ namespace Game.Client
         {
             public float RaiseA, AheadA, InA, RaiseB, AheadB, InB;
             public float StepA, LiftA, StepB, LiftB, Lean, Stretch, Lift, Shove, Drop, Glow, Eyes;
+            // How far it has broken apart into falling stones (0 whole, 1 a heap), as it dies.
+            public float Crumble;
 
             // The same pose with one arm put elsewhere.
             public Pose A(float raise, float ahead, float inward = 0)
@@ -576,7 +581,7 @@ namespace Game.Client
                 RaiseB = L(a.RaiseB, b.RaiseB), AheadB = L(a.AheadB, b.AheadB), InB = L(a.InB, b.InB),
                 StepA = L(a.StepA, b.StepA), LiftA = L(a.LiftA, b.LiftA), StepB = L(a.StepB, b.StepB), LiftB = L(a.LiftB, b.LiftB),
                 Lean = L(a.Lean, b.Lean), Stretch = L(a.Stretch, b.Stretch), Lift = L(a.Lift, b.Lift), Shove = L(a.Shove, b.Shove),
-                Drop = L(a.Drop, b.Drop), Glow = L(a.Glow, b.Glow), Eyes = L(a.Eyes, b.Eyes),
+                Drop = L(a.Drop, b.Drop), Glow = L(a.Glow, b.Glow), Eyes = L(a.Eyes, b.Eyes), Crumble = L(a.Crumble, b.Crumble),
             };
         }
 
@@ -782,6 +787,30 @@ namespace Game.Client
             return to;
         }
 
+        // ---- The fall: staggered back by the last blow, the core flickering and going out, down on its knees, slumped
+        // forward onto its fists, then the stone giving way into a heap. ----
+
+        static Pose Broken(Pose p, float crumble)
+        {
+            p.Crumble = crumble;
+            return p;
+        }
+
+        static readonly (Pose[] Frames, Stage[] Stages) Death = Expand(Rest,
+            (Stage.Slow, 4, P(4, -3, -0.35f, lean: -6, stretch: 0.04f, stepA: -2, stepB: 2, glow: 1.9f)),
+            (Stage.Slow, 1, P(4, -3, -0.35f, lean: -6, stretch: 0.04f, stepA: -2, stepB: 2, glow: 0.2f, eyes: 0.6f)),
+            (Stage.Slow, 1, P(3, -3, -0.3f, lean: -5, stretch: 0.03f, stepA: -2, stepB: 2, glow: 1.5f)),
+            (Stage.Slow, 1, P(3, -2, -0.3f, lean: -5, stretch: 0.03f, stepA: -2, stepB: 2, glow: 0.1f, eyes: 0.4f)),
+            (Stage.Slow, 1, P(2, -2, -0.25f, lean: -4, stretch: 0.02f, stepA: -2, stepB: 2, glow: 1.1f, eyes: 0.8f)),
+            (Stage.Slow, 6, P(-2, 3, 0.3f, lean: 6, stretch: -0.14f, stepA: 1, stepB: -1, drop: 4, glow: 0.3f, eyes: 0.5f)),
+            (Stage.Slow, 6, P(-6, 8, 0.5f, lean: 10, stretch: -0.24f, stepA: 2, stepB: -2, drop: 4, glow: 0.05f, eyes: 0.15f)),
+            (Stage.Slow, 10, Broken(P(-3, 4, 0.45f, lean: 5, stretch: -0.4f, stepA: 2, stepB: -2, drop: 4, glow: 0, eyes: 0), 1)));
+
+        // The frames its core goes out (the flicker ends), it drops to its knees, and it starts to crumble.
+        public const int DieOut = 8;
+        public const int DieKnees = 13;
+        public const int DieCrumble = 20;
+
         // ---- Frames. ----
 
         // The frames a roar takes to fling the arms open, before it shakes there (frames RoarRise.. loop).
@@ -800,7 +829,7 @@ namespace Game.Client
             _ => null,
         };
 
-        static Stage[] StagesOf(WardenPose pose) => pose == WardenPose.Enter ? EnterStages : BlowOf(pose)?.Stages;
+        static Stage[] StagesOf(WardenPose pose) => pose == WardenPose.Enter ? EnterStages : pose == WardenPose.Die ? Death.Stages : BlowOf(pose)?.Stages;
 
         // How many frames each pose has: a wind-up through its telegraph, a blow through its swing and recovery, a loop.
         public static int FramesOf(WardenPose pose) => pose switch
@@ -819,6 +848,7 @@ namespace Game.Client
             WardenPose.Charge => 8,
             WardenPose.Roar => RoarRise + 4,
             WardenPose.Enter => EnterFrames.Length,
+            WardenPose.Die => Death.Frames.Length,
             _ => BlowOf(pose)?.Frames.Length ?? 4,
         };
 
@@ -942,6 +972,8 @@ namespace Game.Client
                     return P(20 + s, -2, -0.95f, lean: -5, stretch: 0.09f, stepA: 2, stepB: -2, glow: 2 + 0.2f * s);
                 case WardenPose.Enter:
                     return EnterFrames[f];
+                case WardenPose.Die:
+                    return Death.Frames[f];
                 default:
                 {
                     var blow = BlowOf(pose);
@@ -1141,6 +1173,20 @@ namespace Game.Client
                     if (c.A == 0) continue;
                     if (IsAmber(c)) c = Glowing(c, sy - Headroom < 23 ? p.Eyes : p.Glow, phase);
                     int px = left + x + shift;
+                    if (p.Crumble > 0)
+                    {
+                        // Breaking up: some stones come away and tumble down toward the floor (always the same ones, so
+                        // the heap grows from frame to frame), the rest dull to rubble.
+                        float chance = Hash(x, sy);
+                        c = c.Mix(Dormant, 0.35f * p.Crumble);
+                        if (chance < 0.4f * p.Crumble)
+                        {
+                            int to = System.Math.Min(Height - 1 - Floor + 2, row + 2 + (int)(chance / 0.4f * 24 * p.Crumble));
+                            int aside = (int)((Hash(sy, x) - 0.5f) * 10 * p.Crumble);
+                            if (image[px + aside, to].A == 0) image[px + aside, to] = c.Scale(0.8f);
+                            continue;
+                        }
+                    }
                     image[px, row] = c;
                     joints.Top = System.Math.Min(joints.Top, row);
                     joints.Bottom = System.Math.Max(joints.Bottom, row);
@@ -1156,6 +1202,13 @@ namespace Game.Client
                 Streak(image, Place(wasB.X, wasB.Y), b);
             }
             return image;
+        }
+
+        static float Hash(int x, int y)
+        {
+            uint h = (uint)(x * 374761393 + y * 668265263);
+            h = (h ^ (h >> 13)) * 1274126177;
+            return ((h ^ (h >> 16)) & 0xFFFF) / 65536f;
         }
 
         static void Streak(PixelImage image, (float X, float Y) from, (float X, float Y) to)

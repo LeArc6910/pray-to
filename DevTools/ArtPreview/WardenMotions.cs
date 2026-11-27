@@ -11,7 +11,7 @@ namespace Game.Client
     // move from each frame to the next (warden_continuity.txt).
     static partial class Motions
     {
-        static readonly string[] WardenRows = { "walk", "slam", "sweep", "burst", "stomp", "punch", "gouge", "uppercut", "cave_in", "charge", "roar", "enter" };
+        static readonly string[] WardenRows = { "walk", "slam", "sweep", "burst", "stomp", "punch", "gouge", "uppercut", "cave_in", "charge", "roar", "enter", "die" };
 
         static (WardenPose, int, float)[][] WardenSequences()
         {
@@ -40,6 +40,7 @@ namespace Game.Client
                     .Concat(Enumerable.Range(0, WardenArt.FramesOf(WardenPose.Brace)).Reverse().Select(f => (WardenPose.Brace, f, 0.07f))).ToArray(),
                 rest.Concat(Run(WardenPose.Roar, 0.08f, 0, WardenArt.RoarRise - 1)).Concat(Run(WardenPose.Roar, 0.1f, WardenArt.RoarRise)).Concat(Run(WardenPose.Roar, 0.1f, WardenArt.RoarRise)).ToArray(),
                 new[] { (WardenPose.Enter, 0, 0.6f) }.Concat(Blow(WardenPose.Enter)).Concat(rest).ToArray(),
+                rest.Concat(Run(WardenPose.Die, 0.085f)).Concat(new[] { (WardenPose.Die, WardenArt.FramesOf(WardenPose.Die) - 1, 1.2f) }).ToArray(),
             };
         }
 
@@ -141,7 +142,7 @@ namespace Game.Client
                 (WardenPose.Wind, 11, 1), (WardenPose.Sweep, WardenArt.StrikeFrame(WardenPose.Sweep), 1), (WardenPose.Hunch, 9, 1),
                 (WardenPose.Burst, WardenArt.StrikeFrame(WardenPose.Burst), 1), (WardenPose.Lift, 9, 1), (WardenPose.Coil, 13, 1),
                 (WardenPose.Scoop, 9, 1), (WardenPose.Gouge, WardenArt.StrikeFrame(WardenPose.Gouge), 1), (WardenPose.Uppercut, WardenArt.StrikeFrame(WardenPose.Uppercut), 1),
-                (WardenPose.Gather, 19, 1), (WardenPose.Brace, 7, 1), (WardenPose.Roar, WardenArt.RoarRise, 1), (WardenPose.Enter, 0, 1), (WardenPose.Idle, 0, 3),
+                (WardenPose.Gather, 19, 1), (WardenPose.Brace, 7, 1), (WardenPose.Roar, WardenArt.RoarRise, 1), (WardenPose.Enter, 0, 1), (WardenPose.Die, WardenArt.DieKnees, 1), (WardenPose.Die, WardenArt.FramesOf(WardenPose.Die) - 1, 1), (WardenPose.Idle, 0, 3),
             };
             var turn = new PixelImage(ways.Length * WardenArt.Width, poses.Length * WardenArt.Height);
             for (int r = 0; r < poses.Length; r++)
@@ -174,7 +175,8 @@ namespace Game.Client
                             bool swing = WardenArt.Swinging(step.Item1, step.Item2);
                             bool strike = step.Item2 == WardenArt.StrikeFrame(step.Item1);
                             float fist = swing ? 26 : 7;
-                            bool jump = a > fist || b > fist || bottom > (strike ? 10 : 4) || top > (strike || swing ? 16 : 6);
+                            bool crumbling = step.Item1 == WardenPose.Die && step.Item2 > WardenArt.DieCrumble;
+                            bool jump = a > fist || b > fist || bottom > (strike ? 10 : crumbling ? 8 : 4) || top > (strike || swing ? 16 : 6);
                             line += $"   move fists {a,4:0.0} {b,4:0.0} top {top} bottom {bottom}" + (jump ? "   <<< JUMP" : "");
                             if (jump) jumps++;
                         }

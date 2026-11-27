@@ -2732,6 +2732,7 @@ namespace Game.Client
                     {
                         if (!_bossesSeen.ContainsKey(e.Source)) Hear(fallen.Kind == BodyKind.Player ? Sound.Down : Sound.Pop, fallen.Position, fallen.Kind == BodyKind.Minion ? 0.4f : 1);
                         if (fallen.Kind == BodyKind.Boss && fallen.Id == "silk_mother") SpiderFalls(fallen.Position);
+                        else if (fallen.Kind == BodyKind.Boss && fallen.Id == "cave_warden") WardenFalls(fallen.Position);
                         else if (fallen.Kind != BodyKind.Player) Burst(fallen.Position, BodyColor(fallen), fallen.Kind == BodyKind.Minion ? 0.6f : fallen.Diameter);
                     }
                     else if (_departed.TryGetValue(e.Source, out var gone))
@@ -2739,6 +2740,7 @@ namespace Game.Client
                         if (!_bossesSeen.ContainsKey(e.Source)) Hear(gone.Kind == BodyKind.Player ? Sound.Down : Sound.Pop, gone.Position, gone.Kind == BodyKind.Minion ? 0.4f : 1);
                         // The silk mother does not burst: it sinks where it stood and its legs curl in over it.
                         if (gone.Kind == BodyKind.Boss && _bossInView?.Id == "silk_mother" && _bossesSeen.ContainsKey(e.Source)) SpiderFalls(gone.Position);
+                        else if (gone.Kind == BodyKind.Boss && _bossInView?.Id == "cave_warden" && _bossesSeen.ContainsKey(e.Source)) WardenFalls(gone.Position);
                         else if (gone.Kind != BodyKind.Player) Burst(gone.Position, gone.Color, gone.Kind == BodyKind.Boss ? 2.4f : gone.Kind == BodyKind.Minion ? 0.6f : 0.8f);
                     }
                     if (_bossesSeen.TryGetValue(e.Source, out var boss))
@@ -3110,8 +3112,9 @@ namespace Game.Client
             body.Glow.transform.localPosition = body.Shape.transform.localPosition;
             body.LungeTime = Mathf.Max(0, body.LungeTime - deltaTime);
             ShowWeapon(body, weapon, facing, order, dead, offset);
-            // A fallen player lies there in their own colours, dimmed; anything else dead is a grey ghost.
-            body.Shape.color = dead ? (body.Kind == BodyKind.Player ? DownColor : DeadColor) : tint;
+            // A fallen player lies there in their own colours, dimmed; anything else dead is a grey ghost, but the cave
+            // warden, whose fall is drawn on its own (WardenFalls).
+            body.Shape.color = dead ? (body.Kind == BodyKind.Player ? DownColor : body.Kind == BodyKind.Boss && body.Id == "cave_warden" ? Color.clear : DeadColor) : tint;
             body.Shape.sortingOrder = order;
             body.Glow.transform.localScale = body.Shape.transform.localScale;
             body.Glow.color = dead ? Color.clear : body.FlashTime > 0 ? HitFlash : glow;

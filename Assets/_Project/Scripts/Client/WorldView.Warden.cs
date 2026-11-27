@@ -143,6 +143,7 @@ namespace Game.Client
             // The body turns with the motion: away from the viewer as a fist is drawn back, round toward the viewer as
             // the sweep comes across.
             sector = Twist(sector, WardenArt.TwistOf(pose, frame));
+            _wardenSector = sector;
 
             var (view, turned) = BossSectors[sector];
             int phase = Mathf.Clamp(body.BossPhase, 1, 3);
@@ -321,6 +322,88 @@ namespace Game.Client
                 }
             }
             return false;
+        }
+
+        // The way it last faced, for its fall.
+        int _wardenSector = 6;
+
+        // ---- Its fall (2026-11-27, the person: "쓰러지는 연출도 만들어줘"): it does not burst like the other bosses.
+        // Staggered back by the last blow with a groan, its core flickers and goes out (a last burst of amber), it
+        // drops to its knees with a thud, slumps forward onto its fists, and the stone gives way into a heap of
+        // rubble with a crash, dust and stones thrown out; the heap lies a moment, greys and fades. ----
+
+        void WardenFalls(Vector3 at)
+        {
+            var (view, turned) = BossSectors[_wardenSector];
+            var renderer = Renderer(_root.transform, "Fallen warden", null, Color.white);
+            renderer.transform.localPosition = at;
+            renderer.sortingOrder = FootOrder(at.y);
+            renderer.flipX = turned;
+            _falls.Add(new Fall { Renderer = renderer, Since = Time.time, View = view, Turned = turned, Warden = true });
+            Hear(Sound.Roar, at, 0.7f);
+            Hear(Sound.Break, at, 0.6f);
+            AddFlash(at + new Vector3(0, 1.3f, 0), 1.2f, AmberColor, FlashKind.Impact);
+            if (Settings.ScreenShake && Feel.HitStop) _hitStop = Mathf.Max(_hitStop, 0.18f);
+            if (Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.35f);
+            ScreenFlash(new Color(1, 0.95f, 0.85f, 0.3f), 0.15f);
+        }
+
+        const float WardenFallFrameSeconds = 0.085f;
+        const float WardenFallLie = 1.4f;
+        const float WardenFallFade = 1.0f;
+
+        // One frame of a fall: its pose, the beats as they come, greying and fading once it lies still. False once gone.
+        bool UpdateWardenFall(Fall fall)
+        {
+            float age = Time.time - fall.Since;
+            int frames = WardenArt.FramesOf(WardenPose.Die);
+            float down = frames * WardenFallFrameSeconds;
+            if (age > down + WardenFallLie + WardenFallFade)
+            {
+                Object.Destroy(fall.Renderer.gameObject);
+                return false;
+            }
+            int frame = Mathf.Min(frames - 1, Mathf.FloorToInt(age / WardenFallFrameSeconds));
+            var at = fall.Renderer.transform.localPosition;
+            if (frame != fall.Frame)
+            {
+                int last = fall.Frame;
+                fall.Frame = frame;
+                bool Reached(int f) => last < f && frame >= f;
+                var view = fall.View;
+                fall.Renderer.sprite = Sprites.Get($"warden/{view}/{WardenPose.Die}/{frame}/1", () => WardenArt.Draw(view, WardenPose.Die, frame, 1), new Vector2(0.5f, WardenArt.Floor / (float)WardenArt.Height));
+                // The core going out: a last burst of amber sparks.
+                if (Reached(WardenArt.DieOut))
+                {
+                    AddFlash(at + new Vector3(0, 1.2f, 0), 1.4f, AmberColor, FlashKind.Burst);
+                    Kick(at + new Vector3(0, 1.2f, 0), Vector3.up, AmberColor, 6);
+                    Hear(Sound.Break, at, 0.7f);
+                }
+                if (Reached(WardenArt.DieKnees))
+                {
+                    Kick(at + new Vector3(0.6f, 0, 0), new Vector3(1, 0.2f, 0), DustColor, 3);
+                    Kick(at + new Vector3(-0.6f, 0, 0), new Vector3(-1, 0.2f, 0), DustColor, 3);
+                    if (Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.2f);
+                    Hear(Sound.Thump, at, 1);
+                }
+                // The stone giving way: the heaviest crash of the fight.
+                if (Reached(WardenArt.DieCrumble))
+                {
+                    Impact(at, 1.2f);
+                    for (int i = 0; i < 10; i++)
+                    {
+                        var way = Quaternion.Euler(0, 0, i * 36 + Random.Range(-12f, 12f)) * Vector3.right;
+                        Kick(at + way * 0.4f + new Vector3(0, 0.5f, 0), way + Vector3.up * 0.8f, i % 2 == 0 ? RockColor : DustColor, 2);
+                    }
+                    AddFlash(at, 3f, DustColor, FlashKind.Ring);
+                }
+                // Grit trickling off it as it breaks up.
+                if (frame >= WardenArt.DieCrumble && frame % 3 == 0) Kick(at + new Vector3(Random.Range(-0.8f, 0.8f), 0.8f, 0), Vector3.down * 0.4f, DustColor, 1);
+            }
+            float gone = Mathf.Clamp01((age - down - WardenFallLie) / WardenFallFade);
+            float grey = Mathf.Clamp01((age - down * 0.7f) / 0.8f);
+            fall.Renderer.color = new Color(1 - 0.3f * grey, 1 - 0.3f * grey, 1 - 0.3f * grey, 1 - gone);
+            return true;
         }
     }
 }
