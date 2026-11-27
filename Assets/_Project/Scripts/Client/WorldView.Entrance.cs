@@ -186,7 +186,7 @@ namespace Game.Client
                         if (puff)
                         {
                             body.DustAt = Time.time + 0.09f;
-                            Kick(feet + (Vector3)(Random.insideUnitCircle * 0.7f), Vector3.up * 0.6f, DustColor, 1);
+                            Bits(feet + (Vector3)(Random.insideUnitCircle * 0.7f), Vector3.up * 0.6f, DustColor, 1);
                         }
                         if (Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.02f + 0.04f * frame / VeinEaterArt.EmergeBreak);
                     }
@@ -206,7 +206,7 @@ namespace Game.Client
                     if (frame < SpiderArt.DescendLands && puff)
                     {
                         body.DustAt = Time.time + 0.12f;
-                        Kick(feet + new Vector3(Random.Range(-0.5f, 0.5f), 2.5f, 0), Vector3.down * 0.5f, SilkColor, 1);
+                        Bits(feet + new Vector3(Random.Range(-0.5f, 0.5f), 2.5f, 0), Vector3.down * 0.5f, SilkColor, 1);
                     }
                     if (Reached(SpiderArt.EnterFrames(body.EntersAgain).From + 1)) Hear(Sound.Cast, feet, 0.9f);
                     if (Reached(SpiderArt.DescendLands))
@@ -244,13 +244,13 @@ namespace Game.Client
                     if (frame < GeneralArt.EnterStood && puff)
                     {
                         body.DustAt = Time.time + 0.15f;
-                        Kick(feet + new Vector3(0.4f, 0.4f, 0), Vector3.up * 0.5f, WarFireColor, 1);
+                        Bits(feet + new Vector3(0.4f, 0.4f, 0), Vector3.up * 0.5f, WarFireColor, 1);
                     }
                     if (Reached(GeneralArt.EnterStood)) Thud(body, 0.05f, 0.6f);
                     if (Reached(GeneralArt.EnterDrawn))
                     {
                         AddFlash(feet + new Vector3(0.5f, 0.3f, 0), 1.2f, WarFireColor, FlashKind.Burst);
-                        Kick(feet + new Vector3(0.5f, 0.2f, 0), Vector3.up, WarFireColor, 5);
+                        Bits(feet + new Vector3(0.5f, 0.2f, 0), Vector3.up, WarFireColor, 5);
                         Hear(Sound.Swing, feet, 1);
                     }
                     if (!body.EntersAgain && Reached(GeneralArt.EnterRoar))
@@ -268,7 +268,7 @@ namespace Game.Client
                     if (frame < WardenArt.EnterEyes && puff)
                     {
                         body.DustAt = Time.time + 0.12f;
-                        Kick(feet + new Vector3(Random.Range(-0.8f, 0.8f), 1.2f, 0), Vector3.down * 0.4f, DustColor, 1);
+                        Bits(feet + new Vector3(Random.Range(-0.8f, 0.8f), 1.2f, 0), Vector3.down * 0.4f, DustColor, 1);
                     }
                     if (Reached(2)) Hear(Sound.Break, feet, 0.5f);
                     if (Reached(WardenArt.EnterEyes)) AddFlash(feet + new Vector3(0, 1.9f, 0), 0.6f, AmberColor, FlashKind.Impact);
@@ -293,7 +293,7 @@ namespace Game.Client
                     if (frame < CrystalQueenArt.EnterBurst && puff)
                     {
                         body.DustAt = Time.time + 0.15f;
-                        Kick(feet + new Vector3(Random.Range(-1.2f, 1.2f), Random.Range(0.4f, 1.6f), 0), Vector3.up * 0.3f, Random.value < 0.5f ? CrystalPink : PrismWhite, 1);
+                        Bits(feet + new Vector3(Random.Range(-1.2f, 1.2f), Random.Range(0.4f, 1.6f), 0), Vector3.up * 0.3f, Random.value < 0.5f ? CrystalPink : PrismWhite, 1);
                     }
                     foreach (int ring in new[] { 6, 11, 15 })
                         if (Reached(ring)) Hear(Sound.Ice, feet, 0.4f + ring * 0.03f);
@@ -304,7 +304,7 @@ namespace Game.Client
                         for (int i = 0; i < 12; i++)
                         {
                             var way = Quaternion.Euler(0, 0, i * 30 + Random.Range(-12f, 12f)) * Vector3.right;
-                            Kick(feet + way * 0.5f + new Vector3(0, 0.6f, 0), way + Vector3.up * 0.8f, i % 2 == 0 ? CrystalPink : CrystalBlue, 2);
+                            Bits(feet + way * 0.5f + new Vector3(0, 0.6f, 0), way + Vector3.up * 0.8f, i % 2 == 0 ? CrystalPink : CrystalBlue, 2);
                         }
                         if (Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.25f);
                         Hear(Sound.Break, feet, 1);
@@ -325,12 +325,12 @@ namespace Game.Client
                     {
                         body.DustAt = Time.time + 0.12f;
                         var from = feet + (Vector3)(Random.insideUnitCircle.normalized * 1.6f);
-                        Kick(from, feet - from, SandColor, 1);
+                        Bits(from, feet - from, SandColor, 1);
                     }
                     foreach (int flick in new[] { AntlionArt.EnterFlick, AntlionArt.EnterFlick + 6 })
                         if (Reached(flick))
                         {
-                            Kick(feet + new Vector3(0, 0.4f, 0), Vector3.up + new Vector3(Random.Range(-0.6f, 0.6f), 0, 0), SandColor, 6);
+                            Bits(feet + new Vector3(0, 0.4f, 0), Vector3.up + new Vector3(Random.Range(-0.6f, 0.6f), 0, 0), SandColor, 6);
                             Hear(Sound.Dig, feet, 0.8f);
                         }
                     if (Reached(AntlionArt.EnterBurst - 4) && Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.12f);
@@ -340,7 +340,7 @@ namespace Game.Client
                         for (int i = 0; i < 10; i++)
                         {
                             var way = Quaternion.Euler(0, 0, i * 36 + Random.Range(-12f, 12f)) * Vector3.right;
-                            Kick(feet + way * 0.5f, way + Vector3.up, SandColor, 2);
+                            Bits(feet + way * 0.5f, way + Vector3.up, SandColor, 2);
                         }
                         Thud(body, 0.08f, 0.7f);
                         Hear(Sound.Break, feet, 0.8f);
@@ -400,7 +400,7 @@ namespace Game.Client
                 {
                     case BossAppearance.Lurk:
                         // Up out of the floor, the water or the sand: it is thrown off.
-                        for (int i = 0; i < 6; i++) Kick(feet + (Vector3)(Random.insideUnitCircle * body.Diameter * 0.5f), Random.insideUnitCircle, DustColor, 1);
+                        for (int i = 0; i < 6; i++) Bits(feet + (Vector3)(Random.insideUnitCircle * body.Diameter * 0.5f), Random.insideUnitCircle, DustColor, 1);
                         Hear(Sound.Dig, feet, 0.8f);
                         break;
                     case BossAppearance.Summon:
@@ -415,7 +415,7 @@ namespace Game.Client
                         break;
                     default:
                         // Stone waking: grit falling from it.
-                        for (int i = 0; i < 4; i++) Kick(feet + new Vector3(Random.Range(-0.5f, 0.5f), 1, 0), Vector3.down * 0.4f, DustColor, 1);
+                        for (int i = 0; i < 4; i++) Bits(feet + new Vector3(Random.Range(-0.5f, 0.5f), 1, 0), Vector3.down * 0.4f, DustColor, 1);
                         Hear(Sound.Break, feet, 0.5f);
                         break;
                 }

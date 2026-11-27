@@ -198,20 +198,20 @@ namespace Game.Client
                         if (puff)
                         {
                             var from = crown + (Vector3)(Random.insideUnitCircle.normalized * (1.6f - 0.8f * progress));
-                            Kick(from, crown - from, Random.value < 0.5f ? CrystalPink : PrismWhite, 1);
+                            Bits(from, crown - from, Random.value < 0.5f ? CrystalPink : PrismWhite, 1);
                         }
                         break;
                     case CrystalQueenPose.Bristle:
-                        if (puff) Kick(middle + (Vector3)(Random.insideUnitCircle * 1.1f), Vector3.up * 0.3f, Random.value < 0.5f ? CrystalBlue : PrismWhite, 1);
+                        if (puff) Bits(middle + (Vector3)(Random.insideUnitCircle * 1.1f), Vector3.up * 0.3f, Random.value < 0.5f ? CrystalBlue : PrismWhite, 1);
                         break;
                     case CrystalQueenPose.Lift:
                         if (Settings.ScreenShake && progress > 0.6f) _shake = Mathf.Max(_shake, 0.03f);
                         break;
                     case CrystalQueenPose.Brood:
-                        if (puff) Kick(feet + (Vector3)(Random.insideUnitCircle * 1.2f), Vector3.up * 0.4f, CrystalPink, 1);
+                        if (puff) Bits(feet + (Vector3)(Random.insideUnitCircle * 1.2f), Vector3.up * 0.4f, CrystalPink, 1);
                         break;
                     case CrystalQueenPose.Crouch:
-                        if (puff) Kick(feet - ahead * 0.8f, -ahead + Vector3.up * 0.3f, DustColor, 2);
+                        if (puff) Bits(feet - ahead * 0.8f, -ahead + Vector3.up * 0.3f, DustColor, 2);
                         break;
                 }
             }
@@ -219,9 +219,9 @@ namespace Game.Client
             {
                 var moved = body.Position - body.LastPosition;
                 SpeedLines(feet, moved);
-                if (puff) Kick(feet, -moved, CrystalBlue, 2);
+                if (puff) Bits(feet, -moved, CrystalBlue, 2);
             }
-            if (view.Phase >= 3 && puff && Random.value < 0.3f) Kick(crown, Vector3.up, CrystalPink, 1);
+            if (view.Phase >= 3 && puff && Random.value < 0.3f) Bits(crown, Vector3.up, CrystalPink, 1);
             // Its heaviest (the rain, the hail, the crown's light): the room dims as the crown gathers, so the light
             // that falls is the brightest thing on the screen, and comes back after.
             bool gathers = view.BossState == BossState.Telegraph && attack != null && (attack.Id == "crystal_rain" || attack.Id == "shard_hail" || attack.Id == "venom_share");
@@ -338,7 +338,7 @@ namespace Game.Client
                 fall.Frame = frame;
                 var view = fall.View;
                 fall.Renderer.sprite = Sprites.Get($"queen/{view}/{CrystalQueenPose.Die}/{frame}/1", () => CrystalQueenArt.Draw(view, CrystalQueenPose.Die, frame, 1), new Vector2(0.5f, CrystalQueenArt.Floor / (float)CrystalQueenArt.Height));
-                if (frame % 4 == 3) Kick(at + new Vector3(Random.Range(-0.8f, 0.8f), 0.8f, 0), Vector3.up * 0.4f, CrystalBlue, 1);
+                if (frame % 4 == 3) Bits(at + new Vector3(Random.Range(-0.8f, 0.8f), 0.8f, 0), Vector3.up * 0.4f, CrystalBlue, 1);
             }
             // Lying still a moment, then the crystal shatters: the brightest flash of the fight and shards everywhere.
             if (age >= down + QueenFallLie && !fall.Shattered)

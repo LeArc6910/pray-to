@@ -426,6 +426,10 @@ namespace Game.Client
                     case FxRamp.Spirit:
                         Put(o, FxShape.Wisp, m, 3 + (i & 1), (int)(t * 10) + i, x, y, 1 - p, dir);
                         break;
+                    case FxRamp.Danger:
+                        // A lump of red mist lifting off, thinning as it swells (a boss's last phase).
+                        Put(o, FxShape.Smoke, m, Even(5 + 5 * p), Math.Min(3, (int)(p * 4)), x, y + 5 * p, 0.55f * (1 - p));
+                        break;
                     default:
                         Put(o, FxShape.Ember, m, 2 + (int)Math.Round(4 * (1 - p)), p < 0.5f ? 0 : 1, x, y, Math.Min(1, 2 - 2 * p), dir);
                         break;
@@ -493,8 +497,8 @@ namespace Game.Client
             float mx = Cos(c.Dir) * R * 0.6f, my = Sin(c.Dir) * R * 0.6f;
             if (t < 0.06f) FxLayers.Light(o, m, R * 2, 1, mx, my, 3);
             if (t < 0.4f) FxLayers.Light(o, m, R * 1.7f, 0.8f * (1 - t / 0.4f), mx, my, 1);
-            // Soot along the blade's track.
-            for (int i = 0; i < 5; i++)
+            // Soot along the blade's track (Plain: the blade's smear alone, over a blow that burns its own way).
+            for (int i = 0; i < 5 && !c.Plain; i++)
             {
                 float dir = c.Dir - half + wide * (i + 0.5f) / 5;
                 if ((i + 0.5f) / 5 > swept) continue;
@@ -510,7 +514,7 @@ namespace Game.Client
                 Put(o, FxShape.Smear, m, SkillFxArt.Even(R * 0.82f), span, 0, 0, fade * 0.9f, head - span / 2f);
                 Put(o, FxShape.Smear, c.Big ? FxRamp.Steel : m, SkillFxArt.Even(R), span, 0, 0, fade, head - span / 2f);
             }
-            for (int i = 0; i < 9; i++)
+            for (int i = 0; i < 9 && !c.Plain; i++)
             {
                 float turn = (i + 0.5f) / 9, dir = c.Dir - half + wide * turn, own = t - sweep * turn;
                 if (own < 0) continue;

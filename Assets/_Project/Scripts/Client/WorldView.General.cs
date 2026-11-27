@@ -213,10 +213,10 @@ namespace Game.Client
                         if (puff && progress > 0.4f) Chips(feet + (Vector3)(Random.insideUnitCircle * 1.6f), Vector3.up, FxRamp.Danger, 1);
                         break;
                     case GeneralPose.Spin:
-                        if (puff) Kick(feet + (Vector3)(Random.insideUnitCircle.normalized * 1.8f), Vector3.zero - (Vector3)(Random.insideUnitCircle.normalized), DustColor, 1);
+                        if (puff) Bits(feet + (Vector3)(Random.insideUnitCircle.normalized * 1.8f), Vector3.zero - (Vector3)(Random.insideUnitCircle.normalized), DustColor, 1);
                         break;
                     case GeneralPose.Charge:
-                        if (puff) Kick(feet - ahead * 0.8f, -ahead + Vector3.up * 0.3f, DirtColor, 2);
+                        if (puff) Bits(feet - ahead * 0.8f, -ahead + Vector3.up * 0.3f, DirtColor, 2);
                         break;
                 }
             }
@@ -227,7 +227,7 @@ namespace Game.Client
                 if (puff) Chips(feet + new Vector3(0, 0.8f, 0), -moved, FxRamp.Fire, 3, 18);
             }
             // His madness in the last phase: red mist curling off him.
-            if (view.Phase >= 3 && puff && Random.value < 0.5f) Kick(chest + (Vector3)(Random.insideUnitCircle * 0.6f), Vector3.up, RageColor, 1);
+            if (view.Phase >= 3 && puff && Random.value < 0.5f) Bits(chest + (Vector3)(Random.insideUnitCircle * 0.6f), Vector3.up, RageColor, 1);
         }
 
         // Where one of his blows lands, fire of his own over the blow's shape burning; false for anyone else's.
@@ -297,13 +297,24 @@ namespace Game.Client
                     return true;
                 }
             }
-            // Any other of his blows: the shared landing, in fire.
+            // Any other of his blows: the shared landing, in fire. In his last phase a blow of the blade (a wedge)
+            // shows the white-hot blade through it too, as the cleave does (F2).
             BlastLanded(hazard, FxRamp.Fire);
+            if (hazard.Shape == HazardShape.Cone && _generalPhase >= 3 && hazard.Id < StagedIds)
+            {
+                c.Width = hazard.Width;
+                c.Big = true;
+                c.Plain = true;
+                AddBossFx(BossFx.Cleave, at, c);
+                WhiteBlades++;
+            }
             return true;
         }
 
         // His phase, for the blade white-hot in the last.
         int _generalPhase = 1;
+        // For the playtest: blows other than the cleave that showed the white-hot blade.
+        public int WhiteBlades { get; private set; }
 
         // The banner's wooden pole, for the arrows' shafts.
         static readonly Color ArrowShaftColor = new Color(0.28f, 0.18f, 0.13f);

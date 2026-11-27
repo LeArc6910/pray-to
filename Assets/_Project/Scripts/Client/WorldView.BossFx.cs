@@ -68,6 +68,26 @@ namespace Game.Client
             AddBossFx(BossFx.Cinders, at, new BossContext { Ramp = ramp, Count = count, Size = reach, Width = spread, Dir = toward.sqrMagnitude < 1e-6f ? 90 : Mathf.Atan2(toward.y, toward.x) * Mathf.Rad2Deg });
         }
 
+        // Kick's bits in what their colour stands for (F2): stone and earth as stones, amber, ore and war fire as
+        // sparks, crystal as shards, silk as wisps, sand as grains, steel as steel sparks, and a last phase's red as
+        // lumps of red mist. For the bosses whose wind-ups and entrances still threw square dots.
+        void Bits(Vector3 at, Vector3 toward, Color color, int count)
+        {
+            FxRamp ramp = color == RageColor ? FxRamp.Danger
+                : color == AmberColor || color == OreColor || color == WarFireColor ? FxRamp.Fire
+                : color == CrystalPink || color == PrismWhite ? FxRamp.Crystal
+                : color == CrystalBlue ? FxRamp.Cold
+                : color == SilkColor ? FxRamp.Spirit
+                : color == SandColor ? FxRamp.Sand
+                : color == SteelColor ? FxRamp.Steel
+                : FxRamp.Dust;
+            BitsThrown += count;
+            Chips(at, toward, ramp, count, ramp == FxRamp.Danger ? 9 : 14, 80);
+        }
+
+        // For the playtest: bits thrown as pieces in place of square dots.
+        public int BitsThrown { get; private set; }
+
         // Every piece of the bosses' effects for this frame.
         void DrawBossFx(float deltaTime)
         {

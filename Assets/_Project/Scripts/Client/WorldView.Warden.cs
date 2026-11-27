@@ -180,7 +180,7 @@ namespace Game.Client
         {
             var feet = body.Position;
             for (int i = 0; i < (hard ? 14 : 8); i++)
-                Kick(feet + new Vector3(Random.Range(-5f, 5f), Random.Range(2.5f, 5f), 0), Vector3.down, i % 3 == 0 ? RockColor : DustColor, 1);
+                Bits(feet + new Vector3(Random.Range(-5f, 5f), Random.Range(2.5f, 5f), 0), Vector3.down, i % 3 == 0 ? RockColor : DustColor, 1);
             AddFlash(feet + new Vector3(0, 2.2f, 0), 1.2f, DustColor, FlashKind.Burst);
             if (Settings.ScreenShake) _shake = Mathf.Max(_shake, hard ? 0.35f : 0.22f);
             Hear(Sound.Break, feet, 0.9f);
@@ -202,7 +202,7 @@ namespace Game.Client
             {
                 float progress = Mathf.Clamp01(since / Mathf.Max(0.1f, attack.Telegraph));
                 var windUp = attack.Shape == AttackShape.Charge ? WardenPose.Brace : WardenWindUpOf(attack);
-                if (puff && progress > 0.5f) Kick(feet + (Vector3)(Random.insideUnitCircle * 1.4f), Vector3.up * 0.4f, RockColor, 1);
+                if (puff && progress > 0.5f) Bits(feet + (Vector3)(Random.insideUnitCircle * 1.4f), Vector3.up * 0.4f, RockColor, 1);
                 switch (windUp)
                 {
                     case WardenPose.Hunch:
@@ -210,19 +210,19 @@ namespace Game.Client
                         if (puff)
                         {
                             var from = core + (Vector3)(Random.insideUnitCircle.normalized * 1.4f);
-                            Kick(from, core - from, AmberColor, 2);
+                            Bits(from, core - from, AmberColor, 2);
                         }
                         break;
                     case WardenPose.Gather:
                         if (puff)
                         {
-                            Kick(feet + new Vector3(Random.Range(-5f, 5f), Random.Range(2f, 5f), 0), Vector3.down, DustColor, 1);
-                            Kick(core, Vector3.up, AmberColor, 1);
+                            Bits(feet + new Vector3(Random.Range(-5f, 5f), Random.Range(2f, 5f), 0), Vector3.down, DustColor, 1);
+                            Bits(core, Vector3.up, AmberColor, 1);
                         }
                         if (Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.03f + 0.08f * progress);
                         break;
                     case WardenPose.Brace:
-                        if (puff) Kick(feet - ahead * 0.8f, -ahead + Vector3.up * 0.3f, DirtColor, 2);
+                        if (puff) Bits(feet - ahead * 0.8f, -ahead + Vector3.up * 0.3f, DirtColor, 2);
                         break;
                     case WardenPose.Lift:
                         if (Settings.ScreenShake && progress > 0.6f) _shake = Mathf.Max(_shake, 0.03f);
@@ -235,12 +235,12 @@ namespace Game.Client
                 SpeedLines(feet, moved);
                 if (puff)
                 {
-                    Kick(feet, -moved, DustColor, 3);
+                    Bits(feet, -moved, DustColor, 3);
                     if (Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.06f);
                     Hear(Sound.Thump, feet, 0.5f);
                 }
             }
-            if (view.Phase >= 3 && puff && Random.value < 0.3f) Kick(core, Vector3.up, RageColor, 1);
+            if (view.Phase >= 3 && puff && Random.value < 0.3f) Bits(core, Vector3.up, RageColor, 1);
         }
 
         // Where one of its blows lands, stone and dust of its own over the blow's shape; false for anyone else's.
@@ -365,13 +365,13 @@ namespace Game.Client
                 if (Reached(WardenArt.DieOut))
                 {
                     AddFlash(at + new Vector3(0, 1.2f, 0), 1.4f, AmberColor, FlashKind.Burst);
-                    Kick(at + new Vector3(0, 1.2f, 0), Vector3.up, AmberColor, 6);
+                    Bits(at + new Vector3(0, 1.2f, 0), Vector3.up, AmberColor, 6);
                     Hear(Sound.Break, at, 0.7f);
                 }
                 if (Reached(WardenArt.DieKnees))
                 {
-                    Kick(at + new Vector3(0.6f, 0, 0), new Vector3(1, 0.2f, 0), DustColor, 3);
-                    Kick(at + new Vector3(-0.6f, 0, 0), new Vector3(-1, 0.2f, 0), DustColor, 3);
+                    Bits(at + new Vector3(0.6f, 0, 0), new Vector3(1, 0.2f, 0), DustColor, 3);
+                    Bits(at + new Vector3(-0.6f, 0, 0), new Vector3(-1, 0.2f, 0), DustColor, 3);
                     if (Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.2f);
                     Hear(Sound.Thump, at, 1);
                 }
@@ -382,12 +382,12 @@ namespace Game.Client
                     for (int i = 0; i < 10; i++)
                     {
                         var way = Quaternion.Euler(0, 0, i * 36 + Random.Range(-12f, 12f)) * Vector3.right;
-                        Kick(at + way * 0.4f + new Vector3(0, 0.5f, 0), way + Vector3.up * 0.8f, i % 2 == 0 ? RockColor : DustColor, 2);
+                        Bits(at + way * 0.4f + new Vector3(0, 0.5f, 0), way + Vector3.up * 0.8f, i % 2 == 0 ? RockColor : DustColor, 2);
                     }
                     AddFlash(at, 3f, DustColor, FlashKind.Ring);
                 }
                 // Grit trickling off it as it breaks up.
-                if (frame >= WardenArt.DieCrumble && frame % 3 == 0) Kick(at + new Vector3(Random.Range(-0.8f, 0.8f), 0.8f, 0), Vector3.down * 0.4f, DustColor, 1);
+                if (frame >= WardenArt.DieCrumble && frame % 3 == 0) Bits(at + new Vector3(Random.Range(-0.8f, 0.8f), 0.8f, 0), Vector3.down * 0.4f, DustColor, 1);
             }
             float gone = Mathf.Clamp01((age - down - WardenFallLie) / WardenFallFade);
             float grey = Mathf.Clamp01((age - down * 0.7f) / 0.8f);
