@@ -56,6 +56,9 @@ namespace Game.Client
         // How far above the origin (the caster's feet) the middle of the skill's reach is, in pixels: a nova's whole
         // effect is lifted by this, so its edge is centred where the host measures from.
         public float Lift;
+        // A projectile's whole flight when nothing stops it, in seconds (its range over its speed; Length its range
+        // in pixels): what is drawn coming down from above (the meteor) lands as the flight ends. 0 when not known.
+        public float Span;
     }
 
     // Every skill's effect as a function of time (Docs/SkillEffects.md): for a moment after the skill is used it says
@@ -228,13 +231,13 @@ namespace Game.Client
         }
 
         // A bolt from one point to another, a new one every 1/25 s.
-        static void Zap(List<FxStamp> o, float t, float x0, float y0, float x1, float y1, int seed, bool thick = false, float alpha = 1, FxRamp ramp = FxRamp.Bolt)
+        static void Zap(List<FxStamp> o, float t, float x0, float y0, float x1, float y1, int seed, bool thick = false, float alpha = 1, FxRamp ramp = FxRamp.Bolt, bool halo = false)
         {
             float dx = x1 - x0, dy = y1 - y0;
             float length = (float)Math.Sqrt(dx * dx + dy * dy);
             if (length < 4) return;
             int kind = (int)((uint)(seed * 7 + (int)(t * 25)) % 6);
-            Put(o, FxShape.Bolt, ramp, SkillFxArt.Step4(length), kind + (thick ? 8 : 0), (x0 + x1) / 2, (y0 + y1) / 2, alpha, (float)Math.Atan2(dy, dx) * Deg);
+            Put(o, FxShape.Bolt, ramp, SkillFxArt.Step4(length), kind + (thick ? 8 : 0) + (halo ? 16 : 0), (x0 + x1) / 2, (y0 + y1) / 2, alpha, (float)Math.Atan2(dy, dx) * Deg);
         }
 
         // Lightning's flicker: on, a blink off, on again, off, and a last dim one.
@@ -245,9 +248,92 @@ namespace Game.Client
         {
             float hx = (float)Math.Cos(c.Dir) * 9, hy = Body + (float)Math.Sin(c.Dir) * 9;
             Gather(o, ramp, t, 0.06f, 12, 5, c.Seed, hx, hy);
-            if (In(t, 0.03f, 0.13f)) Put(o, FxShape.Blob, ramp, size, t < 0.07f ? 0 : t < 0.1f ? 1 : 3, hx, hy);
+            if (In(t, 0.03f, 0.13f))
+            {
+                Put(o, FxShape.Blob, ramp, size, t < 0.07f ? 0 : t < 0.1f ? 1 : 3, hx, hy);
+                FxLayers.Light(o, ramp, size * 2.4f, 0.6f, hx, hy);
+            }
             Fly(o, FxShape.Dot, ramp, 1, 2, 5, t, 0.05f, 0.22f, 2, 11, c.Seed, cx: hx, cy: hy, cone: 120, toward: c.Dir * Deg);
             return 0.3f;
+        }
+
+        // A ball of fire in flight (the rework's comet): a tail of lumps that shrink and darken, sparks shed behind,
+        // and a head of three lumps, the palest foremost. dx, dy is the way it goes on the screen; size the head's
+        // radius. A rock is dark with a glowing heart and drags smoke. Thirteen pieces.
+        static void Comet(List<FxStamp> o, FxRamp ramp, float t, int seed, float dx, float dy, float size, float x = 0, float y = 0, bool rock = false)
+        {
+            float face = (float)Math.Atan2(dy, dx) * Deg;
+            for (int i = 5; i >= 1; i--)
+            {
+                float back = i * size * 0.8f, wave = (float)Math.Sin(t * 30 + i * 1.3f) * size * 0.12f * i;
+                bool smoke = rock && i > 3;
+                Put(o, FxShape.Lump, smoke ? FxRamp.Smoke : ramp, Math.Max(2, (int)Math.Round(2 * size * (1 - i * 0.15f))), (smoke ? 2 : i > 3 ? 4 : i > 1 ? 3 : 2) * 4 + (((int)(t * 25) + i) & 3),
+                    x - dx * back - dy * wave, y - dy * back + dx * wave, i > 3 ? 0.65f : 1);
+            }
+            for (int i = 0; i < 5; i++)
+            {
+                float phase = Frac(t * 3.2f + i / 5f);
+                float back = size * 1.6f + phase * size * 4.5f, side = (Rnd(seed, i, 35) - 0.5f) * size * 2.2f;
+                Put(o, FxShape.Ember, ramp, phase < 0.4f ? 3 : 2, phase < 0.5f ? 0 : 1, x - dx * back - dy * side, y - dy * back + dx * side + phase * 3, 1 - phase, face);
+            }
+            int wave3 = (int)(t * 25) & 3;
+            Put(o, FxShape.Lump, rock ? FxRamp.Dust : ramp, (int)Math.Round(2 * size), (rock ? 4 : 2) * 4 + wave3, x, y);
+            Put(o, FxShape.Lump, ramp, (int)Math.Round(1.4f * size), (rock ? 3 : 1) * 4 + ((wave3 + 1) & 3), x + dx * size * 0.2f, y + dy * size * 0.2f);
+            Put(o, FxShape.Lump, ramp, Math.Max(2, (int)Math.Round(0.84f * size)), (rock ? 1 : 0) * 4 + ((wave3 + 2) & 3), x + dx * size * 0.4f, y + dy * size * 0.4f);
+        }
+
+        // Flames left burning on the floor a while after a blast, shrinking as they go out.
+        static void Flames(List<FxStamp> o, int count, float t, float from, float until, float R, int seed, float cx = 0, float cy = 0)
+        {
+            for (int i = 0; i < count; i++)
+            {
+                float left = U(until - t - i * 0.08f, 0, 0.5f);
+                if (t < from || left <= 0) continue;
+                float angle = (i + 0.3f) / count * 360 + 110;
+                int size = 2 * (int)Math.Round((2 + 8 * left) / 2);
+                Put(o, FxShape.Flame, FxRamp.Fire, size, (int)(t * 14) + i, cx + Cos(angle) * R * 0.45f, cy + Sin(angle) * R * 0.35f + size / 2f - 2, 1);
+            }
+        }
+
+        // Crystals standing round the edge of a reach as the wave gets there, each leaning out from the middle and up
+        // a little (as a thing standing on a floor does, seen from above), tall and short by turns; they hold until
+        // breaks, then fall in two pieces each until over.
+        static void Crystals(List<FxStamp> o, FxRamp ramp, int count, float t, float from, float breaks, float over, float R, int tall, int seed)
+        {
+            for (int i = 0; i < count; i++)
+            {
+                float angle = (i + 0.4f * Rnd(seed, i, 19)) / count * 360, born = from + 0.05f * Rnd(seed, i, 20);
+                float bx = Cos(angle) * (R - 3), by = Sin(angle) * (R - 3);
+                float lean = (float)Math.Atan2(Sin(angle) + 0.45f, Cos(angle)) * Deg;
+                if (In(t, born, breaks))
+                {
+                    int length = 2 * (int)Math.Round((4 + ((i & 1) == 0 ? tall : tall * 0.6f) * Out(U(t, born, born + 0.07f))) / 2);
+                    Put(o, FxShape.Shard, ramp, length, (i & 1) == 0 ? 1 : 0, bx + Cos(lean) * length * 0.3f, by + Sin(lean) * length * 0.3f, 1, lean);
+                }
+                else if (In(t, breaks, over))
+                {
+                    float u = U(t, breaks, over);
+                    for (int piece = 0; piece < 2; piece++)
+                    {
+                        float away = angle + (piece == 0 ? -35 : 35), distance = 3 + 8 * Out(u) * (piece + 1) / 2f;
+                        Put(o, FxShape.Shard, ramp, 4 + 2 * (1 - piece), 0, bx + Cos(away) * distance, by + Sin(away) * distance + 5 * (1 - u) - 9 * u * u, 1 - u * u, away + 220 * u);
+                    }
+                }
+            }
+        }
+
+        // The element lying over the floor out to the reach, spreading fast, with pale veins running out through it.
+        static void Floor(List<FxStamp> o, FxRamp ramp, int veins, float t, float from, float until, float R, int seed)
+        {
+            if (!In(t, from, until)) return;
+            float grow = Out(U(t, from, from + 0.22f)), left = U(until - t, 0, 0.3f);
+            Put(o, FxShape.Wash, ramp, SkillFxArt.Step4(Math.Min(128, 2 * R * grow)), seed & 3, 0, 0, left, 0, true);
+            for (int i = 0; i < veins; i++)
+            {
+                float angle = (i + 0.3f * Rnd(seed, i, 36)) / veins * 360;
+                int length = SkillFxArt.Step4(R * (0.6f + 0.25f * Rnd(seed, i, 37)) * grow);
+                Put(o, FxShape.Crack, ramp, length, SkillFxArt.SplitFrame(i + seed, 1), Cos(angle) * (R * 0.12f + length / 2f), Sin(angle) * (R * 0.12f + length / 2f), 0.6f * left, angle, true);
+            }
         }
 
         // ---- where a skill is used ----
@@ -486,13 +572,20 @@ namespace Game.Client
                         }
                     }
                     Ring(o, FxRamp.Fire, t, A, 12, 1, 0.06f, 0.2f, cy: 2);
+                    FxLayers.Embers(o, FxRamp.Fire, 5, t, A, 13, seed, 0, Body);
                     Float(o, FxShape.Dot, FxRamp.Fire, 1, 2, 7, t, 0.3f, 0.8f, 9, 18, seed, cy: 6);
+                    if (In(t, A, 0.6f)) FxLayers.Light(o, FxRamp.Fire, 34, 0.7f * (1 - U(t, 0.3f, 0.6f)), 0, Body);
                     return 0.8f;
                 }
                 case "fire_ring":
                 {
-                    // A ring of flames spreads to the true reach; no filled hoop, only tongues and a thin edge.
+                    // A wave of fire runs out to the true reach and stands there as a ring of flames, over soot, and
+                    // goes out into sparks and smoke; no filled hoop, only tongues and the edge.
                     Gather(o, FxRamp.Fire, t, A, R * 0.6f, 8, seed);
+                    FxLayers.Scorch(o, t, A + 0.06f, 0.85f, R, seed);
+                    if (In(t, A, A + 0.08f)) FxLayers.Light(o, FxRamp.Fire, R * 1.5f, 1, 0, 0, 3);
+                    if (In(t, A, 0.7f)) FxLayers.Light(o, FxRamp.Fire, R * 1.7f, 0.85f * (1 - U(t, 0.35f, 0.7f)));
+                    FxLayers.Shock(o, FxRamp.Fire, t, A, R / 1.3f, life: 0.26f);
                     const int flames = 14;
                     if (In(t, A, 0.62f))
                     {
@@ -500,37 +593,46 @@ namespace Game.Client
                         for (int i = 0; i < flames; i++)
                         {
                             float angle = (i + 0.5f * Rnd(seed, i, 15)) / flames * 360;
-                            int size = late > 0.5f ? 6 : late > 0 ? 8 : (i & 1) == 0 ? 12 : 10;
+                            int size = late > 0.5f ? 6 : late > 0 ? 10 : (i & 1) == 0 ? 16 : 12;
                             Put(o, FxShape.Flame, FxRamp.Fire, size, (int)(t * 14) + i, Cos(angle) * at, Sin(angle) * at + size / 2f - 2, 1 - late * 0.8f);
                         }
                     }
                     Ring(o, FxRamp.Fire, t, A, R, 2, 0.14f, 0.36f);
-                    Float(o, FxShape.Dot, FxRamp.Fire, 1, 2, 10, t, 0.35f, 0.85f, R, 14, seed);
-                    Puffs(o, FxRamp.Smoke, 6, t, 0.42f, 0.85f, R * 0.85f, R * 0.95f, seed, 6, 0.4f, rise: 9);
+                    FxLayers.Embers(o, FxRamp.Fire, 10, t, A + 0.1f, R * 0.85f, seed, life: 0.4f);
+                    Float(o, FxShape.Dot, FxRamp.Fire, 1, 2, 8, t, 0.35f, 0.85f, R, 14, seed);
+                    Puffs(o, FxRamp.Smoke, 6, t, 0.42f, 0.85f, R * 0.85f, R * 0.95f, seed, 6, 0.45f, rise: 9);
                     return 0.85f;
                 }
                 case "inferno":
                 {
-                    // Pillars of flame burst up in two rings, the inner first, and leave the ground burnt.
+                    // The floor splits and glows, pillars of flame burst up in two rings, the inner first, round a
+                    // ball of fire, and the ground is left burnt.
                     Gather(o, FxRamp.Fire, t, 0.12f, R * 0.6f, 12, seed);
                     if (In(t, 0.08f, 1.25f)) Put(o, FxShape.Scorch, FxRamp.Fire, SkillFxArt.Step4(R * 1.5f), 0, 0, 0, 0.6f * U(t, 0.08f, 0.2f) * (1 - U(t, 0.85f, 1.25f)), 0, true);
+                    FxLayers.Splits(o, FxRamp.Fire, 7, t, 0.12f, 1.25f, R * 0.9f, seed);
+                    if (In(t, 0.12f, 0.2f)) FxLayers.Light(o, FxRamp.Fire, R * 1.6f, 1, 0, 0, 3);
+                    if (In(t, 0.08f, 0.8f)) FxLayers.Light(o, FxRamp.Fire, R * 1.8f, 0.95f * U(t, 0.08f, 0.14f) * (1 - U(t, 0.45f, 0.8f)));
+                    if (In(t, 0.5f, 1.15f)) FxLayers.Light(o, FxRamp.Fire, R, 0.4f * (1 - U(t, 0.8f, 1.15f)), 0, 0, 0);
                     for (int ring = 0; ring < 2; ring++)
                     {
                         float from = 0.12f + ring * 0.08f, at = R * (ring == 0 ? 0.45f : 0.9f);
                         int count = ring == 0 ? 6 : 12;
                         if (!In(t, from, from + 0.46f)) continue;
                         float up = Out(U(t, from, from + 0.07f)), down = U(t, from + 0.3f, from + 0.46f);
-                        int size = 2 * (int)Math.Round((8 + 14 * up) * (1 - down * 0.6f) / 2);
+                        int size = 2 * (int)Math.Round((8 + 16 * up) * (1 - down * 0.6f) / 2);
                         for (int i = 0; i < count; i++)
                         {
                             float angle = (i + ring * 0.5f) / count * 360 + seed % 30;
                             Put(o, FxShape.Flame, FxRamp.Fire, size + (i & 1) * 2, (int)(t * 14) + i, Cos(angle) * at, Sin(angle) * at + size / 2f - 2, 1 - down * 0.7f);
                         }
                     }
-                    if (In(t, 0.12f, 0.36f)) Put(o, FxShape.Blob, FxRamp.Fire, 26, (int)(U(t, 0.12f, 0.36f) * 5.99f), 0, 3);
+                    FxLayers.Ball(o, FxRamp.Fire, t, 0.12f, R * 0.3f, seed, 0, 3);
+                    FxLayers.Shock(o, FxRamp.Fire, t, 0.12f, R / 1.3f, life: 0.34f);
                     Ring(o, FxRamp.Fire, t, 0.12f, R, 3, 0.14f, 0.42f);
-                    Float(o, FxShape.Dot, FxRamp.Fire, 2, 2, 14, t, 0.4f, 1.05f, R * 0.9f, 20, seed);
-                    Puffs(o, FxRamp.Smoke, 8, t, 0.55f, 1.05f, R * 0.5f, R * 0.8f, seed, 8, 0.45f, rise: 12);
+                    FxLayers.Embers(o, FxRamp.Fire, 14, t, 0.14f, R * 0.8f, seed, life: 0.45f);
+                    Float(o, FxShape.Dot, FxRamp.Fire, 2, 2, 8, t, 0.4f, 1.05f, R * 0.9f, 20, seed);
+                    FxLayers.Plumes(o, 5, t, 0.5f, R * 0.45f, seed, life: 0.55f);
+                    Puffs(o, FxRamp.Smoke, 6, t, 0.6f, 1.05f, R * 0.8f, R * 0.92f, seed, 6, 0.4f, rise: 10);
                     return 1.25f;
                 }
 
@@ -670,6 +772,7 @@ namespace Game.Client
                     if (In(t, 0, 0.12f) && (int)(t * 40) % 3 != 2)
                     {
                         for (int i = 0; i < 3; i++) Zap(o, t, hx, hy, hx + Cos(face + (i - 1) * 55) * 10, hy + Sin(face + (i - 1) * 55) * 10, seed + i);
+                        FxLayers.Light(o, FxRamp.Bolt, 22, 0.7f, hx, hy, 2);
                     }
                     if (In(t, 0, 0.1f)) Put(o, FxShape.Glint, FxRamp.Bolt, 7, 1, hx, hy);
                     Fly(o, FxShape.Dot, FxRamp.Bolt, 1, 2, 4, t, 0.04f, 0.2f, 2, 10, seed, cx: hx, cy: hy);
@@ -679,36 +782,30 @@ namespace Game.Client
                     return Muzzle(o, FxRamp.Cold, c, t, 8);
                 case "frost_ring":
                 {
-                    // Spikes of ice erupt round the ring at the true reach, stand a moment and shatter.
+                    // Frost runs out over the floor behind a wave, crystals stand up round the true reach as it gets
+                    // there, hold a moment, then break and fall.
                     Gather(o, FxRamp.Cold, t, A, R * 0.6f, 8, seed);
-                    const int spikes = 12;
-                    for (int i = 0; i < spikes; i++)
-                    {
-                        float angle = (i + 0.4f * Rnd(seed, i, 19)) / spikes * 360, from = A + 0.03f * Rnd(seed, i, 20);
-                        float bx = Cos(angle) * (R - 9), by = Sin(angle) * (R - 9);
-                        if (In(t, from, 0.36f))
-                        {
-                            int length = 2 * (int)Math.Round((4 + 9 * Out(U(t, from, from + 0.06f))) / 2) + (i & 1) * 2;
-                            Put(o, FxShape.Shard, FxRamp.Cold, length, 0, bx + Cos(angle) * length / 2, by + Sin(angle) * length / 2, 1, angle);
-                        }
-                        else if (In(t, 0.36f, 0.75f))
-                        {
-                            float u = U(t, 0.36f, 0.75f);
-                            for (int piece = 0; piece < 2; piece++)
-                            {
-                                float away = angle + (piece == 0 ? -25 : 25), distance = 6 + 9 * Out(u) * (piece + 1) / 2f;
-                                Put(o, FxShape.Shard, FxRamp.Cold, 4, 0, bx + Cos(away) * distance, by + Sin(away) * distance - 14 * u * u, 1 - u * u, away + 200 * u);
-                            }
-                        }
-                    }
+                    Floor(o, FxRamp.Cold, 8, t, A, 0.85f, R, seed);
+                    if (In(t, A, A + 0.08f)) FxLayers.Light(o, FxRamp.Cold, R * 1.5f, 1, 0, 0, 3);
+                    if (In(t, A, 0.6f)) FxLayers.Light(o, FxRamp.Cold, R * 1.6f, 0.8f * (1 - U(t, 0.3f, 0.6f)));
+                    FxLayers.Shock(o, FxRamp.Cold, t, A, R / 1.3f, life: 0.28f);
                     Ring(o, FxRamp.Cold, t, A, R, 2, 0.1f, 0.34f);
-                    Puffs(o, FxRamp.Mist, 6, t, 0.34f, 0.8f, R * 0.8f, R * 0.95f, seed, 7, 0.32f, rise: 3);
-                    return 0.8f;
+                    Crystals(o, FxRamp.Cold, 14, t, A + 0.07f, 0.5f, 0.85f, R, 12, seed);
+                    Puffs(o, FxRamp.Mist, 6, t, 0.2f, 0.8f, R * 0.6f, R * 0.9f, seed, 7, 0.32f, rise: 3);
+                    // Glints over the frost, one after another.
+                    for (int i = 0; i < 6; i++)
+                    {
+                        float born = A + 0.1f + 0.08f * i;
+                        if (!In(t, born, born + 0.16f)) continue;
+                        float angle = Rnd(seed, i, 38) * 360, far = R * (0.2f + 0.6f * Rnd(seed, i, 39));
+                        Put(o, FxShape.Glint, FxRamp.Cold, t - born < 0.08f ? 5 : 3, 0, Cos(angle) * far, Sin(angle) * far);
+                    }
+                    return 0.85f;
                 }
                 case "storm_mantle":
                 {
                     Gather(o, FxRamp.Bolt, t, A, 20, 6, seed);
-                    // Arcs crackle round the body, new ones every moment, with a rim of cold.
+                    // Arcs crackle round the body, new ones every moment, with a rim of cold; each lights the floor.
                     if (In(t, A, 0.44f) && (int)(t * 40) % 4 != 3)
                     {
                         for (int i = 0; i < 5; i++)
@@ -716,8 +813,10 @@ namespace Game.Client
                             float angle = i * 72 + (int)(t * 25) * 31;
                             Zap(o, t, Cos(angle) * 4, Body + Sin(angle) * 4, Cos(angle + 20) * 17, Body + Sin(angle + 20) * 15, seed + i);
                         }
+                        FxLayers.Light(o, FxRamp.Bolt, 36, 0.75f, 0, Body, 2);
                     }
                     Ring(o, FxRamp.Cold, t, A, 14, 2, 0.08f, 0.28f, cy: Body);
+                    FxLayers.Embers(o, FxRamp.Bolt, 5, t, A, 14, seed, 0, Body);
                     if (In(t, 0.2f, 0.8f))
                     {
                         float u = U(t, 0.2f, 0.8f);
@@ -727,43 +826,65 @@ namespace Game.Client
                 }
                 case "thunderclap":
                 {
-                    // A leader from the sky, then the bolt itself and forks along the ground to the true reach.
+                    // Six strikes one after another, five round the caster and the last on them: where each will
+                    // fall a small ring first, then a thick bolt from the sky, drawn anew every 0.04 s, with a halo
+                    // and a star where it lands, sparks thrown off, and a burnt spot left. Arcs run round the edge of
+                    // what it hits. Each strike flashes on the light map; the room is never darkened.
                     Gather(o, FxRamp.Bolt, t, A, R * 0.5f, 6, seed, cy: 2);
-                    if (In(t, 0.02f, A)) Put(o, FxShape.Streak, FxRamp.Bolt, 40, 1, 0, 60, 0.5f, -90);
-                    float flick = Flicker(t - A);
-                    if (t >= A && flick > 0)
+                    int flicker = (int)(t / 0.04f);
+                    float lit = 0, lx = 0, ly = 0;
+                    for (int i = 0; i < 6; i++)
                     {
-                        Zap(o, t, (Rnd(seed, 0, 21) - 0.5f) * 30, 112, 0, 2, seed, true, flick);
-                        for (int i = 0; i < 6; i++)
+                        float angle = i * 72 + 23 + seed % 40, far = i == 5 ? 0 : R * 0.68f;
+                        float x = Cos(angle) * far, y = Sin(angle) * far * 0.9f, born = A + i * 0.035f, age = t - born;
+                        if (age < 0)
                         {
-                            float angle = (i + 0.5f * Rnd(seed, i, 22)) / 6 * 360;
-                            Zap(o, t, Cos(angle) * 5, 2 + Sin(angle) * 5, Cos(angle) * (R - 1), Sin(angle) * (R - 1), seed + 3 + i, false, flick);
+                            Put(o, FxShape.Edge, FxRamp.Bolt, 6 + 2 * ((flicker + i) & 1), 1, x, y, 0.8f, 0, true);
+                            continue;
+                        }
+                        if (age < 0.75f) Put(o, FxShape.Scorch, FxRamp.Smoke, 12, 4 + (i & 3), x, y, 0.85f * (1 - U(age, 0.4f, 0.75f)), 0, true);
+                        float top = x + (Rnd(seed, i, 21) - 0.5f) * 24;
+                        if (age < 0.1f)
+                        {
+                            Zap(o, t, top, y + 100, x, y, seed + i * 13, true, 1, FxRamp.Bolt, true);
+                            Put(o, FxShape.Glint, FxRamp.Bolt, 11, 2, x, y);
+                            if (age < 0.08f) (lit, lx, ly) = (1, x, y);
+                        }
+                        else if (age < 0.2f) Put(o, FxShape.Bolt, FxRamp.Bolt, 100, (seed + i) % 6, (top + x) / 2, y + 50, 0.45f, (float)Math.Atan2(-100, x - top) * Deg);
+                        FxLayers.Embers(o, FxRamp.Bolt, 3, t, born, 13, seed + i, x, y, life: 0.2f);
+                    }
+                    if (lit > 0)
+                    {
+                        FxLayers.Light(o, FxRamp.Bolt, R * 1.7f, (flicker & 1) == 0 ? 1 : 0.7f, 0, 0, 3);
+                        FxLayers.Light(o, FxRamp.Bolt, 34, 1, lx, ly, 3);
+                    }
+                    if (In(t, 0.3f, 0.7f)) FxLayers.Light(o, FxRamp.Bolt, R * 1.2f, 0.45f * (1 - U(t, 0.4f, 0.7f)), 0, 0, 1);
+                    if (In(t, A, 0.44f))
+                    {
+                        float fade = U(0.44f - t, 0, 0.15f);
+                        for (int i = 0; i < 10; i++)
+                        {
+                            if ((i + flicker) % 3 == 0) continue;
+                            Zap(o, t, Cos(i * 36) * R, Sin(i * 36) * R, Cos(i * 36 + 36) * R, Sin(i * 36 + 36) * R, seed + i * 5, false, fade);
                         }
                     }
-                    if (In(t, A, 0.3f)) Put(o, FxShape.Blob, FxRamp.Bolt, 18, (int)(U(t, A, 0.3f) * 5.99f), 0, 3);
                     Ring(o, FxRamp.Bolt, t, A, R, 3, 0.1f, 0.3f);
-                    // What is left: sparks hopping on the ground, a small burn.
-                    if (In(t, 0.28f, 0.62f) && (int)(t * 30) % 3 != 2)
-                    {
-                        for (int i = 0; i < 4; i++)
-                        {
-                            int now = (int)(t * 12) * 13 + i;
-                            float angle = Rnd(seed, now, 23) * 360, distance = R * (0.3f + 0.6f * Rnd(seed, now, 24));
-                            Put(o, FxShape.Bolt, FxRamp.Bolt, 8, now % 6, Cos(angle) * distance, Sin(angle) * distance, 1 - U(t, 0.28f, 0.62f), Rnd(seed, now, 25) * 360);
-                        }
-                    }
-                    if (In(t, A, 0.75f)) Put(o, FxShape.Scorch, FxRamp.Bolt, 16, 1, 0, 0, 0.55f * (1 - U(t, 0.45f, 0.75f)), 0, true);
-                    return 0.75f;
+                    return 0.95f;
                 }
                 case "blizzard":
                 {
-                    // Snow and shards wheel over the whole reach, slowing; spikes stand at its rim and fall.
+                    // Frost over the whole reach, snow and shards wheeling over it and slowing; crystals stand at its
+                    // rim and break as it ends.
                     Gather(o, FxRamp.Cold, t, 0.12f, R * 0.6f, 10, seed);
+                    Floor(o, FxRamp.Cold, 0, t, 0.12f, 1.05f, R, seed);
+                    if (In(t, 0.12f, 0.2f)) FxLayers.Light(o, FxRamp.Cold, R * 1.5f, 1, 0, 0, 3);
+                    if (In(t, 0.12f, 0.9f)) FxLayers.Light(o, FxRamp.Cold, R * 1.6f, 0.8f * (1 - U(t, 0.5f, 0.9f)));
+                    FxLayers.Shock(o, FxRamp.Cold, t, 0.12f, R / 1.3f, life: 0.34f);
                     Ring(o, FxRamp.Cold, t, 0.12f, R, 3, 0.14f, 0.5f);
                     if (In(t, 0.1f, 1.05f))
                     {
                         float u = U(t, 0.1f, 1.05f), swirl = 420 * Out(u), alpha = u < 0.7f ? 1 : 1 - (u - 0.7f) / 0.3f;
-                        for (int i = 0; i < 36; i++)
+                        for (int i = 0; i < 30; i++)
                         {
                             float distance = R * (0.2f + 0.78f * (float)Math.Sqrt(Rnd(seed, i, 26))) * (0.5f + 0.5f * Out(U(t, 0.1f, 0.3f)));
                             float angle = Rnd(seed, i, 27) * 360 + swirl * (1.3f - distance / R * 0.6f);
@@ -772,14 +893,7 @@ namespace Game.Client
                             else Put(o, FxShape.Dot, FxRamp.Cold, 2, 3 - (i & 1), Cos(angle) * distance, Sin(angle) * distance + fall, alpha);
                         }
                     }
-                    for (int i = 0; i < 9; i++)
-                    {
-                        float angle = (i + 0.3f) / 9 * 360, from = 0.16f + 0.04f * Rnd(seed, i, 28);
-                        float bx = Cos(angle) * (R - 12), by = Sin(angle) * (R - 12);
-                        if (!In(t, from, 0.8f)) continue;
-                        int length = 2 * (int)Math.Round((4 + 12 * Out(U(t, from, from + 0.07f))) / 2);
-                        Put(o, FxShape.Shard, FxRamp.Cold, length, 0, bx + Cos(angle) * length / 2, by + Sin(angle) * length / 2, 1 - U(t, 0.6f, 0.8f), angle);
-                    }
+                    Crystals(o, FxRamp.Cold, 10, t, 0.18f, 0.75f, 1.05f, R, 16, seed);
                     Puffs(o, FxRamp.Mist, 8, t, 0.6f, 1.05f, R * 0.5f, R * 0.85f, seed, 8, 0.3f, rise: 3);
                     return 1.05f;
                 }
@@ -799,22 +913,33 @@ namespace Game.Client
                 case "fireball":
                 case "flame_burst":
                 {
-                    int head = skill == "fireball" ? 9 : 7;
-                    Put(o, FxShape.Fireball, FxRamp.Fire, head, (int)(t * 16) % 3, -dx * head / 2, -dy * head / 2, 1, face);
-                    Trail(o, FxShape.Dot, FxRamp.Fire, t, c, skill == "fireball" ? 4 : 2, head, 18, 5, 5, true);
+                    // The comet: a tail of shrinking lumps, sparks shed behind, its light on the floor under it.
+                    bool big = skill == "fireball";
+                    Comet(o, FxRamp.Fire, t, seed, dx, dy, big ? 4.5f : 3.5f);
+                    FxLayers.Light(o, FxRamp.Fire, big ? 20 : 14, big ? 0.6f : 0.45f, 0, -6);
                     break;
                 }
                 case "meteor":
                 {
-                    // High over its shadow, dragging smoke.
-                    Put(o, FxShape.Shadow, FxRamp.Smoke, 14, 0, 0, -3, 1, 0, true);
-                    for (int k = 0; k < 4; k++)
+                    // A burning rock coming down out of the dark onto the place its flight ends, over a shadow that
+                    // grows and a light that brightens under it. Only the picture falls: the host's projectile goes
+                    // along the floor as before, and the shadow is where it is.
+                    float p = c.Span > 0 ? Math.Min(1, t / c.Span) : 1, fall = (1 - p) * (1 - p);
+                    float high = 6 + 74 * fall, back = 34 * fall;
+                    // The way it goes on the screen: the flight along the floor, less the height and the lag it loses.
+                    float rate = c.Span > 0 ? 2 * (1 - p) / c.Span : 0, pace = c.Span > 0 ? c.Length / c.Span : 1;
+                    float vx = dx * (pace + 34 * rate), vy = dy * (pace + 34 * rate) - 74 * rate;
+                    float speed = (float)Math.Sqrt(vx * vx + vy * vy);
+                    if (speed < 0.01f) (vx, vy, speed) = (dx, dy, 1);
+                    Put(o, FxShape.Shadow, FxRamp.Smoke, SkillFxArt.Even(8 + 10 * p), 0, 0, -3, 0.6f + 0.4f * p, 0, true);
+                    FxLayers.Light(o, FxRamp.Fire, 22 + 26 * p, 0.35f + 0.55f * p, 0, -3);
+                    float x = -dx * back, y = high - dy * back;
+                    for (int k = 0; k < 3; k++)
                     {
-                        float phase = Frac(t * 4 + k * 0.25f);
-                        Put(o, FxShape.Smoke, FxRamp.Smoke, 6 + (k & 1) * 2, phase < 0.4f ? 1 : phase < 0.7f ? 2 : 3, -dx * (12 + phase * 24), 7 - dy * (12 + phase * 24) + phase * 7, 0.6f * (1 - phase));
+                        float phase = Frac(t * 4 + k / 3f), far = 22 + phase * 26;
+                        Put(o, FxShape.Plume, FxRamp.Smoke, 6 + 2 * (int)(phase * 3), Math.Min(5, 1 + (int)(phase * 5)), x - vx / speed * far, y - vy / speed * far + phase * 5, 0.7f * (1 - phase));
                     }
-                    Put(o, FxShape.Fireball, FxRamp.Fire, 15, (int)(t * 16) % 3, -dx * 7, 7 - dy * 7, 1, face);
-                    Trail(o, FxShape.Dot, FxRamp.Fire, t, c, 4, 12, 22, 9, 7, true, 7);
+                    Comet(o, FxRamp.Fire, t, seed, vx / speed, vy / speed, 7.5f, x, y, true);
                     break;
                 }
                 case "volley":
@@ -850,13 +975,21 @@ namespace Game.Client
                     break;
                 }
                 case "chain_lightning":
-                    Put(o, FxShape.Bolt, FxRamp.Bolt, 16, (int)(t * 25) % 6, -dx * 7, -dy * 7, 1, face);
+                    Put(o, FxShape.Bolt, FxRamp.Bolt, 20, (int)(t * 25) % 6 + 16, -dx * 9, -dy * 9, 1, face);
                     Put(o, FxShape.Glint, FxRamp.Bolt, 7, (int)(t * 20) & 1, 0, 0);
+                    FxLayers.Light(o, FxRamp.Bolt, 18, ((int)(t * 25) & 1) == 0 ? 0.7f : 0.5f, 0, -6, 2);
                     break;
                 case "ice_lance":
-                    Put(o, FxShape.Streak, FxRamp.Cold, 12, 1, -dx * 22, -dy * 22, 0.5f, face);
+                    // A lance with a bright spine, frost shed behind it in motes that shrink, a cold light under it.
+                    Put(o, FxShape.Streak, FxRamp.Cold, 16, 2, -dx * 24, -dy * 24, 0.6f, face);
+                    for (int k = 0; k < 3; k++)
+                    {
+                        float phase = Frac(t * 4 + k / 3f);
+                        Put(o, FxShape.Lump, FxRamp.Cold, 5 - (int)(phase * 3), 2 * 4 + k, -dx * (16 + phase * 16) - dy * (k - 1) * 2, -dy * (16 + phase * 16) + dx * (k - 1) * 2, 0.6f * (1 - phase));
+                    }
                     Trail(o, FxShape.Dot, FxRamp.Cold, t, c, 4, 14, 16, 5, 0, true);
                     Put(o, FxShape.Shard, FxRamp.Cold, 20, 1, -dx * 8, -dy * 8, 1, face);
+                    FxLayers.Light(o, FxRamp.Cold, 16, 0.5f, 0, -6);
                     break;
             }
         }
@@ -883,13 +1016,15 @@ namespace Game.Client
             var m = c.Main;
             switch (skill)
             {
-                // The rework's blast (E3, FxLayers.Blast): the two that show it. The rest keep Explosion until E4.
+                // The rework's blast (FxLayers.Blast), sized by how much each is.
                 case "fireball":
                     return FxLayers.Blast(o, t, R, FxRamp.Fire, seed, embers: 12);
                 case "flame_burst":
-                    return Explosion(o, t, R, 0, seed);
+                    return FxLayers.Blast(o, t, R, FxRamp.Fire, seed, embers: 6, linger: 0.9f);
                 case "explosive_arrow":
-                    return Explosion(o, t, R, 1, seed);
+                    // Powder: rocks thrown up, and flames left burning on the floor a moment.
+                    Flames(o, 3, t, 0.24f, 0.95f, Math.Max(10, R), seed);
+                    return FxLayers.Blast(o, t, R, FxRamp.Fire, seed, embers: 10, rubble: 4, linger: 1.05f);
                 case "meteor":
                 {
                     R = Math.Max(10, R);
@@ -898,6 +1033,7 @@ namespace Game.Client
                     if (t < 0.5f) Put(o, FxShape.Glow, FxRamp.Fire, SkillFxArt.Step4(R * 2.4f), 0, 0, 0, 0.55f * (1 - t / 0.5f), 0, true);
                     // Four smaller balls of fire round the first, a moment after it.
                     for (int i = 0; i < 4; i++) FxLayers.Ball(o, FxRamp.Fire, t, 0.03f + i * 0.02f, R * 0.5f, i + 1, Cos(i * 90 + 34) * R * 0.5f, Sin(i * 90 + 34) * R * 0.4f);
+                    Flames(o, 4, t, 0.3f, 1.3f, R, seed);
                     return FxLayers.Blast(o, t, R, FxRamp.Fire, seed, embers: 16, rubble: 6, linger: 1.38f);
                 }
                 case "volley":
@@ -920,12 +1056,24 @@ namespace Game.Client
                     {
                         for (int i = 0; i < 5; i++) Put(o, FxShape.Bolt, FxRamp.Bolt, 8, (seed + i + (int)(t * 25)) % 6, Cos(i * 72 + seed) * 5, Sin(i * 72 + seed) * 5, 1, i * 72 + seed);
                     }
-                    if (In(t, 0, 0.08f)) Put(o, FxShape.Glint, FxRamp.Bolt, 9, 2, 0, 0);
-                    Fly(o, FxShape.Dot, FxRamp.Bolt, 1, 2, 4, t, 0.04f, 0.2f, 3, 11, seed);
-                    return 0.26f;
+                    if (In(t, 0, 0.08f))
+                    {
+                        Put(o, FxShape.Glint, FxRamp.Bolt, 11, 2, 0, 0);
+                        FxLayers.Light(o, FxRamp.Bolt, 30, 1, 0, 0, 3);
+                    }
+                    // A burnt spot where it struck, and sparks with tails.
+                    if (In(t, 0, 0.5f)) Put(o, FxShape.Scorch, FxRamp.Smoke, 8, 4 + (seed & 3), 0, -3, 0.8f * (1 - U(t, 0.25f, 0.5f)), 0, true);
+                    FxLayers.Embers(o, FxRamp.Bolt, 6, t, 0.02f, 11, seed, life: 0.2f);
+                    return 0.5f;
                 case "ice_lance":
                     // It shatters: shards fly on past and fall, a breath of mist.
-                    if (In(t, 0, 0.07f)) Put(o, FxShape.Glint, FxRamp.Cold, 9, 2, 0, 0);
+                    if (In(t, 0, 0.07f))
+                    {
+                        Put(o, FxShape.Glint, FxRamp.Cold, 9, 2, 0, 0);
+                        FxLayers.Light(o, FxRamp.Cold, 26, 0.9f, 0, 0, 3);
+                    }
+                    if (In(t, 0, 0.6f)) Put(o, FxShape.Wash, FxRamp.Cold, 20, seed & 3, 0, -4, U(0.6f - t, 0, 0.3f), 0, true);
+                    FxLayers.Shock(o, FxRamp.Cold, t, 0, 9, life: 0.2f);
                     if (In(t, 0, 0.42f))
                     {
                         float u = t / 0.42f;
@@ -936,40 +1084,9 @@ namespace Game.Client
                         }
                     }
                     Puffs(o, FxRamp.Mist, 2, t, 0.04f, 0.5f, 1, 6, seed, 7, 0.32f, rise: 3);
-                    return 0.5f;
+                    return 0.6f;
             }
             return 0;
-        }
-
-        // A bright core, a ball swelling to the blast's reach, bits thrown out, then smoke rising and thinning
-        // (Docs/SkillEffects.md, source 5). Bigger blasts throw rubble, leave flames and, the largest, a burn.
-        static float Explosion(List<FxStamp> o, float t, float R, int level, int seed)
-        {
-            R = Math.Max(10, R);
-            if (level == 2 && In(t, 0.05f, 1.3f)) Put(o, FxShape.Scorch, FxRamp.Fire, SkillFxArt.Step4(R * 1.4f), 2, 0, 0, 0.6f * (1 - U(t, 0.8f, 1.3f)), 0, true);
-            if (In(t, 0, 0.08f)) Put(o, FxShape.Blob, FxRamp.Fire, SkillFxArt.Even(R * 1.1f), t < 0.04f ? 0 : 1, 0, 0);
-            else if (In(t, 0.08f, 0.36f))
-            {
-                float u = U(t, 0.08f, 0.36f);
-                Put(o, FxShape.Blob, FxRamp.Fire, SkillFxArt.Even(R * (1.3f + 0.4f * Out(u))), 2 + Math.Min(3, (int)(u * 4)), 0, 0);
-            }
-            Ring(o, FxRamp.Fire, t, 0, R, level == 2 ? 3 : 2, 0.1f, 0.3f);
-            Fly(o, FxShape.Dot, FxRamp.Fire, 2, 2, 6 + 4 * level, t, 0.03f, 0.42f, 4, R * 1.1f, seed, rise: 6);
-            if (level > 0)
-            {
-                Fly(o, FxShape.Chunk, FxRamp.Smoke, 3, 0, 5 * level, t, 0.03f, 0.4f, 4, R, seed + 1, hop: 8);
-                if (In(t, 0.12f, 0.52f))
-                {
-                    float u = U(t, 0.12f, 0.52f);
-                    for (int i = 0; i < 3 * level; i++)
-                    {
-                        float angle = Rnd(seed, i, 32) * 360, distance = R * 0.65f * (float)Math.Sqrt(Rnd(seed, i, 33));
-                        Put(o, FxShape.Flame, FxRamp.Fire, u < 0.6f ? 8 : 6, (int)(t * 14) + i, Cos(angle) * distance, Sin(angle) * distance + 2, 1 - u);
-                    }
-                }
-            }
-            Puffs(o, FxRamp.Smoke, 3 + 2 * level, t, 0.2f, 0.75f + 0.15f * level, R * 0.15f, R * 0.6f, seed, 6 + 2 * level, 0.5f, rise: 10);
-            return level == 2 ? 1.3f : 0.8f + 0.1f * level;
         }
 
         // Lightning between two enemies: a jagged line, a new one each flicker, a glint and sparks where it lands.
@@ -977,10 +1094,15 @@ namespace Game.Client
         {
             float dx = (float)Math.Cos(c.Dir) * c.Length / 2, dy = (float)Math.Sin(c.Dir) * c.Length / 2;
             float flick = Flicker(t);
-            if (flick > 0) Zap(o, t, -dx, -dy, dx, dy, c.Seed, c.Length >= 24, flick);
-            if (In(t, 0, 0.12f)) Put(o, FxShape.Glint, FxRamp.Bolt, 7, 1, dx, dy);
-            Fly(o, FxShape.Dot, FxRamp.Bolt, 1, 2, 3, t, 0.05f, 0.22f, 2, 9, c.Seed, cx: dx, cy: dy);
-            return 0.3f;
+            if (flick > 0)
+            {
+                Zap(o, t, -dx, -dy, dx, dy, c.Seed, c.Length >= 24, flick, FxRamp.Bolt, c.Length >= 24);
+                FxLayers.Light(o, FxRamp.Bolt, 26, flick, dx, dy, 3);
+            }
+            if (In(t, 0, 0.12f)) Put(o, FxShape.Glint, FxRamp.Bolt, 9, 2, dx, dy);
+            if (In(t, 0, 0.45f)) Put(o, FxShape.Scorch, FxRamp.Smoke, 8, 4 + (c.Seed & 3), dx, dy - 5, 0.8f * (1 - U(t, 0.25f, 0.45f)), 0, true);
+            FxLayers.Embers(o, FxRamp.Bolt, 4, t, 0.03f, 10, c.Seed, dx, dy, life: 0.2f);
+            return 0.45f;
         }
 
         // ---- a buff that is running: small, slow, near the body, never over what is aimed at ----
@@ -1016,6 +1138,7 @@ namespace Game.Client
                     Put(o, FxShape.Flame, FxRamp.Fire, 5, (int)(t * 12) + 2, hx - dy * 3, hy + 2 + dx * 2, 0.7f);
                     float p = Frac(t / 0.6f);
                     Put(o, FxShape.Dot, FxRamp.Fire, 1, 2, hx + (float)Math.Sin(p * 7) * 2, hy + 5 + 10 * p, 0.9f * (1 - p));
+                    FxLayers.Light(o, FxRamp.Fire, 16, 0.32f + 0.06f * (float)Math.Sin(t * 9), hx, hy);
                     break;
                 }
                 case "eagle_eye":
@@ -1048,6 +1171,7 @@ namespace Game.Client
                     {
                         float angle = Rnd(c.Seed, index, 34) * 360;
                         Put(o, FxShape.Bolt, FxRamp.Bolt, 10, (index + (int)(p * 25)) % 6, Cos(angle) * 9, Body + Sin(angle) * 8, 0.9f, angle + 90);
+                        FxLayers.Light(o, FxRamp.Bolt, 20, 0.4f, 0, Body, 2);
                     }
                     for (int k = 0; k < 2; k++) Put(o, FxShape.Dot, FxRamp.Cold, 1, 3, Cos(t * 200 + k * 180) * 10, Body + Sin(t * 200 + k * 180) * 5, 0.7f);
                     break;

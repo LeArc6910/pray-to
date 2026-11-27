@@ -22,7 +22,8 @@ namespace Game.Client
         Blob,
         // A sharp crystal pointing +x, size its length; frame 1 is a lance with a bright spine.
         Shard,
-        // A jagged bolt along +x, size its length; frames 0 to 5 are different bolts, +8 a thick one.
+        // A jagged bolt along +x, size its length; frames 0 to 5 are different bolts, +8 a thick one,
+        // +16 one with a halo in the element's turned colour.
         Bolt,
         // An arc of steel round +x, size its radius, frame how many degrees wide.
         Crescent,
@@ -88,6 +89,18 @@ namespace Game.Client
         // A dotted ring at the true reach, for what still hurts where it lies: size its diameter, frames 0 and 1 the
         // dots stepping round.
         Dashes,
+
+        // ---- the players' skills (E4, Docs/EffectsRework.md 10; drawn in SkillFxArt.Layers) ----
+
+        // A lump with a wavering edge in one of the element's five colours: a comet's tail, a mote of frost. Size its
+        // diameter, frame the shade (0 core to 4 darkest) times four plus one of four wavers.
+        Lump,
+        // The element lying over the floor (frost, a charged or blessed floor): a thin patch, lighter within, its
+        // ragged rim thinned in a pattern, a few pale flecks. Size its diameter, frames 0 to 3 four patches.
+        Wash,
+        // A blade's smear round +x: thick and pale at its head, thinning behind to dots. Size its radius, frame how
+        // many degrees wide.
+        Smear,
     }
 
     // An element's colours, dark to core.
@@ -157,7 +170,7 @@ namespace Game.Client
                 case FxShape.Smoke: return Smoke(r, size, frame);
                 case FxShape.Blob: return Blob(r, size, frame);
                 case FxShape.Shard: return Shard(r, size, frame);
-                case FxShape.Bolt: return Bolt(r, size, frame);
+                case FxShape.Bolt: return Bolt(r, size, frame, Ramp5(ramp)[3]);
                 case FxShape.Crescent: return Crescent(r, size, frame);
                 case FxShape.Crack: return Crack(r, size, frame);
                 case FxShape.Chunk: return Chunk(r, size, frame);
@@ -182,6 +195,9 @@ namespace Game.Client
                 case FxShape.Glow: return Glow(r, size);
                 case FxShape.Puddle: return Puddle(Ramp5(ramp), size, frame);
                 case FxShape.Dashes: return Dashes(r, size, frame);
+                case FxShape.Lump: return Lump(Ramp5(ramp), size, frame);
+                case FxShape.Wash: return Wash(Ramp5(ramp), size, frame);
+                case FxShape.Smear: return Smear(Ramp5(ramp), size, frame);
                 default: return null;
             }
         }
@@ -334,9 +350,9 @@ namespace Game.Client
 
         // Lightning by midpoint displacement (Docs/SkillEffects.md, source 4): the line from end to end is halved again
         // and again, each midpoint pushed aside by less; a branch or two fork off dimmer.
-        static PixelImage Bolt(Rgba[] r, int length, int frame)
+        static PixelImage Bolt(Rgba[] r, int length, int frame, Rgba glow)
         {
-            bool thick = frame >= 8;
+            bool thick = (frame & 8) != 0, halo = (frame & 16) != 0;
             int kind = frame & 7;
             int sway = Math.Clamp((int)(length * 0.16f), 2, 9);
             int branch = length >= 12 ? Math.Min(14, (int)(length * 0.3f)) : 0;
@@ -367,6 +383,34 @@ namespace Game.Client
                     y += slope + (Noise(fork * 7 + step, kind, length) - 0.5f) * 1.6f;
                     int row = (int)Math.Round(y);
                     if (image.Inside(from + step, row) && !image.IsSet(from + step, row)) image[from + step, row] = step > run * 0.6f ? r[1] : r[2];
+                }
+            }
+            if (halo)
+            {
+                // A halo in the element's turned colour (violet round lightning) on every empty pixel beside the bolt.
+                var lit = new bool[image.Width, image.Height];
+                for (int y = 0; y < image.Height; y++)
+                    for (int x = 0; x < image.Width; x++)
+                        lit[x, y] = image.IsSet(x, y);
+                for (int y = 0; y < image.Height; y++)
+                {
+                    for (int x = 0; x < image.Width; x++)
+                    {
+                        if (lit[x, y]) continue;
+                        bool near = false, far = false;
+                        for (int dy = -2; dy <= 2 && !near; dy++)
+                        {
+                            for (int dx = -1; dx <= 1; dx++)
+                            {
+                                int nx = x + dx, ny = y + dy;
+                                if (nx < 0 || ny < 0 || nx >= image.Width || ny >= image.Height || !lit[nx, ny]) continue;
+                                if (Math.Abs(dy) <= 1) near = true;
+                                else far = true;
+                            }
+                        }
+                        if (near) image[x, y] = A(glow, 200);
+                        else if (far && ((x + y) & 1) == 0) image[x, y] = A(glow, 120);
+                    }
                 }
             }
             return image;

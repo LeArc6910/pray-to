@@ -279,6 +279,8 @@ namespace Game.Client
                     var context = scene.Context;
                     context.Dir = angle;
                     context.Seed = 7 + i;
+                    context.Length = scene.Reach;
+                    context.Span = land;
                     float gone = Math.Min(t, land) * skill.Speed * Tile + World.PlayerRadius * Tile;
                     float x = (float)Math.Cos(angle) * gone, y = (float)Math.Sin(angle) * gone + 8;
                     if (t < land) Take(FxProgram.Shot, context, t, x, y);

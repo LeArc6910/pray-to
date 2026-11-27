@@ -229,7 +229,11 @@ namespace Game.Client
             shot.Dir = dir;
             if (!Feel.SkillFx) return false;
             _fxStamps.Clear();
-            SkillFx.Stamps(FxProgram.Shot, shot.Skill.Id, new FxContext { Dir = shot.Dir, Seed = shot.Seed, Main = shot.Main }, shot.Age, _fxStamps);
+            SkillFx.Stamps(FxProgram.Shot, shot.Skill.Id, new FxContext
+            {
+                Dir = shot.Dir, Seed = shot.Seed, Main = shot.Main,
+                Length = shot.Skill.Range * Sprites.PixelsPerUnit, Span = shot.Skill.Speed > 0 ? shot.Skill.Range / shot.Skill.Speed : 0,
+            }, shot.Age, _fxStamps);
             EmitFx(at, shot.Mine ? 1 : OthersFxAlpha, null);
             _skillShotsDrawn++;
             return true;

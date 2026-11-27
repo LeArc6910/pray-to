@@ -343,5 +343,81 @@ namespace Game.Client
             }
             return image;
         }
+
+        // ---- the players' skills (E4) ----
+
+        // One colour, an edge that wavers with the frame.
+        static PixelImage Lump(Rgba[] r, int diameter, int frame)
+        {
+            diameter = Math.Max(1, diameter);
+            var color = r[Math.Clamp(frame >> 2, 0, 4)];
+            var image = new PixelImage(diameter, diameter);
+            float centre = diameter / 2f, phase = (frame & 3) * 1.5708f;
+            for (int y = 0; y < diameter; y++)
+            {
+                for (int x = 0; x < diameter; x++)
+                {
+                    float u = x + 0.5f - centre, v = y + 0.5f - centre;
+                    float edge = centre * (diameter < 5 ? 1 : Wobble((float)Math.Atan2(v, u), diameter, phase, 0.16f) * 0.88f);
+                    if (u * u + v * v <= edge * edge) image[x, y] = color;
+                }
+            }
+            return image;
+        }
+
+        // A thin patch of the element over the floor: deep colour thinned in a pattern, a lighter middle, pale flecks.
+        static PixelImage Wash(Rgba[] r, int diameter, int kind)
+        {
+            var image = new PixelImage(diameter, diameter);
+            float centre = diameter / 2f, full = centre - 0.5f;
+            for (int y = 0; y < diameter; y++)
+            {
+                for (int x = 0; x < diameter; x++)
+                {
+                    float u = x + 0.5f - centre, v = y + 0.5f - centre;
+                    float angle = (float)Math.Atan2(v, u), d = (float)Math.Sqrt(u * u + v * v);
+                    float edge = full * (0.93f + 0.07f * (float)Math.Sin(angle * 7 + kind * 1.9f) * (float)Math.Sin(angle * 4 + kind));
+                    if (d > edge) continue;
+                    float k = d / edge;
+                    if (k > 0.9f && !Thin(x, y, 0.5f)) continue;
+                    if (k < 0.8f && Noise(x, y, 57 + kind) > 0.965f) image[x, y] = A(r[1], 200);
+                    else if (k < 0.62f) image[x, y] = A(r[3], Thin(x, y, 0.5f) ? 120 : 90);
+                    else image[x, y] = A(r[4], Thin(x, y, 0.6f) ? 130 : 95);
+                }
+            }
+            return image;
+        }
+
+        // A blade's sweep turning counterclockwise, heavier than Crescent: a broad pale head with a white edge, the
+        // band narrowing behind it and breaking into dots at its tail.
+        static PixelImage Smear(Rgba[] r, int radius, int degrees)
+        {
+            float thick = Math.Clamp(radius * 0.2f, 4, 10);
+            int size = 2 * (radius + 1) + 2;
+            var image = new PixelImage(size, size);
+            float centre = size / 2f, span = degrees / 2f;
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float u = x + 0.5f - centre, v = centre - (y + 0.5f);
+                    float angle = (float)(Math.Atan2(v, u) * 180 / Math.PI);
+                    if (Math.Abs(angle) > span) continue;
+                    float along = (angle + span) / (2 * span);
+                    // Rounded off at the very head.
+                    float wide = thick * (float)Math.Pow(along, 1.4) * (along > 0.93f ? 0.35f + 0.65f * (1 - along) / 0.07f : 1);
+                    float off = (float)Math.Sqrt(u * u + v * v) - radius;
+                    if (off > 0.5f || off < -wide - 0.5f) continue;
+                    float across = -off / Math.Max(1, wide);
+                    if (along < 0.22f && ((x + y) & 3) != 0) continue;
+                    if (along < 0.4f && ((x + y) & 1) == 0) continue;
+                    if (across < 0.28f) image[x, y] = along > 0.5f ? r[0] : r[1];
+                    else if (across < 0.6f) image[x, y] = along > 0.7f ? r[0] : along > 0.4f ? r[1] : r[2];
+                    else if (across < 0.86f) image[x, y] = along > 0.6f ? r[1] : r[2];
+                    else if (((x + y) & 1) == 0) image[x, y] = A(r[3], 200);
+                }
+            }
+            return image;
+        }
     }
 }
