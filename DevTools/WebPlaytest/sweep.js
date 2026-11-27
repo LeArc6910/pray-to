@@ -3090,7 +3090,7 @@ async function mobwarn(browser) {
   await game.context.close();
 
   note('\n## 일반 몬스터의 예고 (E5, 휴대폰 세로)\n');
-  const phone = await open(browser, run, Profiles.phonePortrait, url);
+  const phone = await open(browser, run, Profiles.phone, url);
   await phone.startSolo();
   await phone.wait(1200);
   await phone.send('goto wild');
