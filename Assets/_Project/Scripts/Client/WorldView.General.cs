@@ -178,6 +178,7 @@ namespace Game.Client
         void GeneralExtras(Body body, EntityView view)
         {
             var attack = view.BossAttack;
+            _generalPhase = view.Phase;
             float since = Time.time - body.BossSince;
             bool puff = Time.time >= body.DustAt;
             if (puff) body.DustAt = Time.time + 0.1f;
@@ -201,15 +202,15 @@ namespace Game.Client
                             Hear(Sound.Thump, feet, 0.55f + 0.35f * progress);
                             if (Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.02f + 0.04f * progress);
                         }
-                        if (puff) Kick(feet + new Vector3(Random.Range(-0.3f, 0.3f), 3f, 0), Vector3.up, blow == GeneralPose.Rally ? BannerColor : WarFireColor, 1);
+                        if (puff) Chips(feet + new Vector3(Random.Range(-0.3f, 0.3f), 3f, 0), Vector3.up, blow == GeneralPose.Rally ? FxRamp.Danger : FxRamp.Fire, 1);
                         break;
                     }
                     case GeneralPose.Plant:
-                        if (puff && progress > 0.35f) Kick(feet + new Vector3(Random.Range(-0.4f, 0.4f), 2.8f, 0), Vector3.up * 0.5f, WarFireColor, 1);
+                        if (puff && progress > 0.35f) Chips(feet + new Vector3(Random.Range(-0.4f, 0.4f), 2.8f, 0), Vector3.up, FxRamp.Fire, 1);
                         break;
                     case GeneralPose.Stab:
                         // Ghostly spearmen's breath gathering at his feet.
-                        if (puff && progress > 0.4f) Kick(feet + (Vector3)(Random.insideUnitCircle * 1.6f), Vector3.up * 0.6f, WarGhostColor, 1);
+                        if (puff && progress > 0.4f) Chips(feet + (Vector3)(Random.insideUnitCircle * 1.6f), Vector3.up, FxRamp.Danger, 1);
                         break;
                     case GeneralPose.Spin:
                         if (puff) Kick(feet + (Vector3)(Random.insideUnitCircle.normalized * 1.8f), Vector3.zero - (Vector3)(Random.insideUnitCircle.normalized), DustColor, 1);
@@ -223,31 +224,30 @@ namespace Game.Client
             {
                 var moved = body.Position - body.LastPosition;
                 SpeedLines(feet, moved);
-                if (puff) Kick(feet + new Vector3(0, 0.8f, 0), -moved, WarFireColor, 2);
+                if (puff) Chips(feet + new Vector3(0, 0.8f, 0), -moved, FxRamp.Fire, 3, 18);
             }
             // His madness in the last phase: red mist curling off him.
             if (view.Phase >= 3 && puff && Random.value < 0.5f) Kick(chest + (Vector3)(Random.insideUnitCircle * 0.6f), Vector3.up, RageColor, 1);
         }
 
-        // Where one of his blows lands, a burst of its own; false for anyone else's.
+        // Where one of his blows lands, fire of his own over the blow's shape burning; false for anyone else's.
         bool GeneralLanded(HazardState hazard)
         {
-            var attack = AttackOf(hazard);
-            if (attack == null || _bossInView == null || _bossInView.Id != "mad_general") return false;
+            var (boss, id) = BlowOf(hazard);
+            if (boss != "mad_general") return false;
             var at = new Vector3(hazard.Position.X, hazard.Position.Y, 0);
             var along = new Vector3(hazard.Direction.X, hazard.Direction.Y, 0);
-            switch (attack.Id)
+            var c = new BossContext { Ramp = FxRamp.Fire, Dir = hazard.Direction.Angle * Mathf.Rad2Deg, Size = hazard.Size * Ppu, Width = hazard.Width * Ppu };
+            switch (id)
             {
                 case "cleave":
                 {
-                    // The blade down through the wedge: fire thrown along it, a heavy jolt.
-                    float half = attack.Angle / 2;
-                    for (float a = -half; a <= half; a += 15)
-                    {
-                        var dir = Quaternion.Euler(0, 0, a) * along;
-                        Kick(at + dir * hazard.Size * 0.7f, dir, WarFireColor, 2);
-                    }
-                    AddFlash(at + along * hazard.Size * 0.5f, hazard.Size * 0.8f, WarFireColor, FlashKind.Burst);
+                    // The burning blade down through the wedge: a thick smear of fire swept across it, flame left
+                    // along its track, sparks flung on, a heavy jolt. White-hot in his last phase.
+                    BlastLanded(hazard, FxRamp.Fire, sparks: false, light: false);
+                    c.Width = hazard.Width;
+                    c.Big = _generalPhase >= 3 && hazard.Id < StagedIds;
+                    AddBossFx(BossFx.Cleave, at, c);
                     Cracks(at + along * 1.2f, 1.2f, 3);
                     if (Settings.ScreenShake && Feel.HitStop) _hitStop = Mathf.Max(_hitStop, 0.06f);
                     if (Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.22f);
@@ -257,24 +257,23 @@ namespace Game.Client
                 case "hellfire":
                 case "meteors":
                 {
-                    // Fire called down where he pointed: a pillar of flame, burning arrows shattering for the volley.
-                    bool volley = attack.Id == "meteors";
-                    AddFlash(at, hazard.Size * 1.2f, WarFireColor, FlashKind.Burst);
-                    Kick(at, Vector3.up, WarFireColor, volley ? 4 : 6);
-                    if (volley) Kick(at, Vector3.up * 0.5f, ArrowShaftColor, 2);
+                    // Fire called down where he pointed: an explosion and flames left burning; the volley's arrows
+                    // break and fly.
+                    bool volley = id == "meteors";
+                    BlastLanded(hazard, FxRamp.Fire, sparks: false, chunks: false, light: false, wave: false);
+                    c.Count = volley ? 2 : 1;
+                    AddBossFx(BossFx.FireCall, at, c);
                     if (Settings.ScreenShake) _shake = Mathf.Max(_shake, volley ? 0.16f : 0.12f);
                     Hear(volley ? Sound.Shoot : Sound.Boom, at, 0.7f);
                     return true;
                 }
                 case "dark_cross":
                 {
-                    // Ghostly spears thrust up along both arms of the cross, out from where the blade went in.
-                    var across = new Vector3(-along.y, along.x, 0);
-                    foreach (var arm in new[] { along, -along, across, -across })
-                        for (float d = 0.8f; d <= attack.Length; d += 1.1f)
-                            Kick(at + arm * d, Vector3.up, WarGhostColor, 1);
-                    AddFlash(at, 1.6f, WarGhostColor, FlashKind.Impact);
-                    Cracks(at, 1.4f, 4);
+                    // Ghostly spears thrust up along the arm from its middle outward, their afterimages lifting off.
+                    BlastLanded(hazard, null, sparks: false);
+                    c.Ramp = FxRamp.Danger;
+                    AddBossFx(BossFx.Spears, at, c);
+                    Cracks(at + along * hazard.Size * 0.5f, 1.4f, 4);
                     if (Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.2f);
                     Hear(Sound.Hammer, at, 0.8f);
                     Hear(Sound.Roar, at, 0.35f);
@@ -283,15 +282,13 @@ namespace Game.Client
                 case "flame_ring":
                 case "ember_wake":
                 {
-                    // Fire running out round the planted banner (or the struck floor): flame all round its edge.
-                    float inner = attack.Radius, outer = attack.Radius + 0.5f * (attack.Length - attack.Radius);
-                    for (int i = 0; i < 14; i++)
-                    {
-                        var dir = Quaternion.Euler(0, 0, i * 360f / 14 + Random.Range(-8f, 8f)) * Vector3.right;
-                        Kick(at + dir * Random.Range(inner, outer), dir + Vector3.up * 0.6f, WarFireColor, 1);
-                    }
-                    AddFlash(at, attack.Length, WarFireColor, FlashKind.Ring);
-                    if (attack.Id == "flame_ring")
+                    // Fire running round the band from the planted banner (or the struck floor): rows of flame, soot
+                    // under them, sparks rising.
+                    BlastLanded(hazard, FxRamp.Fire, sparks: false, chunks: false, light: false);
+                    c.Inner = hazard.Width * Ppu;
+                    c.Dir = 90;
+                    AddBossFx(BossFx.FireBand, at, c);
+                    if (id == "flame_ring")
                     {
                         Impact(at, 0.7f);
                         Hear(Sound.Boom, at, 0.8f);
@@ -300,8 +297,13 @@ namespace Game.Client
                     return true;
                 }
             }
-            return false;
+            // Any other of his blows: the shared landing, in fire.
+            BlastLanded(hazard, FxRamp.Fire);
+            return true;
         }
+
+        // His phase, for the blade white-hot in the last.
+        int _generalPhase = 1;
 
         // The banner's wooden pole, for the arrows' shafts.
         static readonly Color ArrowShaftColor = new Color(0.28f, 0.18f, 0.13f);

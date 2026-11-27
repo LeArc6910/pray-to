@@ -55,6 +55,17 @@ namespace Game.Client
             // The crystal queen's rain and hail: each crystal's shadow, then the crystal itself.
             if (boss == "crystal_queen" && (attack == "crystal_rain" || attack == "shard_hail"))
                 _bossDraws.Add((BossFx.ShardDrop, new BossContext { Size = hazard.Size * Ppu, Progress = progress, Big = attack == "shard_hail", Ramp = FxRamp.Crystal }, at));
+            // The general's fire called down where he pointed, and the volley's burning arrows.
+            if (boss == "mad_general" && (attack == "hellfire" || attack == "meteors"))
+                _bossDraws.Add((BossFx.ShardDrop, new BossContext { Size = hazard.Size * Ppu, Progress = progress, Count = attack == "meteors" ? 2 : 1, Ramp = FxRamp.Fire }, at));
+        }
+
+        // A few bits thrown one way in what the ramp is made of (BossFx.Cinders): what Kick's square dots were, for the
+        // bosses whose effects have been reworked.
+        void Chips(Vector3 at, Vector3 toward, FxRamp ramp, int count, float reach = 14, float spread = 70)
+        {
+            if (!Feel.Bits) return;
+            AddBossFx(BossFx.Cinders, at, new BossContext { Ramp = ramp, Count = count, Size = reach, Width = spread, Dir = toward.sqrMagnitude < 1e-6f ? 90 : Mathf.Atan2(toward.y, toward.x) * Mathf.Rad2Deg });
         }
 
         // Every piece of the bosses' effects for this frame.

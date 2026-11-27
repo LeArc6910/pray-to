@@ -64,6 +64,17 @@ namespace Game.Client
             Add("crystal_queen", "venom_share", BossFx.Column, HazardForm.Circle, 1.8f, 0, 0, null, r => { r.Tone = WarnTone.Gather; r.Context.Ramp = crystal; r.Tall = 160; r.AtY = 0.78f; });
             Add("crystal_queen", "crown", BossFx.Spray, HazardForm.Circle, 1, 0, 90, crystal, r => { r.NoShape = true; r.Context = new BossContext { Ramp = crystal, Size = 46, Count = 8, Width = 60, Dir = 90, Seed = 5 }; });
             Add("crystal_queen", "shatter", BossFx.Spray, HazardForm.Circle, 1, 0, 0, crystal, r => { r.NoShape = true; r.Context = new BossContext { Ramp = crystal, Size = 52, Count = 16, Seed = 6 }; });
+            var fire = FxRamp.Fire;
+            Add("mad_general", "cleave", BossFx.Cleave, HazardForm.Cone, 3.4f, 110, 0, fire, r => { r.Context.Width = 110; r.AtX = 0.22f; r.AtY = 0.5f; r.Tall = 128; });
+            Add("mad_general", "cleave white-hot", BossFx.Cleave, HazardForm.Cone, 3.4f, 110, 0, fire, r => { r.Context.Width = 110; r.Context.Big = true; r.AtX = 0.22f; r.AtY = 0.5f; r.Tall = 128; });
+            Add("mad_general", "hellfire warned", BossFx.ShardDrop, HazardForm.Circle, 1.5f, 0, 0, fire, r => { r.Warning = true; r.Context.Count = 1; r.Tall = 144; r.AtY = 0.78f; });
+            Add("mad_general", "hellfire", BossFx.FireCall, HazardForm.Circle, 1.5f, 0, 0, fire, r => r.Context.Count = 1);
+            Add("mad_general", "meteors warned", BossFx.ShardDrop, HazardForm.Circle, 1.4f, 0, 0, fire, r => { r.Warning = true; r.Context.Count = 2; r.Tall = 144; r.AtY = 0.78f; });
+            Add("mad_general", "meteors", BossFx.FireCall, HazardForm.Circle, 1.4f, 0, 0, fire, r => r.Context.Count = 2);
+            Add("mad_general", "dark_cross", BossFx.Spears, HazardForm.Band, 12f, 1.2f, 0, null, r => { r.Context.Ramp = FxRamp.Danger; r.Wide = 216; r.Tall = 80; r.AtX = 0.06f; r.AtY = 0.7f; });
+            Add("mad_general", "flame_ring", BossFx.FireBand, HazardForm.Donut, 6f, 2.4f, 0, fire, r => { r.Context.Inner = 2.4f * T; r.Context.Dir = 90; (r.Wide, r.Tall, r.AtY) = (216, 216, 0.5f); });
+            Add("mad_general", "ember_wake", BossFx.FireBand, HazardForm.Donut, 3.6f, 1.2f, 0, fire, r => { r.Context.Inner = 1.2f * T; r.Context.Dir = 90; (r.Wide, r.Tall, r.AtY) = (136, 136, 0.5f); });
+            Add("mad_general", "cinders", BossFx.Cinders, HazardForm.Circle, 1, 0, 0, fire, r => { r.NoShape = true; r.Tall = 48; r.Context = new BossContext { Ramp = fire, Size = 18, Count = 3, Seed = 4 }; });
             return rows;
         }
 

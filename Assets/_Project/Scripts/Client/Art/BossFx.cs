@@ -10,8 +10,9 @@ namespace Game.Client
         // A beam of light along a line from the origin: thin, full, narrowing, then a thin line left. Size its
         // length, Width how thick, Dir its way.
         Beam,
-        // A crystal on its way down onto a warned circle (a loop over the warning, Progress how full it is): its
-        // shadow growing on the floor, then the crystal itself with a streak of light behind. Size the circle's radius.
+        // What comes down onto a warned circle (a loop over the warning, Progress how full it is): its shadow
+        // growing on the floor, then the thing itself with a streak behind. Size the circle's radius. Count what
+        // falls: 0 a crystal, 1 a ball of fire, 2 burning arrows.
         ShardDrop,
         // Where it struck: it stands in the floor with splinters sprung up round it, then all of it breaks.
         ShardFall,
@@ -24,6 +25,23 @@ namespace Game.Client
         Column,
         // Shards and sparks thrown one way: Count of them over Width degrees round Dir, out to Size.
         Spray,
+
+        // ---- shared by the bosses ----
+        // A few bits thrown one way, in what the ramp is made of (sparks of fire, chips of crystal, stones, sand,
+        // wisps): Count of them round Dir, out to Size. What the old square dots were.
+        Cinders,
+
+        // ---- the mad general ----
+        // Fire running round a ring's band from Dir: tongues of flame in rows, soot under them, sparks rising. Size the
+        // band's outer radius, Inner its inner.
+        FireBand,
+        // The burning blade through a wedge: a thick smear swept across it, flame along its track, sparks flung on. Size
+        // the reach, Width the wedge in degrees, Dir its middle. Big: the blade white-hot (his last phase).
+        Cleave,
+        // Fire where he pointed: an explosion and what burns on after. Size its radius. Count 2: the volley's arrows.
+        FireCall,
+        // Ghostly spears thrust up along a line from its middle outward. Size the line's length, Dir its way.
+        Spears,
     }
 
     // What one of the bosses' effects is told. Lengths in pixels, angles in degrees.
@@ -76,6 +94,11 @@ namespace Game.Client
                 case BossFx.Fangs: life = Fangs(c, t, o); break;
                 case BossFx.Column: life = Column(c, t, o); break;
                 case BossFx.Spray: life = Spray(c, t, o); break;
+                case BossFx.Cinders: life = Cinders(c, t, o); break;
+                case BossFx.FireBand: life = FireBand(c, t, o); break;
+                case BossFx.Cleave: life = Cleave(c, t, o); break;
+                case BossFx.FireCall: life = FireCall(c, t, o); break;
+                case BossFx.Spears: life = Spears(c, t, o); break;
                 default: return false;
             }
             return t < life;
@@ -132,6 +155,24 @@ namespace Game.Client
             if (p <= 0.72f) return;
             // The last quarter of the warning it is seen, falling faster and faster.
             float fall = (1 - p) / 0.28f, y = tall / 2f - 2 + fall * fall * 110;
+            if (c.Count == 1)
+            {
+                // A ball of fire, its tail above it.
+                Put(o, FxShape.Fireball, c.Ramp, 14, (int)(t * 12) % 3, 0, y, 1, -90);
+                FxLayers.Light(o, c.Ramp, R * 1.6f, 0.5f * (1 - fall));
+                return;
+            }
+            if (c.Count == 2)
+            {
+                // Three burning arrows, a little apart, slanting in.
+                for (int i = -1; i <= 1; i++)
+                {
+                    float ax = i * R * 0.4f + y * 0.25f, ay = y + (i == 0 ? 0 : 9);
+                    Put(o, FxShape.Streak, c.Ramp, 16, 1, ax + 3, ay + 13, 0.6f, -104);
+                    Put(o, FxShape.Arrow, FxRamp.Dust, 12, 0, ax, ay, 1, -104);
+                }
+                return;
+            }
             Put(o, FxShape.Streak, c.Ramp, 28, 2, 0, y + tall / 2f + 12, 0.6f, -90);
             Put(o, FxShape.Shard, c.Ramp, tall, 2, 0, y, 1, -90);
         }
@@ -264,6 +305,177 @@ namespace Game.Client
             }
             FxLayers.Embers(o, m, Math.Min(10, count + 2), t, 0, c.Size * 0.8f, c.Seed + 3, 0, 0, cone, c.Dir);
             return 0.56f;
+        }
+
+        // ---- shared by the bosses ----
+
+        static float Cinders(in BossContext c, float t, List<FxStamp> o)
+        {
+            var m = c.Ramp;
+            int count = Math.Clamp(c.Count, 1, 8);
+            float reach = c.Size <= 0 ? 14 : c.Size;
+            for (int i = 0; i < count; i++)
+            {
+                float own = 0.3f + 0.2f * Rnd(c.Seed, i, 11), p = t / own;
+                if (p >= 1) continue;
+                float dir = c.Dir + (Rnd(c.Seed, i, 12) - 0.5f) * (c.Width <= 0 ? 70 : c.Width), go = reach * (0.2f + 0.8f * Out(p)) * (0.6f + 0.4f * Rnd(c.Seed, i, 13));
+                float x = Cos(dir) * go + (Rnd(c.Seed, i, 14) - 0.5f) * 5, y = Sin(dir) * go + (Rnd(c.Seed, i, 15) - 0.5f) * 5;
+                switch (m)
+                {
+                    case FxRamp.Crystal:
+                    case FxRamp.Cold:
+                        Put(o, FxShape.Shard, m, Even(6 - 3 * p), 0, x, y, 1 - p * p, dir + 240 * p);
+                        break;
+                    case FxRamp.Dust:
+                    case FxRamp.Smoke:
+                        // Stones go up and come down.
+                        Put(o, FxShape.Chunk, m, 3 + (i & 1), 4 + (i & 3), x, y + 9 * p * (1 - p) * 4 * 0.5f, 1 - p * p * p);
+                        break;
+                    case FxRamp.Sand:
+                        Put(o, FxShape.Grains, m, 8 + 2 * (i & 1), (int)(t * 12) + i, x, y + 6 * p * (1 - p), 1 - p * p, dir);
+                        break;
+                    case FxRamp.Spirit:
+                        Put(o, FxShape.Wisp, m, 3 + (i & 1), (int)(t * 10) + i, x, y, 1 - p, dir);
+                        break;
+                    default:
+                        Put(o, FxShape.Ember, m, 2 + (int)Math.Round(4 * (1 - p)), p < 0.5f ? 0 : 1, x, y, Math.Min(1, 2 - 2 * p), dir);
+                        break;
+                }
+            }
+            return 0.5f;
+        }
+
+        // ---- the mad general ----
+
+        static float FireBand(in BossContext c, float t, List<FxStamp> o)
+        {
+            const float life = 0.95f;
+            var m = c.Ramp;
+            float inner = c.Inner, outer = c.Size, band = outer - inner, mid = (inner + outer) / 2;
+            float left = U(life - 0.1f - t, 0, 0.35f);
+            int rows = band > 44 ? 3 : 2;
+            float lit = Math.Min(110, outer * 1.5f);
+            if (t < 0.08f) FxLayers.Light(o, m, lit * 1.2f, 1, 0, 0, 3);
+            FxLayers.Light(o, m, lit, 0.8f * left, 0, 0, 1);
+            // Soot under the fire, a patch here and there round the band.
+            int soot = Math.Clamp((int)(mid / 9), 5, 8);
+            for (int i = 0; i < soot; i++)
+            {
+                float dir = c.Dir + (i + 0.5f) * 360f / soot;
+                Put(o, FxShape.Scorch, FxRamp.Smoke, SkillFxArt.Step4(Math.Min(24, band * 0.7f)), 4 + (i & 3), Cos(dir) * mid, Sin(dir) * mid, 0.6f * U(life - t, 0, 0.25f) * U(t, 0, 0.1f), 0, true);
+            }
+            // The band's own edges, crisp for a moment.
+            if (t < 0.3f && outer <= 80)
+            {
+                Put(o, FxShape.Edge, m, SkillFxArt.Even(2 * outer), 1, 0, 0, 1 - t / 0.3f, 0, true);
+                Put(o, FxShape.Edge, m, SkillFxArt.Even(2 * inner), 1, 0, 0, 1 - t / 0.3f, 0, true);
+            }
+            for (int row = 0; row < rows; row++)
+            {
+                float far = rows == 2 ? (row == 0 ? inner + 6 : outer - 6) : row == 0 ? inner + 6 : row == 1 ? mid : outer - 6;
+                int n = Math.Clamp((int)(2 * Math.PI * far / 20), 6, 16);
+                for (int i = 0; i < n; i++)
+                {
+                    // The fire runs round both ways from where it was lit.
+                    float turn = (i + 0.5f * (row & 1)) / n, dir = c.Dir + turn * 360;
+                    float own = t - row * 0.04f - 0.2f * Math.Min(turn, 1 - turn);
+                    if (own < 0) continue;
+                    float leap = own < 0.18f ? 1 + Sin(own / 0.18f * 180) : 1;
+                    int size = Even((9 + 5 * Rnd(c.Seed, i + row * 20, 16)) * leap * left);
+                    if (size < 4) continue;
+                    Put(o, FxShape.Flame, m, size, (int)(t * 14) + i + row, Cos(dir) * far, Sin(dir) * far + size / 2f - 2);
+                }
+            }
+            // Sparks carried up off it.
+            for (int i = 0; i < 12; i++)
+            {
+                float p = SkillFx.Frac(t * 1.3f + Rnd(c.Seed, i, 17)), dir = c.Dir + i * 30;
+                Put(o, FxShape.Ember, m, 3, p < 0.5f ? 0 : 1, Cos(dir) * mid + Sin(p * 400 + i * 50) * 3, Sin(dir) * mid + 4 + p * 22, left * (1 - p), 90);
+            }
+            return life;
+        }
+
+        static float Cleave(in BossContext c, float t, List<FxStamp> o)
+        {
+            const float sweep = 0.1f;
+            var m = c.Ramp;
+            float R = c.Size, wide = Math.Clamp(c.Width, 20, 300), half = wide / 2;
+            float swept = U(t, 0, sweep), left = U(0.7f - t, 0, 0.3f);
+            float mx = Cos(c.Dir) * R * 0.6f, my = Sin(c.Dir) * R * 0.6f;
+            if (t < 0.06f) FxLayers.Light(o, m, R * 2, 1, mx, my, 3);
+            if (t < 0.4f) FxLayers.Light(o, m, R * 1.7f, 0.8f * (1 - t / 0.4f), mx, my, 1);
+            // Soot along the blade's track.
+            for (int i = 0; i < 5; i++)
+            {
+                float dir = c.Dir - half + wide * (i + 0.5f) / 5;
+                if ((i + 0.5f) / 5 > swept) continue;
+                Put(o, FxShape.Scorch, FxRamp.Smoke, 12, 4 + (i & 3), Cos(dir) * R * 0.8f, Sin(dir) * R * 0.8f, 0.6f * left, 0, true);
+            }
+            if (t < 0.26f)
+            {
+                // The smear's head runs across the wedge in a tenth of a second and its tail follows.
+                float fade = t < 0.12f ? 1 : (0.26f - t) / 0.14f;
+                int span = 10 * Math.Max(2, (int)Math.Round(wide * (0.25f + 0.75f * swept) / 10));
+                float head = c.Dir - half + wide * swept;
+                Put(o, FxShape.Smear, m, SkillFxArt.Even(R * 0.62f), span, 0, 0, fade * 0.8f, head - span / 2f);
+                Put(o, FxShape.Smear, m, SkillFxArt.Even(R * 0.82f), span, 0, 0, fade * 0.9f, head - span / 2f);
+                Put(o, FxShape.Smear, c.Big ? FxRamp.Steel : m, SkillFxArt.Even(R), span, 0, 0, fade, head - span / 2f);
+            }
+            for (int i = 0; i < 9; i++)
+            {
+                float turn = (i + 0.5f) / 9, dir = c.Dir - half + wide * turn, own = t - sweep * turn;
+                if (own < 0) continue;
+                float fx = Cos(dir) * R * 0.88f, fy = Sin(dir) * R * 0.88f;
+                int tall = Even(12 * U(0.5f - own, 0, 0.3f));
+                if (tall >= 4) Put(o, FxShape.Flame, m, tall, (int)(t * 14) + i, fx, fy + tall / 2f - 2);
+                if ((i & 1) == 1)
+                {
+                    tall = Even(9 * U(0.4f - own, 0, 0.3f));
+                    if (tall >= 4) Put(o, FxShape.Flame, m, tall, (int)(t * 14) + i + 9, Cos(dir) * R * 0.5f, Sin(dir) * R * 0.5f + tall / 2f - 2);
+                }
+                float p = own / 0.35f;
+                if (p < 1) Put(o, FxShape.Ember, c.Big ? FxRamp.Gold : m, 2 + (int)Math.Round(4 * (1 - p)), p < 0.5f ? 0 : 1, fx + Cos(dir) * 18 * Out(p), fy + Sin(dir) * 18 * Out(p), 1 - p, dir);
+            }
+            return 0.7f;
+        }
+
+        static float FireCall(in BossContext c, float t, List<FxStamp> o)
+        {
+            float R = c.Size;
+            float life = FxLayers.Blast(o, t, R, c.Ramp, c.Seed, 10, 0, true, 1.0f);
+            SkillFx.Flames(o, 4, t, 0.25f, 1.0f, R, c.Seed);
+            if (c.Count == 2 && t < 0.5f)
+            {
+                // The volley's shafts, broken and thrown.
+                for (int i = 0; i < 3; i++)
+                {
+                    float p = t / 0.5f, dir = 40 + i * 50;
+                    Put(o, FxShape.Arrow, FxRamp.Dust, 9, 0, Cos(dir) * R * 0.7f * Out(p), 4 + Sin(dir) * R * 0.5f * Out(p) + 30 * p * (1 - p), 1 - p * p, dir + 500 * p);
+                }
+            }
+            return life;
+        }
+
+        static float Spears(in BossContext c, float t, List<FxStamp> o)
+        {
+            var m = c.Ramp;
+            float L = c.Size, dx = Cos(c.Dir), dy = Sin(c.Dir);
+            int count = Math.Clamp((int)(L / 18), 4, 16);
+            for (int i = 0; i < count; i++)
+            {
+                // From the middle outward, each a moment after the one inside it, leaning a little by turns.
+                float along = (i + 0.5f) / count, born = 0.25f * Math.Abs(along - 0.5f), own = t - born;
+                if (own < 0 || own >= 0.5f) continue;
+                float lean = 90 + ((i & 1) == 0 ? -9 : 9), bx = dx * L * along, by = dy * L * along;
+                int tall = 26 + 4 * (i % 3);
+                float up = tall * (Out(U(own, 0, 0.07f)) - 0.5f);
+                if (own < 0.3f) Put(o, FxShape.Spear, m, tall, 0, bx + Cos(lean) * up, by + Sin(lean) * up, own < 0.22f ? 1 : (0.3f - own) / 0.08f, lean);
+                // Its afterimage lifts off it and thins.
+                if (own > 0.1f) Put(o, FxShape.Spear, m, tall, 1, bx + Cos(lean) * (up + 5 + 14 * (own - 0.1f)), by + Sin(lean) * (up + 5 + 14 * (own - 0.1f)), 0.7f * (0.5f - own) / 0.4f, lean);
+                if (own < 0.08f) Put(o, FxShape.Glint, m, 7, 0, bx, by);
+            }
+            FxLayers.Embers(o, m, 8, t, 0, 20, c.Seed, dx * L / 2, dy * L / 2);
+            return 0.25f * 0.5f + 0.5f;
         }
     }
 }
