@@ -29,6 +29,8 @@ namespace Game.Client
             public float Age;
             public int Seed;
             public int Frame = -1;
+            // Under 1 for an ordinary monster's (MonsterFx.BlowStrength).
+            public float Strength = 1;
         }
 
         sealed class Scar
@@ -361,7 +363,7 @@ namespace Game.Client
             int frame = Mathf.FloorToInt(blast.Age * 30);
             if (frame == blast.Frame) return;
             blast.Frame = frame;
-            if (!HazardArt.Blast(blast.Layer.Field, blast.Ramp, blast.Age, blast.Seed, blast.Layer.Buffer, true)) blast.Age = float.MaxValue;
+            if (!HazardArt.Blast(blast.Layer.Field, blast.Ramp, blast.Age, blast.Seed, blast.Layer.Buffer, true, blast.Strength)) blast.Age = float.MaxValue;
             else Upload(blast.Layer);
         }
 

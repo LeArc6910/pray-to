@@ -150,9 +150,9 @@ namespace Game.Client
         }
 
         // The body's colour at a depth: edge, rim, shell, core, hot centre.
-        static Rgba Shade(ShotElement element, float depth, float u, float v, float wx, float wy, float r, int frame)
+        static Rgba Shade(ShotElement element, float depth, float u, float v, float wx, float wy, float r, int frame, Rgba[] own)
         {
-            var c = Ramps[(int)element];
+            var c = own ?? Ramps[(int)element];
             if (depth < 1) return EdgeDark;
             if (depth < 2) return RimRed;
             float inner = r - Rim;
@@ -203,7 +203,9 @@ namespace Game.Client
         }
 
         // A shot flying at the step's angle, the picture's middle where it is. A still one (step under 0) has no tail.
-        public static PixelImage Shot(ShotElement element, int reach, int step, int frame)
+        // own: its colours, hot centre to shade, in place of the element's (a kind with no element shoots in its own
+        // colour, MonsterFx.OwnRamp, F2).
+        public static PixelImage Shot(ShotElement element, int reach, int step, int frame, Rgba[] own = null)
         {
             float r = reach;
             int half = (int)Math.Ceiling(r * (step < 0 ? 1.2f : 3.5f)) + 1, size = half * 2 + 1;
@@ -221,7 +223,7 @@ namespace Game.Client
                     float depth = Depth(element, u, v, r, 5);
                     if (depth >= 0)
                     {
-                        image[x, y] = Shade(element, depth, u, v, wx, wy, r, frame % Frames);
+                        image[x, y] = Shade(element, depth, u, v, wx, wy, r, frame % Frames, own);
                         continue;
                     }
                     if (step < 0) continue;
@@ -232,7 +234,7 @@ namespace Game.Client
                         // (A flame is drawn out already, and a clod's crumbs are round.)
                         var piece = element == ShotElement.Stone || element == ShotElement.Iron || element == ShotElement.Crystal || element == ShotElement.Frost ? element : ShotElement.Ember;
                         if (Depth(piece, (u + back) / scale, v / scale, r, 5) * scale < 0.4f) continue;
-                        var c = Ramps[(int)element];
+                        var c = own ?? Ramps[(int)element];
                         image[x, y] = k == 1 ? c[2] : k == 2 ? c[2].Mix(TailRed, 0.5f).WithAlpha(215) : TailRed.WithAlpha((byte)(k == 3 ? 170 : 110));
                         break;
                     }
@@ -242,9 +244,9 @@ namespace Game.Client
         }
 
         // Where it ended: a white spark, a ring opening out and thinning, bits of what it was made of flying off.
-        public static PixelImage Pop(ShotElement element, int frame)
+        public static PixelImage Pop(ShotElement element, int frame, Rgba[] own = null)
         {
-            var c = Ramps[(int)element];
+            var c = own ?? Ramps[(int)element];
             var image = new PixelImage(PopSize, PopSize);
             float mid = PopSize / 2, t = (frame + 0.5f) / PopFrames;
             float ring = 3.5f + 10.5f * (1 - (1 - t) * (1 - t)), thick = frame < 2 ? 2f : frame < 4 ? 1.2f : 0.8f;

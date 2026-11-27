@@ -517,12 +517,18 @@ namespace Game.Client
                 look.Ramp, look.Tint, look.Look);
         }
 
+        // Shapes burning at once, bosses' and monsters' together: past this a monster's blow is its pieces alone.
+        const int MostMobBlasts = 16;
+        // For the playtest: shots drawn in a kind's own colour, and blows that landed as their warning's shape.
+        public int MobOwnShots { get; private set; }
+        public int MobShapeBlows { get; private set; }
+
         // The blow itself and its sound: the brightest and shortest part, then what thins out (MonsterFx.Land).
         void MonsterBlow(MonsterAttackShape shape, HazardShape area, Vector3 at, Vec2 facing, float reach, float width, FxRamp ramp, uint tint, MobLook kind = MobLook.Plain)
         {
             bool line = area == HazardShape.Line, cone = area == HazardShape.Cone;
             MonsterBlowsShown++;
-            AddMobFx(MobFx.Land, at, new MobContext
+            var context = new MobContext
             {
                 Shape = shape,
                 Area = area,
@@ -532,7 +538,21 @@ namespace Game.Client
                 Size = (reach + World.PlayerRadius) * Ppu,
                 Width = cone ? width : width * Ppu,
                 Look = kind,
-            });
+                Seed = ++_fxSeed & 0xFFFF,
+            };
+            // A wedge, a thrust, a beam or a ring lands as its warning's own shape burning in what the kind is made
+            // of (F2): the same picture the warning was, fainter than a boss's, with no scar left.
+            if (Feel.MonsterFx && MonsterFx.ShapeBlow(context) && _blasts.Count < MostMobBlasts)
+            {
+                var warned = context;
+                if (line) warned.Width = (width + 2 * World.PlayerRadius) * Ppu;
+                var layer = MakeLayer(_root.transform, "MobBlast", MonsterFx.Field(warned), 19000);
+                layer.Renderer.transform.localPosition = at;
+                _blasts.Add(new Blast { Layer = layer, Ramp = MonsterFx.BlowRamp(context), Seed = context.Seed, Strength = MonsterFx.BlowStrength });
+                UpdateBlast(_blasts[_blasts.Count - 1], 0);
+                MobShapeBlows++;
+            }
+            AddMobFx(MobFx.Land, at, context);
             // The kind's own sound where it has one (spores puff, crystal rings, a sting hisses, magma sizzles, water
             // splashes); else the shape's.
             var sound = shape switch
@@ -592,6 +612,8 @@ namespace Game.Client
                 if (_enemyShots.TryGetValue(projectile.Id, out var made))
                 {
                     made.Element = MonsterFx.ShotOf(from.MobKind, from.MobRamp);
+                    made.Tint = MonsterFx.ShotTint(from.MobKind, from.MobRamp, from.MobTint);
+                    if (made.Tint != 0) MobOwnShots++;
                     made.Frame = -1;
                     if (!made.Own)
                     {

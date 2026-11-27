@@ -356,8 +356,9 @@ namespace Game.Client
             return along < 4;
         }
 
-        // The blow at an age in seconds, in the colours given (bright to dark, five). False once it is over.
-        public static bool Blast(HazardField field, Rgba[] ramp, float age, int seed, byte[] buffer, bool flip)
+        // The blow at an age in seconds, in the colours given (bright to dark, five). False once it is over. An
+        // ordinary monster's is fainter (strength under 1, MonsterFx.BlowStrength).
+        public static bool Blast(HazardField field, Rgba[] ramp, float age, int seed, byte[] buffer, bool flip, float strength = 1)
         {
             int w = field.Width, h = field.Height;
             float cross = SweepSeconds(field.Form);
@@ -374,7 +375,7 @@ namespace Game.Client
                     if (depth == 0) continue;
                     if (flash)
                     {
-                        Put(buffer, at, Rgba.White, depth <= 2 ? 1 : 0.85f);
+                        Put(buffer, at, Rgba.White, (depth <= 2 ? 1 : 0.85f) * strength);
                         any = true;
                         continue;
                     }
@@ -384,7 +385,7 @@ namespace Game.Client
                     if (tau < 0)
                     {
                         // The whole shape is lit while the blow crosses it.
-                        Put(buffer, at, ramp[1], depth == 1 ? 0.9f : 0.3f);
+                        Put(buffer, at, ramp[1], (depth == 1 ? 0.9f : 0.3f) * strength);
                         any = true;
                         continue;
                     }
@@ -394,15 +395,15 @@ namespace Game.Client
                     if (depth == 1 && tau < 0.09f)
                     {
                         // The edge of what it hits, crisp for a moment.
-                        Put(buffer, at, ramp[1], 0.9f);
+                        Put(buffer, at, ramp[1], 0.9f * strength);
                         continue;
                     }
                     float level = heat * (1 - 0.62f * field.Core[i] / 255f) + (PixelNoise.Value(x >> 1, y >> 1, flicker) - 0.5f) * 0.1f;
-                    if (level > 0.72f) Put(buffer, at, ramp[0], 1);
-                    else if (level > 0.54f) Put(buffer, at, ramp[1], 1);
-                    else if (level > 0.36f) Put(buffer, at, ramp[2], 1);
-                    else if (level > 0.2f) Put(buffer, at, ramp[3], 0.95f);
-                    else if (level > 0.1f && Thin(x, y, 0.5f)) Put(buffer, at, ramp[4], 0.85f);
+                    if (level > 0.72f) Put(buffer, at, ramp[0], strength);
+                    else if (level > 0.54f) Put(buffer, at, ramp[1], strength);
+                    else if (level > 0.36f) Put(buffer, at, ramp[2], strength);
+                    else if (level > 0.2f) Put(buffer, at, ramp[3], 0.95f * strength);
+                    else if (level > 0.1f && Thin(x, y, 0.5f)) Put(buffer, at, ramp[4], 0.85f * strength);
                 }
             }
             return any;

@@ -268,6 +268,10 @@ namespace Game.Client
                 : ramp == FxRamp.Spirit ? ShotElement.Water : ramp == FxRamp.Dust ? ShotElement.Sand : ShotElement.Ember;
         }
 
+        // A kind made of nothing in particular shoots in its own colour (F2): its tint, or 0 for a kind whose shot
+        // is an element's.
+        public static uint ShotTint(MobLook look, FxRamp ramp, uint tint) => look == MobLook.Plain && ramp == FxRamp.Plain ? tint : 0;
+
         // A mark's picture (E5): its shape at the size it is judged at, on the pixel grid (sizes in pixels as the
         // context has them, a cone's width in degrees).
         public static HazardField Field(in MobContext c)
@@ -303,6 +307,49 @@ namespace Game.Client
         public static int WarnArrows(in MobContext c, float t, bool still) =>
             c.Area == HazardShape.Line && Dash(c.Shape) ? (still ? 0 : (int)(t * 12) * 3 % 22) : -1;
 
+        // Whether a blow lands as its warning's own shape burning in its element's colours (F2, as a boss's does, E1):
+        // a wedge, a thrust or a beam, a ring. A circle bursts as before (Burst), and a path run down is no blow.
+        public static bool ShapeBlow(in MobContext c) =>
+            (c.Area == HazardShape.Cone || c.Area == HazardShape.Line || c.Area == HazardShape.Ring) && !Dash(c.Shape);
+
+        // Fainter than a boss's blow, as the warning is.
+        public const float BlowStrength = 0.7f;
+
+        // What a kind's blow is made of, as an element's colours: by what the kind is made of, else its own ramp
+        // (Plain: its own colour).
+        public static FxRamp ElementOf(in MobContext c)
+        {
+            switch (c.Look)
+            {
+                case MobLook.Spore: return c.Ramp == FxRamp.Spirit ? FxRamp.Spirit : FxRamp.Violet;
+                case MobLook.Crystal: return c.Ramp == FxRamp.Violet ? FxRamp.Violet : FxRamp.Cold;
+                case MobLook.Frost: return FxRamp.Cold;
+                case MobLook.Ember: return FxRamp.Fire;
+                case MobLook.Sand: return FxRamp.Sand;
+                case MobLook.Water: return FxRamp.Spirit;
+                case MobLook.Shadow:
+                case MobLook.Hex: return FxRamp.Violet;
+                case MobLook.Iron: return FxRamp.Steel;
+            }
+            return c.Ramp;
+        }
+
+        // The five colours the shape burns in, bright to dark: the element's, or for a kind with none its own colour
+        // from pale to deep.
+        public static Rgba[] BlowRamp(in MobContext c)
+        {
+            var element = ElementOf(c);
+            if (element != FxRamp.Plain || c.Tint == 0) return SkillFxArt.Ramp5(element);
+            return OwnRamp(c.Tint);
+        }
+
+        // A kind's own colour as five, pale to deep (its blow, and its shot's four: ShotArt takes the first four).
+        public static Rgba[] OwnRamp(uint tint)
+        {
+            var own = new Rgba((byte)(tint >> 16), (byte)(tint >> 8), (byte)tint);
+            return new[] { own.Mix(Rgba.White, 0.8f), own.Mix(Rgba.White, 0.4f), own, own.Scale(0.65f), own.Scale(0.4f) };
+        }
+
         public static uint TintOf(Rgba color) => 0x1000000u | (uint)color.R << 16 | (uint)color.G << 8 | color.B;
 
         // Adds this moment's pieces. False once a one-off is over (a Mark, Pool, Shot or loop never is).
@@ -316,6 +363,13 @@ namespace Game.Client
                 case MobFx.Mark: Mark(c, t, o); break;
                 case MobFx.Tell: Tell(c, t, o); break;
                 case MobFx.Land:
+                    if (ShapeBlow(c))
+                    {
+                        // The warning's own shape burns under this (BlowRamp, laid by the view); here the blow's
+                        // one stroke and what its element does inside the shape.
+                        life = ShapeLand(c, t, o);
+                        break;
+                    }
                     life = Land(c, t, o, out bool whole);
                     if (t < life && !whole) LandLook(c, t, c.Size, o);
                     break;
@@ -1068,6 +1122,124 @@ namespace Game.Client
                     SkillFx.Float(o, FxShape.Smoke, c.Ramp == FxRamp.Cold ? FxRamp.Mist : FxRamp.Smoke, 8, 2, 3, t, 0.12f, life, r * 0.5f, 6, c.Seed);
                     return life;
                 }
+            }
+        }
+
+        // A blow in its warning's shape (F2): the shape itself burns in the element's colours under this (the view's
+        // and the preview's, HazardArt.Blast with BlowRamp). Here: the one stroke that says what struck (a cut, a
+        // thrust's streak, a beam's white heart), a light, and the element going off at a few places inside the shape
+        // (three across a wedge, two to four along a line, five round a ring), each a moment after the last.
+        static float ShapeLand(in MobContext c, float t, List<FxStamp> o)
+        {
+            const float life = 0.62f;
+            float dir = c.Dir * Deg, r = c.Size;
+            var element = ElementOf(c);
+            switch (c.Shape)
+            {
+                case MonsterAttackShape.Strike:
+                case MonsterAttackShape.Sweep:
+                    if (t < 0.24f) Put(o, FxShape.Crescent, element, (int)Math.Max(6, r * 0.8f), (int)Math.Clamp(c.Width, 40, 170), 0, 0, t < 0.08f ? 1 : 1 - (t - 0.08f) / 0.16f, dir);
+                    break;
+                case MonsterAttackShape.Thrust:
+                case MonsterAttackShape.Beam:
+                    if (t < 0.24f && c.Area == HazardShape.Line)
+                    {
+                        float alpha = t < 0.1f ? 1 : 1 - (t - 0.1f) / 0.14f, mx = SkillFx.Cos(dir) * r / 2, my = SkillFx.Sin(dir) * r / 2;
+                        Put(o, FxShape.Streak, c.Shape == MonsterAttackShape.Beam ? FxRamp.Steel : element, SkillFxArt.Step4(r), c.Shape == MonsterAttackShape.Beam ? 2 : 3, mx, my, alpha, dir);
+                    }
+                    break;
+            }
+            float inner = c.Area == HazardShape.Ring ? Math.Min(c.Width, r - 4) : 0;
+            int spots = c.Area == HazardShape.Cone ? (c.Width < 60 ? 2 : 3) : c.Area == HazardShape.Line ? Math.Clamp((int)Math.Round(r / 20), 2, 4) : 5;
+            float girth = c.Area == HazardShape.Cone ? r * 0.24f : c.Area == HazardShape.Line ? c.Width / 2 : (r - inner) / 2;
+            girth = Math.Clamp(girth, 5, 12);
+            float lx = 0, ly = 0;
+            for (int i = 0; i < spots; i++)
+            {
+                float x, y;
+                if (c.Area == HazardShape.Cone)
+                {
+                    float a = dir + (spots == 1 ? 0 : (i / (float)(spots - 1) - 0.5f) * Math.Min(c.Width, 300) * 0.62f);
+                    x = SkillFx.Cos(a) * r * 0.62f;
+                    y = SkillFx.Sin(a) * r * 0.62f;
+                }
+                else if (c.Area == HazardShape.Line)
+                {
+                    float along = r * (i + 0.5f) / spots;
+                    x = SkillFx.Cos(dir) * along;
+                    y = SkillFx.Sin(dir) * along;
+                }
+                else
+                {
+                    float a = i * 72 + c.Seed % 72, mid = (r + inner) / 2;
+                    x = SkillFx.Cos(a) * mid;
+                    y = SkillFx.Sin(a) * mid;
+                }
+                if (i == spots / 2)
+                {
+                    lx = x;
+                    ly = y;
+                }
+                Pop(c, element, t - 0.035f * i, o, x, y, girth, c.Seed + i * 17);
+            }
+            if (c.Area == HazardShape.Ring) (lx, ly) = (0, 0);
+            if (element != FxRamp.Dust && element != FxRamp.Sand && element != FxRamp.Plain && element != FxRamp.Steel)
+                FxLayers.Light(o, element, Math.Max(r * 0.9f, girth * 3), 0.7f * (1 - t / 0.35f), lx, ly);
+            return life;
+        }
+
+        // The element going off at one place in a blow's shape, small: at most four pieces at a moment.
+        static void Pop(in MobContext c, FxRamp element, float t, List<FxStamp> o, float x, float y, float rr, int seed)
+        {
+            if (t < 0) return;
+            if (element == FxRamp.Fire || (element == FxRamp.Violet && c.Look != MobLook.Spore))
+            {
+                // A small ball of fire and sparks; fire burns on a moment, the void's has a star going out in it.
+                FxLayers.Ball(o, element, t, 0, rr, seed & 3, x, y + 3);
+                FxLayers.Embers(o, element, 2, t, 0.02f, rr * 1.8f, seed, x, y + 3, life: 0.26f);
+                if (element == FxRamp.Fire) { if (SkillFx.In(t, 0.2f, 0.58f)) Put(o, FxShape.Flame, FxRamp.Fire, 7 + (seed & 1) * 2, (int)(t * 12 + seed) & 3, x, y + 4, 1 - (t - 0.2f) / 0.38f); }
+                else if (SkillFx.In(t, 0.1f, 0.4f) && SkillFx.Frac(t * 12 + seed * 0.37f) < 0.6f) Put(o, FxShape.Glint, FxRamp.Violet, 5, 1, x, y + 4);
+            }
+            else if (c.Look == MobLook.Spore || c.Look == MobLook.Water)
+            {
+                // Lumps (drops, of water) thrown up and out, and a puff going up after.
+                bool wet = c.Look == MobLook.Water;
+                float p = SkillFx.U(t, 0, 0.3f);
+                for (int i = 0; i < 3 && p < 1; i++)
+                {
+                    float a = i * 120 + seed % 97, far = rr * (0.3f + 1.1f * SkillFx.Out(p));
+                    Put(o, wet ? FxShape.Dot : FxShape.Blob, element, wet ? 3 : 2 * (3 - (int)(2 * p)), wet ? 3 : 1, x + SkillFx.Cos(a) * far, y + SkillFx.Sin(a) * far * 0.8f + 4 * 7 * p * (1 - p));
+                }
+                float q = (t - 0.1f) / 0.5f;
+                if (q >= 0 && q < 1) Put(o, FxShape.Smoke, wet ? FxRamp.Mist : element, SkillFxArt.Even(7 + 5 * q), Math.Min(3, (int)(q * 4)), x, y + 2 + q * 12, 0.5f * (1 - q));
+            }
+            else if (element == FxRamp.Cold)
+            {
+                // A spike stands, holds a moment and breaks.
+                if (t < 0.06f) Put(o, FxShape.Glint, FxRamp.Steel, 9, 2, x, y + 4);
+                int tall = 5 + (int)((5 + 3 * (seed & 1)) * SkillFx.Out(SkillFx.U(t, 0, 0.1f)));
+                if (t < 0.28f) Put(o, FxShape.Shard, c.Ramp == FxRamp.Plain ? FxRamp.Cold : c.Ramp, tall, 0, x, y + tall / 2f, 1, 90 + ((seed & 3) - 1.5f) * 8);
+                SkillFx.Fly(o, FxShape.Shard, c.Ramp == FxRamp.Plain ? FxRamp.Cold : c.Ramp, 5, 0, 3, t, 0.28f, 0.26f, 2, rr * 1.5f, seed, hop: 6, cx: x, cy: y + 3, aimed: true);
+            }
+            else if (element == FxRamp.Sand || element == FxRamp.Dust)
+            {
+                // A stone thrown up over its shadow, and dust low along the floor.
+                FxLayers.Rubble(o, FxRamp.Dust, 1, t, 0, rr, seed, x, y);
+                float q = SkillFx.U(t, 0, 0.5f);
+                if (q > 0 && q < 1) Put(o, FxShape.Smoke, FxRamp.Dust, SkillFxArt.Even(7 + 5 * q), Math.Min(3, (int)(q * 4)), x, y + 2, 0.7f * (1 - q), 0, true);
+                if (c.Shape == MonsterAttackShape.Thrust && c.Look == MobLook.Sand) SkillFx.Fly(o, FxShape.Dot, FxRamp.Heal, 2, 2, 1, t, 0.04f, 0.3f, 2, 8, seed + 13, hop: 5, cx: x, cy: y);
+            }
+            else if (element == FxRamp.Steel)
+            {
+                // Sparks off iron.
+                if (t < 0.07f) Put(o, FxShape.Glint, FxRamp.Steel, 9, 2, x, y + 3);
+                FxLayers.Embers(o, FxRamp.Steel, 3, t, 0, rr * 1.8f, seed, x, y + 3, life: 0.22f);
+            }
+            else
+            {
+                // A kind with no element: a flash of its own colour and bits of it thrown out.
+                if (t < 0.08f) Put(o, FxShape.Blob, element, SkillFxArt.Even(rr * 1.3f), 0, x, y + 3);
+                SkillFx.Fly(o, FxShape.Dot, element, 2, 2, 3, t, 0.02f, 0.28f, 2, rr * 1.6f, seed, hop: 6, cx: x, cy: y + 2);
             }
         }
 

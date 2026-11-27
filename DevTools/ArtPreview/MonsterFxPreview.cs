@@ -243,6 +243,8 @@ namespace Game.Client
                 if (Shoots)
                 {
                     var element = MonsterFx.ShotOf(_look, _ramp);
+                    uint ownTint = MonsterFx.ShotTint(_look, _ramp, _tint);
+                    var own = ownTint != 0 ? MonsterFx.OwnRamp(ownTint) : null;
                     // Where a fan's shots will go, while it winds up (the only shots whose way the screen knows).
                     if (_attack.Shape == MonsterAttackShape.Spread && t < tele)
                     {
@@ -276,7 +278,7 @@ namespace Game.Client
                                 shot.Dir = back && flown > outFor + World.TurnPause ? (float)Math.PI : turn;
                                 shot.Armed = still;
                                 float sx = _mx + 6 + x * (float)Math.Cos(turn), sy = _my - 6 - x * (float)Math.Sin(turn);
-                                var picture = ShotArt.Shot(element, ShotArt.Reach(_attack.Radius), still ? -1 : ShotArt.Step(shot.Dir), (int)(t * ShotArt.FramesPerSecond) % ShotArt.Frames);
+                                var picture = ShotArt.Shot(element, ShotArt.Reach(_attack.Radius), still ? -1 : ShotArt.Step(shot.Dir), (int)(t * ShotArt.FramesPerSecond) % ShotArt.Frames, own);
                                 _pictures.Add((picture, (int)Math.Round(sx - picture.Width / 2f), (int)Math.Round(sy - picture.Height / 2f), 1, 1));
                                 int pieces = 1 + Take(MobFx.Shot, shot, t, sx, sy);
                                 if (count) MostShot = Math.Max(MostShot, pieces);
@@ -286,7 +288,7 @@ namespace Game.Client
                         {
                             // Where each ended: its element's ring and bits.
                             int shots = _attack.Shape == MonsterAttackShape.Spread ? Math.Max(1, _attack.Count) : 1;
-                            var pop = ShotArt.Pop(element, Math.Min(ShotArt.PopFrames - 1, (int)((flown - outFor) / ShotArt.PopSeconds * ShotArt.PopFrames)));
+                            var pop = ShotArt.Pop(element, Math.Min(ShotArt.PopFrames - 1, (int)((flown - outFor) / ShotArt.PopSeconds * ShotArt.PopFrames)), own);
                             for (int i = 0; i < shots; i++)
                             {
                                 float turn = shots == 1 ? 0 : (-_attack.Angle / 2 + _attack.Angle * i / (shots - 1)) * (float)Math.PI / 180;
@@ -342,6 +344,16 @@ namespace Game.Client
                     else if (t >= lands && _attack.Shape != MonsterAttackShape.Blink && _attack.Tell != Tell.Dash)
                     {
                         int pieces = Take(MobFx.Land, here, t - lands, x, y);
+                        // A wedge, a thrust, a beam or a ring: the warning's own shape burning, as the view lays it (F2).
+                        if (MonsterFx.ShapeBlow(here))
+                        {
+                            var burning = Blow(here, t - lands, x, y);
+                            if (burning.Image != null)
+                            {
+                                _pictures.Add(burning);
+                                pieces++;
+                            }
+                        }
                         if (count) MostLand = Math.Max(MostLand, pieces);
                         // What it leaves on the floor (a line leaves a few along it).
                         if (_attack.Pool != MonsterPool.None)
@@ -470,6 +482,16 @@ namespace Game.Client
         }
 
         // The pools, the one-offs of traits and of the new engine pieces, and the marks no monster has yet: a row each.
+        // A blow in its warning's shape as the view lays it (WorldView.MonsterBlow): HazardArt.Blast in the kind's
+        // colours, fainter than a boss's. No picture once it is over.
+        internal static (PixelImage Image, int X, int Y, float Alpha, int Layer) Blow(MobContext c, float age, float x, float y)
+        {
+            var field = MonsterFx.Field(c);
+            var buffer = field.Buffer();
+            if (!HazardArt.Blast(field, MonsterFx.BlowRamp(c), age, c.Seed, buffer, false, MonsterFx.BlowStrength)) return (null, 0, 0, 0, 1);
+            return (HazardArt.Image(field, buffer), (int)Math.Round(x - field.OriginX), (int)Math.Round(y - field.OriginY), 1, 1);
+        }
+
         static (PixelImage Sheet, bool Fine) Pieces(PixelImage floor)
         {
             bool fine = true;
@@ -510,9 +532,15 @@ namespace Game.Client
                         SkillFxPreview.Over(image, warning.Image, warning.X, warning.Y, warning.Alpha);
                     }
                     foreach (var stamp in o) if (!stamp.Ground && !stamp.Low) Blit(image, ox, oy, stamp);
+                    if (fx == MobFx.Land && MonsterFx.ShapeBlow(now))
+                    {
+                        var burning = Blow(now, t, ox, oy);
+                        if (burning.Image != null) SkillFxPreview.Over(image, burning.Image, burning.X, burning.Y, 1);
+                    }
                     if (fx == MobFx.Shot)
                     {
-                        var picture = ShotArt.Shot(MonsterFx.ShotOf(now.Look, now.Ramp), ShotArt.Reach(0.3f), now.Armed ? -1 : ShotArt.Step(now.Dir), i % ShotArt.Frames);
+                        uint ownTint = MonsterFx.ShotTint(now.Look, now.Ramp, now.Tint);
+                        var picture = ShotArt.Shot(MonsterFx.ShotOf(now.Look, now.Ramp), ShotArt.Reach(0.3f), now.Armed ? -1 : ShotArt.Step(now.Dir), i % ShotArt.Frames, ownTint != 0 ? MonsterFx.OwnRamp(ownTint) : null);
                         SkillFxPreview.Over(image, picture, (int)Math.Round(ox - picture.Width / 2f), (int)Math.Round(oy - picture.Height / 2f), 1);
                     }
                     row.Add(image);
@@ -533,7 +561,14 @@ namespace Game.Client
             // Blows of kinds no monster has yet.
             foreach (var shape in new[] { MonsterAttackShape.Sweep, MonsterAttackShape.Beam, MonsterAttackShape.Slam, MonsterAttackShape.Push, MonsterAttackShape.Mine })
                 rows.Add(Row(MobFx.Land, new MobContext { Shape = shape, Ramp = shape == MonsterAttackShape.Mine ? FxRamp.Violet : shape == MonsterAttackShape.Push ? FxRamp.Spirit : FxRamp.Plain, Tint = green,
-                    Size = (shape == MonsterAttackShape.Beam ? 2.2f : 1.6f) * Tile, Width = shape == MonsterAttackShape.Sweep ? 100 : 0.7f * Tile, Dir = 0.3f, Seed = 9 }, 0.45f, false));
+                    Area = shape == MonsterAttackShape.Sweep ? HazardShape.Cone : shape == MonsterAttackShape.Beam ? HazardShape.Line : HazardShape.Circle,
+                    Size = (shape == MonsterAttackShape.Beam ? 2.2f : 1.6f) * Tile, Width = shape == MonsterAttackShape.Sweep ? 100 : 0.7f * Tile, Dir = 0.3f, Seed = 9 }, shape == MonsterAttackShape.Sweep || shape == MonsterAttackShape.Beam ? 0.62f : 0.45f, false));
+            // F2: a blow in its warning's shape, in what each kind is made of (a wedge), then a thrust and a ring.
+            foreach (var look in new[] { MobLook.Plain, MobLook.Spore, MobLook.Crystal, MobLook.Frost, MobLook.Ember, MobLook.Sand, MobLook.Water, MobLook.Shadow, MobLook.Iron })
+                rows.Add(Row(MobFx.Land, new MobContext { Shape = MonsterAttackShape.Strike, Area = HazardShape.Cone, Look = look, Ramp = look == MobLook.Spore ? FxRamp.Violet : FxRamp.Plain, Tint = green,
+                    Size = 1.7f * Tile, Width = 100, Dir = 0.3f, Seed = 9 }, 0.62f, false));
+            rows.Add(Row(MobFx.Land, new MobContext { Shape = MonsterAttackShape.Thrust, Area = HazardShape.Line, Look = MobLook.Ember, Size = 2.4f * Tile, Width = 0.9f * Tile, Dir = 0.3f, Seed = 9 }, 0.62f, false));
+            rows.Add(Row(MobFx.Land, new MobContext { Shape = MonsterAttackShape.Nova, Area = HazardShape.Ring, Look = MobLook.Frost, Ramp = FxRamp.Cold, Size = 2.0f * Tile, Width = 1.0f * Tile, Seed = 9 }, 0.62f, false));
             // One-offs and loops.
             foreach (var fx in new[] { MobFx.Bounce, MobFx.Turn, MobFx.BlinkOut, MobFx.Split, MobFx.Stagger, MobFx.Rally, MobFx.Deathburst, MobFx.Trip, MobFx.Guard })
                 rows.Add(Row(fx, new MobContext { Ramp = fx == MobFx.BlinkOut || fx == MobFx.Turn ? FxRamp.Violet : fx == MobFx.Deathburst ? FxRamp.Cold : FxRamp.Plain, Tint = green, Size = 2 * Tile, Seed = 11 }, 0.4f, false));
@@ -553,7 +588,7 @@ namespace Game.Client
                     Tint = MonsterFx.TintOf(Rgba.Hex("#7CD2E2")), Dir = 0, Seed = 11 }, 1, true));
             // Shots (E5): one of each thing a kind is made of, flying; the last a returning one standing at its turn.
             foreach (var look in new[] { MobLook.Plain, MobLook.Spore, MobLook.Crystal, MobLook.Frost, MobLook.Ember, MobLook.Sand, MobLook.Water, MobLook.Shadow, MobLook.Iron, MobLook.Hex })
-                rows.Add(Row(MobFx.Shot, new MobContext { Shape = MonsterAttackShape.Spread, Look = look, Ramp = look == MobLook.Spore ? FxRamp.Violet : FxRamp.Plain, Dir = 0.3f, Seed = 11 }, 1, true));
+                rows.Add(Row(MobFx.Shot, new MobContext { Shape = MonsterAttackShape.Spread, Look = look, Ramp = look == MobLook.Spore ? FxRamp.Violet : FxRamp.Plain, Tint = green, Dir = 0.3f, Seed = 11 }, 1, true));
             rows.Add(Row(MobFx.Shot, new MobContext { Shape = MonsterAttackShape.Boomerang, Look = MobLook.Shadow, Ramp = FxRamp.Violet, Armed = true, Seed = 11 }, 1, true));
             // E5: a charging body's dust and lines of speed (plain, frost, ember), and a thrown thing going off as each
             // element does (fire, spores, water, ice, earth, the void).

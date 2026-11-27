@@ -17,12 +17,15 @@ namespace Game.Client
             // Drawn here; else it keeps its boss's own picture (rock, crescent, venom) and only breaks up as these do.
             public bool Own;
             public int Frame = -1;
+            // A monster's own colour (0x1RRGGBB) for a kind with no element, else 0 (MonsterFx.ShotTint).
+            public uint Tint;
         }
 
         sealed class ShotPop
         {
             public SpriteRenderer Renderer;
             public ShotElement Element;
+            public uint Tint;
             public float Age;
             public int Frame;
         }
@@ -72,11 +75,13 @@ namespace Game.Client
             for (int i = 0; i < _stagedShots.Count; i++) yield return _stagedShots[i];
         }
 
-        static Sprite EnemyShotSprite(EnemyShot shot, int frame) =>
-            Sprites.Centered($"shot/enemy/{(int)shot.Element}/{shot.Reach}/{shot.Step}/{frame}", () => ShotArt.Shot(shot.Element, shot.Reach, shot.Step, frame));
+        static Sprite EnemyShotSprite(EnemyShot shot, int frame) => shot.Tint == 0
+            ? Sprites.Centered($"shot/enemy/{(int)shot.Element}/{shot.Reach}/{shot.Step}/{frame}", () => ShotArt.Shot(shot.Element, shot.Reach, shot.Step, frame))
+            : Sprites.Centered($"shot/enemy/own{shot.Tint:X}/{shot.Reach}/{shot.Step}/{frame}", () => ShotArt.Shot(shot.Element, shot.Reach, shot.Step, frame, MonsterFx.OwnRamp(shot.Tint)));
 
-        static Sprite ShotPopSprite(ShotElement element, int frame) =>
-            Sprites.Centered($"shot/pop/{(int)element}/{frame}", () => ShotArt.Pop(element, frame));
+        static Sprite ShotPopSprite(ShotElement element, int frame, uint tint = 0) => tint == 0
+            ? Sprites.Centered($"shot/pop/{(int)element}/{frame}", () => ShotArt.Pop(element, frame))
+            : Sprites.Centered($"shot/pop/own{tint:X}/{frame}", () => ShotArt.Pop(element, frame, MonsterFx.OwnRamp(tint)));
 
         static Sprite AimDotSprite => Sprites.Centered("shot/aim", ShotArt.AimDot);
 
@@ -109,7 +114,7 @@ namespace Game.Client
 
         // The light a shot throws, in its element's colour (a player's keeps its own).
         Rgba ShotLightColor(int id, SpriteRenderer renderer) =>
-            _enemyShots.TryGetValue(id, out var shot) && shot.Own ? ShotArt.Glow(shot.Element) : Sprites.ToRgba(renderer.color);
+            _enemyShots.TryGetValue(id, out var shot) && shot.Own ? (shot.Tint != 0 ? MonsterFx.OwnRamp(shot.Tint)[2] : ShotArt.Glow(shot.Element)) : Sprites.ToRgba(renderer.color);
 
         // Where an enemy's shot ended (struck, stopped by a wall, or spent): a ring and bits of what it was made of.
         // The bosses' venom and crescents end their own way.
@@ -119,10 +124,10 @@ namespace Game.Client
             _enemyShots.Remove(id);
             _stagedElements.Remove(id);
             if (!plain || _shotPops.Count >= MostShotPops) return;
-            var renderer = Renderer(_root.transform, "ShotEnd", ShotPopSprite(shot.Element, 0), Color.white);
+            var renderer = Renderer(_root.transform, "ShotEnd", ShotPopSprite(shot.Element, 0, shot.Tint), Color.white);
             renderer.transform.localPosition = at;
             renderer.sortingOrder = 20000;
-            _shotPops.Add(new ShotPop { Renderer = renderer, Element = shot.Element });
+            _shotPops.Add(new ShotPop { Renderer = renderer, Element = shot.Element, Tint = shot.Tint });
         }
 
         void UpdateShotPops(float deltaTime)
@@ -142,7 +147,7 @@ namespace Game.Client
                 }
                 if (frame == pop.Frame) continue;
                 pop.Frame = frame;
-                pop.Renderer.sprite = ShotPopSprite(pop.Element, frame);
+                pop.Renderer.sprite = ShotPopSprite(pop.Element, frame, pop.Tint);
             }
         }
 
