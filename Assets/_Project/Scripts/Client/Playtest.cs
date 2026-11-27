@@ -2929,6 +2929,8 @@ namespace Game.Client
                 json.Field("mobFxPieces", root.MonsterFxPieces);
                 json.Field("warnsShown", root.WarnsShown);
                 json.Field("blastPieces", root.BlastPieces);
+                json.Field("bossFx", root.BossFxCount);
+                json.Field("bossFxPieces", root.BossFxPieces);
                 json.Field("floorScars", root.FloorScars);
                 json.Field("enemyShots", root.EnemyShots);
                 json.Field("shotEnds", root.ShotEnds);

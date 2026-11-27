@@ -64,6 +64,8 @@ dotnet run --project DevTools/ArtPreview -- --only skillfx
 dotnet run --project DevTools/ArtPreview -- --only monsterfx
 # 적의 탄(out/shot/: shots.png 원소 열넷(보스 아홉 + 몬스터 다섯)의 맥동·각도·큰 것·멈춘 것·소멸 5프레임과 옛 공·플레이어 탄·조준선, 흑백 _gray, report.txt. Docs/EffectsRework.md 7절)
 dotnet run --project DevTools/ArtPreview -- --only shot
+# 보스 고유 이펙트(E6): out/bossfx/<보스>.png·_gray(줄마다 이펙트 하나, 밑에 타격 도형), report.txt(조각·빛 수). 한 이펙트 72조각·빛 3개를 넘으면 실패. 웹 점검은 sweep.js --only bossfx
+dotnet run --project DevTools/ArtPreview -- --only bossfx
 # 게임의 UI 스킨만(out/ui/: skin.png 조각 전부, windows.png 지금 화면에 입힌 모습, pixels.png 정수 배 틀, encounters.png·encounters_phone.png 상점·상자·작업대·모루·대화 창, growth.png·growth_phone.png 스킬·특성 트리·캐릭터 창, records.png·records_phone.png 일지·지도, bag_hud.png·bag_hud_phone.png 가방·HUD·쓰러짐 카드·메뉴. Docs/UiRework.md U1~U7)
 dotnet run --project DevTools/ArtPreview -- --only ui
 # 사냥 세트·정예 고유·보스 세트 아이콘과 사냥 재료(out/gear.png, Docs/Gear.md)

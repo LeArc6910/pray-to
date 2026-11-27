@@ -16,7 +16,8 @@
 - E3 공용 층 조각과 폭발은 끝났다(2026-11-27, `Docs/EffectsRework.md` 8절). 본보기: `Client/Art/FxLayers.cs`(`Blast`와 층 도우미), `SkillFxArt.Layers.cs`(새 조각, `Ramp5`), `--only skillfx`, 명령 `blast`, `sweep.js --only blast`. 실제로 바꾼 것은 화염구·유성뿐
 - E5 일반 몬스터의 예고·탄·장판은 끝났다(2026-11-27, `Docs/EffectsRework.md` 9절). 본보기: `Client/Art/MonsterFx.cs`(`Field`·`ShotOf`·`Burst`·`Pool`·`Rush`), `--only monsterfx`, `sweep.js --only mobwarn`. 남은 것: 한 발짜리 탄의 조준선(Core), 부채꼴·찌르기·광선의 착지 모양
 - E4 플레이어 스킬 30종과 구르기는 끝났다(2026-11-27, `Docs/EffectsRework.md` 10절, 스킬마다의 표는 `Docs/SkillEffects.md`). 본보기: `Client/Art/SkillFx.cs`(`Comet`·`Crystals`·`Floor`), 새 조각 `Lump`·`Wash`·`Smear`·번개 후광, 명령 `castfx`, `sweep.js --only layers`. 남은 것: 근접 스킬이 맞은 몸의 별(E7), 유성의 목표 지점 표시(어디서 터질지 미리 알려면 Core)
-- **E6 보스 고유**(다음 차례): 여왕 광선·결정 비, 모르그 불, 그 밖. 그 뒤 E7 타격·숫자
+- E6 보스 고유 이펙트는 끝났다(2026-11-27, `Docs/EffectsRework.md` 11절). 본보기: `Client/Art/BossFx.cs`(`BossEffects`), `WorldView.BossFx.cs`, `BlastLanded`의 원소 인자, `--only bossfx`, 명령 `warn … <보스> <공격>`, `sweep.js --only bossfx`. 남은 것: 탄을 쏘는 순간의 터짐, 예고 중의 자잘한 사각 점, 광맥 포식자·발두인을 공격 이름으로 놓아 보기
+- **E7 타격·숫자**(다음 차례, 마지막 묶음): 원소별 타격 모양(지금은 색만 다른 `EffectArt.Burst`), 피해 숫자, 근접 스킬이 맞은 몸의 별(E4에서 미룸)
 - 묶음마다: 한도(이펙트 72조각, 바닥 빛 3장, 흔적 24개) 확인, 흑백 표, Playtest 장면과 `sweep.js` 구역, PlayMode 사진
 
 ## 정해진 것 (2026-11-27, 추천대로)

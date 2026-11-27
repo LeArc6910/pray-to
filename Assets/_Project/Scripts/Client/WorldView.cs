@@ -2102,6 +2102,13 @@ namespace Game.Client
                 if (_seen.Contains(pair.Key)) continue;
                 // An enemy's ends in a ring and bits, the rocks and a monster's too; venom and crescents end their way.
                 EnemyShotGone(pair.Key, pair.Value.transform.localPosition, pair.Value.sprite != CrescentSprite && pair.Value.sprite != VenomGlobSprite);
+                // A crescent breaks into petals and a few sparks of steel, a glob of venom into drops (E6).
+                if (pair.Value.sprite == CrescentSprite)
+                {
+                    Petals(pair.Value.transform.localPosition, Vector3.up, 4, 1.5f, 0.8f, 0.3f);
+                    Chips(pair.Value.transform.localPosition, Vector3.up, FxRamp.Steel, 4, 12, 360);
+                }
+                else if (pair.Value.sprite == VenomGlobSprite) Chips(pair.Value.transform.localPosition, Vector3.up, FxRamp.Heal, 6, 12, 360);
                 Object.Destroy(pair.Value.gameObject);
                 _gone.Add(pair.Key);
             }

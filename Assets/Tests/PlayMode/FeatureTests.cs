@@ -912,6 +912,66 @@ namespace Game.Client.Tests
             Assert.IsTrue(_root.Playing);
         }
 
+        // The bosses' own effects (E6, Docs/EffectsRework.md 11): blows laid as the queen's, the general's, the cave
+        // warden's, the antlion's and the plain bosses' land with crystal, fire, stone, sand and their element, each
+        // within the pieces an effect may have.
+        [UnityTest, Category(Screens.Category)]
+        public IEnumerator BossesLandBlowsOfTheirOwn()
+        {
+            yield return Start();
+            World.MonstersHold = true;
+            var view = _root.View;
+            var right = new Vec2(1, 0);
+            void Lay(string boss, string attack, HazardShape shape, float dx, float dy, float size, float width)
+            {
+                view.StageWarningAs(boss, attack);
+                view.StageWarning(shape, Player.Position + new Vec2(dx, dy), right, size, width, true, 0.9f);
+            }
+            Feel.SkillFxHold = 0.14f;
+            Lay("crystal_queen", "bite", HazardShape.Cone, -8, 2.6f, 3.2f, 90);
+            Lay("crystal_queen", "crystal_rain", HazardShape.Circle, -2.5f, 3.2f, 1.4f, 0);
+            Lay("crystal_queen", "web_quake", HazardShape.Circle, 2, 3.2f, 2, 0);
+            Lay("crystal_queen", "venom_share", HazardShape.Share, 6.8f, 2.6f, 1.8f, 0);
+            Lay("crystal_queen", "crystal_cross", HazardShape.Line, -8, -3.2f, 8, 1.2f);
+            yield return new WaitForSecondsRealtime(0.2f);
+            view.EndStagedWarnings(land: true);
+            yield return new WaitForSecondsRealtime(0.2f);
+            Assert.GreaterOrEqual(_root.BossFxCount, 5, "Each of the queen's blows lays an effect of her own.");
+            Assert.That(_root.BossFxPieces, Is.InRange(1, 72), "An effect stays within its pieces.");
+            yield return Screens.Take("bossfx-queen");
+            Feel.SkillFxHold = -1;
+            yield return new WaitForSecondsRealtime(1.3f);
+            Feel.SkillFxHold = 0.14f;
+            Lay("mad_general", "cleave", HazardShape.Cone, -8, 2.4f, 3.4f, 110);
+            Lay("mad_general", "hellfire", HazardShape.Circle, -2.2f, 3.2f, 1.5f, 0);
+            Lay("mad_general", "ember_wake", HazardShape.Ring, 6, 1, 3.6f, 1.2f);
+            Lay("mad_general", "dark_cross", HazardShape.Line, -8, -3.6f, 9, 1.2f);
+            Lay("cave_warden", "slam", HazardShape.Circle, 0, -3.2f, 2.2f, 0);
+            Lay("antlion", "pit", HazardShape.Circle, 5, -3.4f, 2, 0);
+            view.EndStagedWarnings(land: true);
+            yield return new WaitForSecondsRealtime(0.2f);
+            Assert.GreaterOrEqual(_root.BossFxCount, 6);
+            Assert.That(_root.BossFxPieces, Is.InRange(1, 72));
+            yield return Screens.Take("bossfx-general");
+            Feel.SkillFxHold = -1;
+            yield return new WaitForSecondsRealtime(1.3f);
+            Feel.SkillFxHold = 0.14f;
+            Lay("lava_titan", "slam", HazardShape.Circle, -6, 2.8f, 2, 0);
+            Lay("void_lord", "star_fall", HazardShape.Circle, -1, 3, 1.8f, 0);
+            Lay("tide_serpent", "spray_rain", HazardShape.Circle, 3.5f, 3, 1.6f, 0);
+            Lay("crown_wraith", "grasp", HazardShape.Cone, -6, -3.2f, 3.2f, 80);
+            Lay("crown_wraith", "lightning_fall", HazardShape.Circle, 2, -3.2f, 1.5f, 0);
+            view.EndStagedWarnings(land: true);
+            yield return new WaitForSecondsRealtime(0.2f);
+            Assert.GreaterOrEqual(_root.BossFxCount, 5, "The plain bosses' blows land in their element.");
+            yield return Screens.Take("bossfx-elements");
+            Feel.SkillFxHold = -1;
+            yield return new WaitForSecondsRealtime(1.3f);
+            Assert.AreEqual(0, _root.BossFxCount, "The effects end.");
+            World.MonstersHold = false;
+            Assert.IsTrue(_root.Playing);
+        }
+
         // A pack notices together (2026-11-22, Docs/WorldRework.md 무리): five slimes as one pack, most further off than
         // they see; one notices the player and the rest come too, each with a mark over its head.
         [UnityTest, Category(Screens.Category)]

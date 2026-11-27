@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu title testground hunt harvest zones towns time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight warden antlion queen general spider arenas world farm life npc factory defense gear skills skillfx layers monsterfx hazards shots blast mobwarn map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
+// Sections: menu title testground hunt harvest zones towns time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight warden antlion queen general spider arenas world farm life npc factory defense gear skills skillfx layers monsterfx hazards bossfx shots blast mobwarn map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -3022,6 +3022,78 @@ async function hazards(browser) {
   await phone.wait(250);
   await phone.shot('hazards-phone-blast', '휴대폰 세로: 착지 0.11초');
   await phone.send('fxhold off; monsters go');
+  await phone.context.close();
+}
+
+// ---------------------------------------------------------------- 보스 고유 이펙트 (이펙트 개편 E6, Docs/EffectsRework.md 11절)
+// Each boss's blows laid beside the player as that boss's attacks ('warn ... <boss> <attack>', WorldView.BossFx.cs)
+// and landed, held at a moment for each picture: the queen's crystal and beams, the general's fire, the stone
+// bosses' dust and stone (as the cave warden's), the antlion's sand, and the four plain bosses' elements.
+const BossBlows = {
+  queen: ['cone -8 2.6 3.2 90 0 F crystal_queen bite', 'circle -2.5 3.2 1.4 0 0 F crystal_queen crystal_rain', 'circle 2 3.2 2 0 0 F crystal_queen web_quake',
+    'share 6.8 2.6 1.8 0 0 F crystal_queen venom_share', 'line -8 -3.2 8 1.2 0 F crystal_queen crystal_cross', 'circle 4 -3.4 1.3 0 0 F crystal_queen shard_hail'],
+  general: ['cone -8 2.4 3.4 110 0 F mad_general cleave', 'circle -2.2 3.2 1.5 0 0 F mad_general hellfire', 'circle 1.6 3.2 1.4 0 0 F mad_general meteors',
+    'ring 6 1 3.6 1.2 0 F mad_general ember_wake', 'line -8 -3.6 9 1.2 0 F mad_general dark_cross'],
+  stone: ['circle -6 2.6 2.5 0 0 F cave_warden slam', 'cone -1.5 1.6 4 120 30 F cave_warden sweep', 'circle 6.6 3.2 1.6 0 0 F cave_warden cave_in',
+    'ring 5 -2 3.6 1.6 0 F cave_warden shockwave', 'circle -7 -3.4 1.1 0 0 F cave_warden rock_trail', 'circle -3.6 -3.4 1.1 0 0 F cave_warden rock_trail'],
+  antlion: ['cone -8 2.6 3.2 90 0 F antlion bite', 'circle -2.2 3 2.2 0 0 F antlion pit', 'share 3 3.2 1.8 0 0 F antlion sandstorm',
+    'circle 7 3.2 1.1 0 0 F antlion sand_trail', 'line -8 -3.4 8 1.4 0 F antlion sand_jet', 'ring 5 -2.4 3.4 1.4 0 F antlion quicksand'],
+  elements: ['circle -7 3 2 0 0 F lava_titan slam', 'cone -4 2.6 3.6 80 0 F lava_titan fire_wave', 'circle 3 3.2 1.8 0 0 F void_lord star_fall', 'line 4.5 0.8 5 1.4 0 F void_lord beam',
+    'circle -7 -3 1.6 0 0 F tide_serpent spray_rain', 'cone -4.6 -3.4 3.4 80 0 F tide_serpent tail_sweep', 'circle 1.4 -3.2 1.5 0 0 F crown_wraith lightning_fall',
+    'cone 3.6 -3.4 3.2 80 0 F crown_wraith grasp'],
+};
+const blowsAt = (blows, filled) => blows.map(b => 'warn ' + b.replace(' F ', ` ${filled} `)).join('; ');
+
+async function bossfx(browser) {
+  note('\n## 보스 고유 이펙트 (PC)\n');
+  const game = await open(browser, run, Profiles.pc, url);
+  await game.startSolo();
+  await game.wait(1200);
+  await game.send('goto wild');
+  await clearRoom(game, 12, 7);
+  await game.send('monsters hold; heal; face 1 0');
+  const Names = { queen: '수정 거미 여왕', general: '장군 모르그', stone: '돌 보스(수호자의 공격으로)', antlion: '개미귀신', elements: '용암·공허·물·망령' };
+  for (const [key, blows] of Object.entries(BossBlows)) {
+    if (key === 'queen' || key === 'general') {
+      // What falls onto the warnings before the blow.
+      await game.send('fxhold off; warn clear; ' + blowsAt(blows, 0.93));
+      await game.wait(350);
+      await game.shot(`bossfx-${key}-warn`, `${Names[key]}: 착지 직전(떨어지는 결정·불)`);
+    }
+    await game.send('warn clear; fxhold 0.14; ' + blowsAt(blows, 0.9) + '; warn land');
+    await game.wait(300);
+    const st = await game.state();
+    check(st.bossFx >= blows.length, `${Names[key]}: 타격마다 고유 이펙트가 놓인다 (${st.bossFx}개, 타격 ${blows.length})`);
+    check(st.bossFxPieces > 0 && st.bossFxPieces <= 72, `${Names[key]}: 이펙트 하나의 조각이 한도 안 (${st.bossFxPieces}조각, 한도 72)`);
+    check(st.skillFxLights <= 12, `${Names[key]}: 바닥 빛이 화면 한도 안 (${st.skillFxLights}개, 한도 12)`);
+    await game.shot(`bossfx-${key}-1`, `${Names[key]}: 착지 0.14초`);
+    await game.send('fxhold 0.5');
+    await game.wait(300);
+    await game.shot(`bossfx-${key}-2`, `${Names[key]}: 착지 0.5초(남는 것)`);
+    await game.send('fxhold off');
+    await pollState(game, t => t.bossFx === 0, 3000);
+  }
+  // The dust of a slam stays under a warning that is still lying.
+  await game.send('warn circle -1.8 1 2 0 0 0.5 cave_warden slam; warn circle 1.8 1 2 0 0 0.5 cave_warden slam; fxhold 0.2; warn land 1');
+  await game.wait(250);
+  check((await game.state()).warnsShown === 1, '내려찍기의 먼지 옆에서도 남은 예고는 그대로 보인다');
+  await game.shot('bossfx-dust-under', '왼쪽 내려찍기 0.2초와 오른쪽 예고(먼지가 예고를 가리지 않는다)');
+  await game.send('fxhold off; warn clear; monsters go');
+  await game.context.close();
+
+  note('\n## 보스 고유 이펙트 (휴대폰 세로)\n');
+  const phone = await open(browser, run, Profiles.phone, url);
+  await phone.startSolo();
+  await phone.wait(1200);
+  await phone.send('goto wild');
+  await clearRoom(phone, 9, 6);
+  await phone.send('monsters hold; heal; face 1 0; fxhold 0.14; warn line -3 4.5 6 1.2 0 0.9 crystal_queen crystal_cross; warn circle 0 1.5 1.4 0 0 0.9 crystal_queen crystal_rain; ' +
+    'warn ring 0 -3 3 1.2 0 0.9 mad_general ember_wake; warn cone -2.5 -6.5 3.4 110 0 0.9 mad_general cleave; warn land');
+  await phone.wait(300);
+  const small = await phone.state();
+  check(small.bossFx >= 4 && small.bossFxPieces <= 72, `휴대폰 세로에서도 고유 이펙트가 놓인다 (${small.bossFx}개, 가장 많은 것 ${small.bossFxPieces}조각)`);
+  await phone.shot('bossfx-phone', '휴대폰 세로: 여왕의 광선·결정, 모르그의 불 고리·베기 0.14초');
+  await phone.send('fxhold off; warn clear; monsters go');
   await phone.context.close();
 }
 
@@ -8440,7 +8512,7 @@ async function towns(browser) {
   }
 }
 
-const Sections = { menu, title, testground, hunt, harvest, zones, towns, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, warden, antlion, queen, general, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, layers, monsterfx, hazards, shots, blast, mobwarn, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
+const Sections = { menu, title, testground, hunt, harvest, zones, towns, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, warden, antlion, queen, general, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, layers, monsterfx, hazards, bossfx, shots, blast, mobwarn, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });
