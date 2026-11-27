@@ -101,6 +101,70 @@ namespace Game.Client
             return shot;
         }
 
+        // ---- Shots let fly (F2) ----
+
+        // Enemy shots first seen this frame that no monster owned: a boss's volley, gathered to flash once.
+        readonly List<ProjectileView> _firedNow = new List<ProjectileView>();
+        // For the playtest: flashes laid since the view was made, and how many shots the last one was for.
+        public int MuzzleFlashes { get; private set; }
+        public int LastMuzzleShots { get; private set; }
+
+        // Where shots were let fly: a short flash, sparks and a ring in what the shots are made of (BossFx.Muzzle).
+        // at the shooter's middle, far how far out its shots leave it (tiles).
+        void Muzzle(Vector3 at, float far, FxRamp ramp, uint tint, float degrees, float spread, int count)
+        {
+            AddBossFx(BossFx.Muzzle, at, new BossContext { Ramp = ramp, Tint = tint, Dir = degrees, Width = spread, Count = count, Size = far * Ppu });
+            MuzzleFlashes++;
+            LastMuzzleShots = count;
+        }
+
+        // What a boss's shots are made of, for their flash: those with a shot of their own picture too.
+        static FxRamp MuzzleRamp(string boss) => boss switch
+        {
+            "shrine_samurai" => FxRamp.Steel,
+            "silk_mother" => FxRamp.Heal,
+            _ => ShotArt.RampOf(ShotArt.ElementOf(boss)),
+        };
+
+        // The boss's shots first seen this frame flash once where they left it: a few as a fan of muzzles, a round
+        // of them as one ring round the boss. (A shot first seen far from any boss is not flashed: nothing to show
+        // where it came from.)
+        void FlashFired()
+        {
+            if (_firedNow.Count == 0) return;
+            Body boss = null;
+            float best = float.MaxValue;
+            var first = _firedNow[0].Position;
+            foreach (var body in _others.Values)
+            {
+                if (body.Kind != BodyKind.Boss) continue;
+                float distance = Vector2.Distance(body.Position, new Vector2(first.X, first.Y));
+                if (distance >= best) continue;
+                best = distance;
+                boss = body;
+            }
+            if (boss != null && best < boss.Diameter / 2 + 3.5f)
+            {
+                // The middle of their ways and how far they spread from it.
+                float sx = 0, sy = 0;
+                foreach (var shot in _firedNow)
+                {
+                    var way = shot.Velocity.LengthSquared > 1e-6f ? shot.Velocity.Normalized : new Vec2(0, 0);
+                    sx += way.X;
+                    sy += way.Y;
+                }
+                float n = _firedNow.Count, together = Mathf.Sqrt(sx * sx + sy * sy) / n;
+                float middle = Mathf.Atan2(sy, sx) * Mathf.Rad2Deg, spread = 0;
+                bool round = n >= 6 && together < 0.3f;
+                if (round) middle = _firedNow[0].Velocity.Angle * Mathf.Rad2Deg;
+                else
+                    foreach (var shot in _firedNow)
+                        spread = Mathf.Max(spread, 2 * Mathf.Abs(Mathf.DeltaAngle(middle, shot.Velocity.Angle * Mathf.Rad2Deg)));
+                Muzzle(boss.Position, boss.Diameter / 2, MuzzleRamp(boss.Id), 0, middle, round ? 360 : Mathf.Min(spread, 299), _firedNow.Count);
+            }
+            _firedNow.Clear();
+        }
+
         // The core beats, two frames (held on the first when motion is reduced), each shot a little out of step.
         void BeatEnemyShot(int id, SpriteRenderer renderer)
         {

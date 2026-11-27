@@ -96,6 +96,19 @@ namespace Game.Client
             _ => ShotElement.Ember,
         };
 
+        // An element's colours for the pieces that go with its shot (the flash where it is let fly, F2).
+        public static FxRamp RampOf(ShotElement element) => element switch
+        {
+            ShotElement.Stone => FxRamp.Dust,
+            ShotElement.Crystal => FxRamp.Crystal,
+            ShotElement.Sand => FxRamp.Sand,
+            ShotElement.Void or ShotElement.Spore or ShotElement.Hex => FxRamp.Violet,
+            ShotElement.Water or ShotElement.Frost => FxRamp.Cold,
+            ShotElement.Wraith or ShotElement.Mote => FxRamp.Spirit,
+            ShotElement.Iron => FxRamp.Steel,
+            _ => FxRamp.Fire,
+        };
+
         // The nearest drawn angle to the way it flies.
         public static int Step(float angle)
         {

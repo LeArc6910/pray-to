@@ -671,6 +671,12 @@ namespace Game.Client
                 if (from == null) return;
                 shot = new MobShot { Shape = from.MobAttack.Shape, Ramp = from.MobRamp, Tint = from.MobTint, Seed = ++_fxSeed & 0xFFFF, Dir = projectile.Velocity.Angle };
                 _mobShots[projectile.Id] = shot;
+                // It flashes where it left its monster, in what it is made of (F2): only when seen leaving.
+                if (best < from.Diameter / 2 + 2.2f)
+                {
+                    uint own = MonsterFx.ShotTint(from.MobKind, from.MobRamp, from.MobTint);
+                    Muzzle(from.Position, from.Diameter / 2, own != 0 ? FxRamp.Plain : ShotArt.RampOf(MonsterFx.ShotOf(from.MobKind, from.MobRamp)), own, projectile.Velocity.Angle * Mathf.Rad2Deg, 0, 1);
+                }
                 if (_enemyShots.TryGetValue(projectile.Id, out var made))
                 {
                     made.Element = MonsterFx.ShotOf(from.MobKind, from.MobRamp);

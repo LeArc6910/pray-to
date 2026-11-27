@@ -98,6 +98,20 @@ namespace Game.Client
                 Add("elements", name + " line", BossFx.Element, HazardForm.Band, 11f, 1.5f, 0, ramp, r => { r.Context.Form = HazardForm.Band; r.Wide = 200; r.Tall = 96; r.AtX = 0.06f; r.AtY = 0.6f; });
                 Add("elements", name + " ring", BossFx.Element, HazardForm.Donut, 6.5f, 2.4f, 0, ramp, r => { r.Context.Form = HazardForm.Donut; r.Context.Inner = 2.4f * T; r.Context.Width = 0; (r.Wide, r.Tall, r.AtY) = (232, 232, 0.5f); });
             }
+            // F2: shots let fly. A fan of three (fire), a round of twelve (crystal) and of thirty-two (the void), one
+            // shot of sand, and a monster's own colour.
+            void Fired(string name, FxRamp ramp, int count, float spread, float far, uint tint = 0) =>
+                Add("muzzle", name, BossFx.Muzzle, HazardForm.Circle, 1, 0, 0, ramp, r =>
+                {
+                    r.NoShape = true;
+                    (r.Tall, r.AtY, r.AtX) = (spread >= 300 ? 96 : 64, 0.5f, spread >= 300 ? 0.5f : 0.3f);
+                    r.Context = new BossContext { Ramp = ramp, Tint = tint, Size = far, Count = count, Width = spread, Dir = spread >= 300 ? 20 : 10, Seed = 4 + rows.Count };
+                });
+            Fired("fan of 3 (fire)", FxRamp.Fire, 3, 40, 22);
+            Fired("round of 12 (crystal)", FxRamp.Crystal, 12, 360, 26);
+            Fired("round of 32 (void)", FxRamp.Violet, 32, 360, 26);
+            Fired("one (sand)", FxRamp.Sand, 1, 0, 14);
+            Fired("one (a kind's own colour)", FxRamp.Plain, 1, 0, 8, MonsterFx.TintOf(Rgba.Hex("#8CD94D")));
             return rows;
         }
 

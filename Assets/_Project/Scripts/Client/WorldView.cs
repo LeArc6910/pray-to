@@ -2098,6 +2098,8 @@ namespace Game.Client
                 renderer.enabled = !DrawSkillShot(projectile, isNew, deltaTime);
                 // A monster's shot from the sheet is the enemy's shot in what its monster is made of (WorldView.MonsterFx).
                 if (!projectile.Friendly) DrawMonsterShot(projectile, isNew, renderer);
+                // A boss's, new this frame: its volley flashes once where it was let fly (F2, FlashFired).
+                if (isNew && !projectile.Friendly && projectile.Id < StagedIds && !_mobShots.ContainsKey(projectile.Id)) _firedNow.Add(projectile);
                 if (!projectile.Friendly) BeatEnemyShot(projectile.Id, renderer);
                 // The silk mother's venom sheds drops as it flies.
                 if (!projectile.Friendly && _bossInView?.Id == "silk_mother" && UnityEngine.Random.value < 0.3f)
@@ -2107,6 +2109,7 @@ namespace Game.Client
                     Petals(new Vector3(projectile.Position.X, projectile.Position.Y, 0), -new Vector3(projectile.Velocity.X, projectile.Velocity.Y, 0), 1, 1.5f, 0.8f, 0.2f);
             }
 
+            FlashFired();
             _gone.Clear();
             foreach (var pair in _projectiles)
             {

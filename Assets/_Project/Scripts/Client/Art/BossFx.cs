@@ -31,6 +31,12 @@ namespace Game.Client
         // wisps): Count of them round Dir, out to Size. What the old square dots were.
         Cinders,
 
+        // Shots let fly (F2), bosses' and monsters' alike: a short flash and sparks at each muzzle, a ring where
+        // they left. The origin is the shooter's middle, Size how far out the shots leave it, Dir the middle of their
+        // ways, Width the degrees they spread over (300 and more: all round, one ring at Size and a flash for up to
+        // eight of them), Count how many. Ramp what the shots are made of (ShotArt.RampOf); Tint a kind's own colour.
+        Muzzle,
+
         // ---- the mad general ----
         // Fire running round a ring's band from Dir: tongues of flame in rows, soot under them, sparks rising. Size the
         // band's outer radius, Inner its inner.
@@ -90,6 +96,8 @@ namespace Game.Client
         // Without the part of the effect something else already draws there.
         public bool Plain;
         public FxRamp Ramp;
+        // A colour (0x1RRGGBB) the Plain ramp's pieces take (a monster's own, for its shots' flash).
+        public uint Tint;
         // The blow's shape, for an effect laid over any of them (BossFx.Element).
         public HazardForm Form;
     }
@@ -130,6 +138,20 @@ namespace Game.Client
                 case BossFx.Column: life = Column(c, t, o); break;
                 case BossFx.Spray: life = Spray(c, t, o); break;
                 case BossFx.Cinders: life = Cinders(c, t, o); break;
+                case BossFx.Muzzle:
+                {
+                    int from = o.Count;
+                    life = Muzzle(c, t, o);
+                    if (c.Tint != 0)
+                        for (int i = from; i < o.Count; i++)
+                        {
+                            if (o[i].Ramp != FxRamp.Plain) continue;
+                            var stamp = o[i];
+                            stamp.Tint = c.Tint;
+                            o[i] = stamp;
+                        }
+                    break;
+                }
                 case BossFx.FireBand: life = FireBand(c, t, o); break;
                 case BossFx.Cleave: life = Cleave(c, t, o); break;
                 case BossFx.FireCall: life = FireCall(c, t, o); break;
@@ -351,6 +373,30 @@ namespace Game.Client
         }
 
         // ---- shared by the bosses ----
+
+        public const float MuzzleSeconds = 0.24f;
+
+        // Shots let fly: brightest in its first two frames, gone in a quarter of a second, so it never hides the
+        // shots it sends off.
+        static float Muzzle(in BossContext c, float t, List<FxStamp> o)
+        {
+            var m = c.Ramp;
+            bool round = c.Width >= 300;
+            int count = Math.Max(1, c.Count), shown = Math.Min(count, round ? 8 : 5);
+            float far = Math.Max(4, c.Size);
+            FxLayers.Light(o, m, round ? far * 2.2f + 24 : 34, 0.8f * (1 - t / 0.16f), round ? 0 : Cos(c.Dir) * far, round ? 0 : Sin(c.Dir) * far);
+            // Where they left: a ring opening fast (round the shooter, when they go all ways).
+            if (round) FxLayers.Shock(o, m, t, 0, far + 8, life: 0.22f);
+            else FxLayers.Shock(o, m, t, 0, 9 + Math.Min(6, count), Cos(c.Dir) * far, Sin(c.Dir) * far, 0.2f);
+            for (int i = 0; i < shown; i++)
+            {
+                float a = round ? c.Dir + i * 360f / shown : shown == 1 ? c.Dir : c.Dir + (i / (float)(shown - 1) - 0.5f) * c.Width;
+                float x = Cos(a) * far, y = Sin(a) * far;
+                if (t < 0.07f) Put(o, FxShape.Glint, m == FxRamp.Plain ? FxRamp.Plain : FxRamp.Steel, t < 0.035f ? 11 : 9, 2, x, y);
+                FxLayers.Embers(o, m, round ? 1 : 2, t, 0, 13, c.Seed + i * 7, x, y, 50, a, 0.16f);
+            }
+            return MuzzleSeconds;
+        }
 
         static float Cinders(in BossContext c, float t, List<FxStamp> o)
         {
