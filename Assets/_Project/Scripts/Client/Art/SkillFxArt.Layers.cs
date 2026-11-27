@@ -25,6 +25,8 @@ namespace Game.Client
             new[] { Rgba.Hex("#B8201E"), Rgba.Hex("#5A1014") },
             new[] { Rgba.Hex("#6A3FA8"), Rgba.Hex("#33204F") },
             new[] { Rgba.Hex("#5E5E5E"), Rgba.Hex("#333333") },
+            new[] { Rgba.Hex("#7A3AA8"), Rgba.Hex("#3F2468") },
+            new[] { Rgba.Hex("#6E4E28"), Rgba.Hex("#3E2A18") },
         };
 
         static readonly Rgba[][] Fives = new Rgba[Turns.Length][];
@@ -415,6 +417,73 @@ namespace Game.Client
                     else if (across < 0.6f) image[x, y] = along > 0.7f ? r[0] : along > 0.4f ? r[1] : r[2];
                     else if (across < 0.86f) image[x, y] = along > 0.6f ? r[1] : r[2];
                     else if (((x + y) & 1) == 0) image[x, y] = A(r[3], 200);
+                }
+            }
+            return image;
+        }
+
+        // ---- the bosses' own pieces (E6) ----
+
+        // A stretch of a beam: its half width ripples along its length with a period of the stretch, so stretches
+        // join; from the middle out a pale core, the element's light and mid colours and a darker rim.
+        static PixelImage Beam(Rgba[] r, int thick, int frame)
+        {
+            const int length = 32;
+            thick = Math.Clamp(thick, 1, 48);
+            int half = thick / 2 + 3;
+            var image = new PixelImage(length, 2 * half + 1);
+            float phase = (frame & 3) * (float)Math.PI / 2;
+            for (int x = 0; x < length; x++)
+            {
+                if (thick <= 2)
+                {
+                    image[x, half] = r[thick == 1 ? 2 : 1];
+                    continue;
+                }
+                float ripple = thick < 8 ? 0.5f * (float)Math.Sin(x * Math.PI / 4 - phase)
+                    : 1.2f * (float)Math.Sin(x * Math.PI / 8 - phase) + 0.8f * (float)Math.Sin(x * Math.PI / 4 + 2 * phase);
+                float reach = Math.Max(1, thick / 2f + ripple);
+                for (int dy = -half; dy <= half; dy++)
+                {
+                    float u = Math.Abs(dy) / reach;
+                    if (u > 1) continue;
+                    image[x, half + dy] = u < 0.3f ? r[0] : u < 0.62f ? r[1] : u < 0.85f ? r[2] : r[3];
+                }
+            }
+            return image;
+        }
+
+        static PixelImage Spear(Rgba[] r, int length, int frame)
+        {
+            length = Math.Max(8, length);
+            var image = new PixelImage(length, 5);
+            bool after = frame == 1;
+            int head = Math.Clamp(length / 3, 5, 9);
+            for (int x = 0; x < length - head; x++) image[x, 2] = after ? A(r[3], 150) : x % 6 == 5 ? r[3] : r[2];
+            for (int x = length - head; x < length; x++)
+            {
+                float along = (x - (length - head)) / (float)(head - 1);
+                int reach = along < 0.3f ? (int)Math.Round(along / 0.3f * 2) : (int)Math.Round((1 - along) / 0.7f * 2);
+                for (int dy = -reach; dy <= reach; dy++) image[x, 2 + dy] = after ? A(r[3], 150) : dy == 0 ? r[0] : dy < 0 ? r[1] : r[2];
+            }
+            return image;
+        }
+
+        // Grains strung along a line, close and bright at the head (the right), thinning behind it.
+        static PixelImage Grains(Rgba[] r, int length, int frame)
+        {
+            length = Math.Clamp(length, 4, 48);
+            var image = new PixelImage(length, 5);
+            for (int x = 0; x < length; x++)
+            {
+                float along = x / (float)(length - 1);
+                for (int row = 0; row < 5; row++)
+                {
+                    int away = Math.Abs(row - 2);
+                    // More of them near the head and near the middle of the pour.
+                    float chance = along * along * (away == 0 ? 0.95f : away == 1 ? 0.6f : 0.22f);
+                    if (Noise(x + (frame & 3) * 5, row, 77 + length) >= chance) continue;
+                    image[x, row] = away == 0 && along > 0.75f ? r[0] : Noise(x, row, 78) < 0.5f ? r[1] : away == 2 ? r[3] : r[2];
                 }
             }
             return image;

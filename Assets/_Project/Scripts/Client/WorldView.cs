@@ -657,6 +657,7 @@ namespace Game.Client
             UpdateFlashes(deltaTime);
             UpdateBlasts(deltaTime);
             DrawMonsterFx(deltaTime);
+            DrawBossFx(deltaTime);
             UpdateSkillFx(deltaTime);
             UpdateWaves(deltaTime);
             UpdateTracers(deltaTime);
@@ -1342,6 +1343,7 @@ namespace Game.Client
                     continue;
                 }
                 if (!FlyingGob(mark, hazard, view.Progress)) FallingRock(mark, hazard, view.Progress);
+                BossWarnExtras(hazard, view.Progress);
                 // The shape itself on the pixel grid: a two-pixel edge from the start, stripes over what has filled,
                 // the whole of it blinking at the last (E1, WorldView.Hazards.cs). Its size is the judged size.
                 DrawWarn(mark, hazard, view.Progress);
@@ -1378,8 +1380,7 @@ namespace Game.Client
             }
             // A web or a pool of venom running out is no blow.
             if (!hazard.Harmful || IsPool(hazard)) return;
-            if (VeinEaterLanded(hazard) || KnightLanded(hazard) || SpiderLanded(hazard) || WardenLanded(hazard) || AntlionLanded(hazard) || CrystalQueenLanded(hazard) || GeneralLanded(hazard)) return;
-            BlastLanded(hazard);
+            BossBlow(hazard);
         }
 
         // A crop grows through four drawings on its patch of soil, and sways a little once ripe.

@@ -50,6 +50,12 @@ namespace Game.Client
                 return ShotPreview.Write(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out", "shot"),
                     TileArt.Ground(TileArt.Index(GroundKind.Floor, 0, 0))) ? 0 : 1;
             }
+            if (args.Length == 2 && args[0] == "--only" && args[1] == "bossfx")
+            {
+                // --only bossfx: the bosses' own effects over their blows' shapes (out/bossfx/, BossFxPreview, E6).
+                return BossFxPreview.Write(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out", "bossfx"),
+                    TileArt.Ground(TileArt.Index(GroundKind.Floor, 0, 0))) ? 0 : 1;
+            }
             if (args.Length == 2 && args[0] == "--only" && args[1] == "monsterfx")
             {
                 // --only monsterfx: just the ordinary monsters' warnings and effects (out/monsterfx/, MonsterFxPreview).

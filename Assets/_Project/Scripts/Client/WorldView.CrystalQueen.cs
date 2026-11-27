@@ -150,16 +150,14 @@ namespace Game.Client
             body.Top = -body.Feet + CrystalQueenArt.BodyTall / (float)Sprites.PixelsPerUnit;
         }
 
-        // The crown letting its light go: a flash over its head; thrown up into the roof for the rain and the hail.
+        // The crown letting its light go: a flash over its head and splinters of light; thrown up into the roof for the
+        // rain and the hail.
         void CrownFlares(Body body, BossAttack attack)
         {
             var crown = body.Position + new Vector3(0, 2.1f, 0);
+            bool up = attack != null && QueenStrikeAt(attack) < 1;
             AddFlash(crown, 1.4f, PrismWhite, FlashKind.Impact);
-            for (int i = 0; i < 6; i++)
-            {
-                var way = Quaternion.Euler(0, 0, i * 60 + Random.Range(-15f, 15f)) * Vector3.right;
-                Kick(crown, way + (attack != null && QueenStrikeAt(attack) < 1 ? Vector3.up * 2 : Vector3.zero), i % 2 == 0 ? CrystalPink : CrystalBlue, 1);
-            }
+            AddBossFx(BossFx.Spray, crown, new BossContext { Ramp = FxRamp.Crystal, Size = up ? 46 : 22, Count = up ? 8 : 6, Width = up ? 60 : 360, Dir = 90 });
             Hear(Sound.Zap, crown, 0.7f);
         }
 
@@ -171,7 +169,7 @@ namespace Game.Client
             {
                 var at = under + Quaternion.Euler(0, 0, 90 + i * 120) * Vector3.right * 1.6f;
                 AddFlash(at, 0.7f, CrystalPink, FlashKind.Burst);
-                Kick(at, Vector3.up, i % 2 == 0 ? CrystalPink : CrystalBlue, 3);
+                AddBossFx(BossFx.Spray, at, new BossContext { Ramp = i % 2 == 0 ? FxRamp.Crystal : FxRamp.Cold, Size = 14, Count = 4, Width = 120, Dir = 90 });
             }
             Hear(Sound.Break, under, 0.6f);
             Hear(Sound.Squelch, under, 0.5f);
@@ -224,22 +222,27 @@ namespace Game.Client
                 if (puff) Kick(feet, -moved, CrystalBlue, 2);
             }
             if (view.Phase >= 3 && puff && Random.value < 0.3f) Kick(crown, Vector3.up, CrystalPink, 1);
+            // Its heaviest (the rain, the hail, the crown's light): the room dims as the crown gathers, so the light
+            // that falls is the brightest thing on the screen, and comes back after.
+            bool gathers = view.BossState == BossState.Telegraph && attack != null && (attack.Id == "crystal_rain" || attack.Id == "shard_hail" || attack.Id == "venom_share");
+            if (gathers) Dim(0.25f * Mathf.Clamp01(since / 0.3f));
+            else if (_dim != null && _dim.color.a > 0) Dim(Mathf.Max(0, _dim.color.a - Time.deltaTime * 0.5f));
         }
 
-        // Where one of its blows lands, crystal of its own; false for anyone else's.
+        // Where one of its blows lands, crystal of its own over the blow's shape burning pink; false for anyone else's.
         bool CrystalQueenLanded(HazardState hazard)
         {
-            var attack = AttackOf(hazard);
-            if (attack == null || _bossInView?.Id != "crystal_queen") return false;
+            var (boss, id) = BlowOf(hazard);
+            if (boss != "crystal_queen") return false;
             var at = new Vector3(hazard.Position.X, hazard.Position.Y, 0);
-            var along = new Vector3(hazard.Direction.X, hazard.Direction.Y, 0);
-            switch (attack.Id)
+            var c = new BossContext { Ramp = FxRamp.Crystal, Dir = hazard.Direction.Angle * Mathf.Rad2Deg, Size = hazard.Size * Ppu, Width = hazard.Width * Ppu };
+            switch (id)
             {
                 case "bite":
                 {
-                    // The fangs closing: a white star and a spray of pink shards.
-                    AddFlash(at + along * hazard.Size * 0.5f, 1.2f, PrismWhite, FlashKind.Impact);
-                    Kick(at + along * hazard.Size * 0.6f, along, CrystalPink, 4);
+                    // The fangs closing: a white star, two cuts and a spray of pink shards on past them.
+                    BlastLanded(hazard, FxRamp.Crystal, sparks: false, light: false);
+                    AddBossFx(BossFx.Fangs, at, c);
                     if (Settings.ScreenShake && Feel.HitStop) _hitStop = Mathf.Max(_hitStop, 0.06f);
                     Hear(Sound.Bite, at, 0.9f);
                     return true;
@@ -247,27 +250,26 @@ namespace Game.Client
                 case "crystal_rain":
                 case "shard_hail":
                 {
-                    // A shard falling out of the roof and shattering.
-                    bool hard = attack.Id == "shard_hail";
-                    AddFlash(at, hazard.Size * 1.2f, CrystalBlue, FlashKind.Burst);
-                    Kick(at, Vector3.up, CrystalPink, hard ? 5 : 3);
-                    Kick(at, Vector3.up, CrystalBlue, hard ? 4 : 2);
+                    // A crystal out of the roof: it stands in the floor a moment, splinters round it, and shatters.
+                    bool hard = id == "shard_hail";
+                    c.Big = hard;
+                    BlastLanded(hazard, FxRamp.Crystal, sparks: false, chunks: false, light: false, wave: false);
+                    AddBossFx(BossFx.ShardFall, at, c);
                     if (Settings.ScreenShake) _shake = Mathf.Max(_shake, hard ? 0.22f : 0.12f);
                     Hear(Sound.Ice, at, 0.8f);
-                    if (hard) ScreenFlash(new Color(1, 0.85f, 0.95f, 0.2f), 0.1f);
+                    if (hard) ScreenFlash(new Color(1, 0.85f, 0.95f, 0.2f), 0.05f);
                     return true;
                 }
                 case "web_quake":
                 case "crystal_ripple":
                 {
-                    // The floor ringing: a ring of crystal shards standing up and breaking.
-                    float radius = attack.Shape == AttackShape.Ring ? (attack.Radius + attack.Length) / 2 : hazard.Size;
-                    for (int i = 0; i < 10; i++)
-                    {
-                        var dir = Quaternion.Euler(0, 0, i * 36 + Random.Range(-10f, 10f)) * Vector3.right;
-                        Kick(at + dir * radius, dir + Vector3.up * 0.6f, i % 2 == 0 ? CrystalPink : CrystalBlue, 1);
-                    }
-                    AddFlash(at, attack.Shape == AttackShape.Ring ? attack.Length : hazard.Size * 1.2f, CrystalBlue, FlashKind.Ring);
+                    // The floor ringing: crystals stand up round it and break. The ripple's stand near its inner edge
+                    // and its wave runs on out.
+                    bool ring = hazard.Shape == HazardShape.Ring;
+                    BlastLanded(hazard, FxRamp.Crystal, sparks: false, light: false, wave: ring);
+                    if (ring) c.Inner = Mathf.Lerp(hazard.Width, hazard.Size, 0.3f) * Ppu;
+                    else c.Size *= 0.86f;
+                    AddBossFx(BossFx.CrystalRing, at, c);
                     if (Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.18f);
                     Hear(Sound.Ice, at, 0.7f);
                     return true;
@@ -275,29 +277,26 @@ namespace Game.Client
                 case "crystal_cross":
                 case "crystal_lattice":
                 {
-                    // Beams of light split through crystal: glints along every arm.
-                    for (int arm = 0; arm < 4; arm++)
-                    {
-                        var dir = Quaternion.Euler(0, 0, attack.Angle + arm * 90) * Vector3.right;
-                        for (float d = 1; d < attack.Length; d += 1.5f) AddFlash(at + dir * d, 0.5f, arm % 2 == 0 ? PrismWhite : CrystalPink, FlashKind.Impact);
-                    }
-                    AddFlash(at, 1.4f, PrismWhite, FlashKind.Burst);
+                    // A beam of light split through crystal along each arm.
+                    BlastLanded(hazard, FxRamp.Crystal, sparks: false, chunks: false);
+                    AddBossFx(BossFx.Beam, at, c);
                     if (Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.15f);
                     Hear(Sound.Zap, at, 0.9f);
                     return true;
                 }
                 case "venom_share":
                 {
-                    // The crown's light coming down as a column on the gold circle.
-                    AddFlash(at, hazard.Size * 1.3f, PrismWhite, FlashKind.Burst);
-                    AddFlash(at, hazard.Size, CrystalPink, FlashKind.Ring);
-                    Kick(at, Vector3.up, PrismWhite, 5);
+                    // The crown's light coming down as a column on the gold circle (which burns gold, as it warned).
+                    BlastLanded(hazard, null, sparks: false, chunks: false, light: false);
+                    AddBossFx(BossFx.Column, at, c);
                     if (Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.2f);
                     Hear(Sound.Nova, at, 0.8f);
                     return true;
                 }
             }
-            return false;
+            // Any other of its blows: the shared landing, in crystal.
+            BlastLanded(hazard, FxRamp.Crystal);
+            return true;
         }
 
         // ---- Its fall: the legs give way and fold over it like the silk mother's, but the crystal does not grey and
@@ -347,11 +346,8 @@ namespace Game.Client
                 fall.Shattered = true;
                 AddFlash(at + new Vector3(0, 0.8f, 0), 3f, PrismWhite, FlashKind.Burst);
                 AddFlash(at, 3.4f, CrystalPink, FlashKind.Ring);
-                for (int i = 0; i < 14; i++)
-                {
-                    var way = Quaternion.Euler(0, 0, i * 360f / 14 + Random.Range(-10f, 10f)) * Vector3.right;
-                    Kick(at + way * 0.4f + new Vector3(0, 0.7f, 0), way + Vector3.up * 0.7f, i % 2 == 0 ? CrystalPink : CrystalBlue, 2);
-                }
+                AddBossFx(BossFx.Spray, at + new Vector3(0, 0.7f, 0), new BossContext { Ramp = FxRamp.Crystal, Size = 52, Count = 16 });
+                AddBossFx(BossFx.Spray, at + new Vector3(0, 0.7f, 0), new BossContext { Ramp = FxRamp.Cold, Size = 30, Count = 12 });
                 if (Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.35f);
                 Hear(Sound.Ice, at, 1);
                 Hear(Sound.Break, at, 0.9f);

@@ -20,7 +20,8 @@ namespace Game.Client
         Smoke,
         // An explosion's ball: frames 0 to 5 from a bright core to dark scraps.
         Blob,
-        // A sharp crystal pointing +x, size its length; frame 1 is a lance with a bright spine.
+        // A sharp crystal pointing +x, size its length; frame 1 is a lance with a bright spine, frame 2 a stout gem
+        // with a dark rim.
         Shard,
         // A jagged bolt along +x, size its length; frames 0 to 5 are different bolts, +8 a thick one,
         // +16 one with a halo in the element's turned colour.
@@ -101,6 +102,17 @@ namespace Game.Client
         // A blade's smear round +x: thick and pale at its head, thinning behind to dots. Size its radius, frame how
         // many degrees wide.
         Smear,
+
+        // ---- the bosses' own effects (E6, Docs/EffectsRework.md 11; drawn in SkillFxArt.Layers) ----
+
+        // A stretch of a beam of light along +x, 32 pixels long so stretches laid end to end join: a pale core inside
+        // two shells, its edges rippling. Size how thick it is, frames 0 to 3 the ripple running along it.
+        Beam,
+        // A spear pointing +x, size its length: a thin shaft and a leaf of a head. Frame 1 is its afterimage.
+        Spear,
+        // Sand pouring: a streak of grains along +x, thick at its head and scattering behind. Size its length,
+        // frames 0 to 3 the grains running.
+        Grains,
     }
 
     // An element's colours, dark to core.
@@ -123,6 +135,10 @@ namespace Game.Client
         Danger,
         Violet,
         Plain,
+        // The bosses' own elements (E6, Docs/EffectsRework.md 11): the pink of the crystal queen's light and the
+        // warm yellow of the antlion's sand.
+        Crystal,
+        Sand,
     }
 
     static partial class SkillFxArt
@@ -145,6 +161,8 @@ namespace Game.Client
             new[] { Rgba.Hex("#8A1E1A"), Rgba.Hex("#E03A30"), Rgba.Hex("#FF5A48"), Rgba.Hex("#FFC8B8") },
             new[] { Rgba.Hex("#4A2A8A"), Rgba.Hex("#9058E0"), Rgba.Hex("#C49CFF"), Rgba.Hex("#F0E4FF") },
             new[] { Rgba.Hex("#5E5E5E"), Rgba.Hex("#A8A8A8"), Rgba.Hex("#E0E0E0"), Rgba.Hex("#FFFFFF") },
+            new[] { Rgba.Hex("#A84AC0"), Rgba.Hex("#F07CD0"), Rgba.Hex("#FFC0E8"), Rgba.Hex("#FFF4FF") },
+            new[] { Rgba.Hex("#8A6A32"), Rgba.Hex("#C8A050"), Rgba.Hex("#E8CC84"), Rgba.Hex("#FFF0C0") },
         };
 
         public static Rgba[] Ramp(FxRamp ramp) => Ramps[(int)ramp];
@@ -198,6 +216,9 @@ namespace Game.Client
                 case FxShape.Lump: return Lump(Ramp5(ramp), size, frame);
                 case FxShape.Wash: return Wash(Ramp5(ramp), size, frame);
                 case FxShape.Smear: return Smear(Ramp5(ramp), size, frame);
+                case FxShape.Beam: return Beam(Ramp5(ramp), size, frame);
+                case FxShape.Spear: return Spear(Ramp5(ramp), size, frame);
+                case FxShape.Grains: return Grains(Ramp5(ramp), size, frame);
                 default: return null;
             }
         }
@@ -332,7 +353,7 @@ namespace Game.Client
         // A kite: widest a third along, light above its spine and mid below, its tip the brightest pixels.
         static PixelImage Shard(Rgba[] r, int length, int kind)
         {
-            int half = Math.Max(1, length / (kind == 1 ? 8 : 6));
+            int half = Math.Max(1, length / (kind == 1 ? 8 : kind == 2 ? 4 : 6));
             var image = new PixelImage(length, 2 * half + 1);
             float widest = length * 0.35f;
             for (int x = 0; x < length; x++)
@@ -342,7 +363,7 @@ namespace Game.Client
                 for (int dy = -rows; dy <= rows; dy++)
                 {
                     bool tip = x >= length - Math.Max(2, length / 4);
-                    image[x, half + dy] = x < 1 && length > 4 ? r[0] : dy == 0 ? (tip || kind == 1 && x > length / 2 ? r[3] : r[2]) : dy < 0 ? r[2] : r[1];
+                    image[x, half + dy] = kind == 2 && rows > 1 && Math.Abs(dy) == rows ? r[0] : x < 1 && length > 4 ? r[0] : dy == 0 ? (tip || kind == 1 && x > length / 2 ? r[3] : r[2]) : dy < 0 ? r[2] : r[1];
                 }
             }
             return image;

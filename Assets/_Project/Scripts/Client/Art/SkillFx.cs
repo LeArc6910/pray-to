@@ -283,7 +283,7 @@ namespace Game.Client
         }
 
         // Flames left burning on the floor a while after a blast, shrinking as they go out.
-        static void Flames(List<FxStamp> o, int count, float t, float from, float until, float R, int seed, float cx = 0, float cy = 0)
+        internal static void Flames(List<FxStamp> o, int count, float t, float from, float until, float R, int seed, float cx = 0, float cy = 0)
         {
             for (int i = 0; i < count; i++)
             {
@@ -298,7 +298,7 @@ namespace Game.Client
         // Crystals standing round the edge of a reach as the wave gets there, each leaning out from the middle and up
         // a little (as a thing standing on a floor does, seen from above), tall and short by turns; they hold until
         // breaks, then fall in two pieces each until over.
-        static void Crystals(List<FxStamp> o, FxRamp ramp, int count, float t, float from, float breaks, float over, float R, int tall, int seed)
+        internal static void Crystals(List<FxStamp> o, FxRamp ramp, int count, float t, float from, float breaks, float over, float R, int tall, int seed)
         {
             for (int i = 0; i < count; i++)
             {
@@ -323,7 +323,7 @@ namespace Game.Client
         }
 
         // The element lying over the floor out to the reach, spreading fast, with pale veins running out through it.
-        static void Floor(List<FxStamp> o, FxRamp ramp, int veins, float t, float from, float until, float R, int seed)
+        internal static void Floor(List<FxStamp> o, FxRamp ramp, int veins, float t, float from, float until, float R, int seed)
         {
             if (!In(t, from, until)) return;
             float grow = Out(U(t, from, from + 0.22f)), left = U(until - t, 0, 0.3f);

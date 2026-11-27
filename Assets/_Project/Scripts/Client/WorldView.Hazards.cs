@@ -69,7 +69,8 @@ namespace Game.Client
         public void EndStagedWarnings(bool land, int count = int.MaxValue)
         {
             count = Mathf.Min(count, _stagedMarks.Count);
-            if (land) for (int i = 0; i < count; i++) if (_stagedMarks[i].State.Harmful) BlastLanded(_stagedMarks[i].State);
+            if (land) for (int i = 0; i < count; i++) if (_stagedMarks[i].State.Harmful) BossBlow(_stagedMarks[i].State);
+            for (int i = 0; i < count; i++) _stagedAs.Remove(_stagedMarks[i].State.Id);
             _stagedMarks.RemoveRange(0, count);
         }
 
@@ -171,13 +172,23 @@ namespace Game.Client
             };
         }
 
+        // A boss's blow: its own effect where it has one (each *Landed lays the shared landing under it), else the
+        // shared landing alone.
+        void BossBlow(HazardState hazard)
+        {
+            if (VeinEaterLanded(hazard) || KnightLanded(hazard) || SpiderLanded(hazard) || WardenLanded(hazard) || AntlionLanded(hazard) || CrystalQueenLanded(hazard) || GeneralLanded(hazard)) return;
+            BlastLanded(hazard);
+        }
+
         // The blow lands in the warning's own shape: a white flash, the shape burning the way it reads, a shockwave,
-        // sparks with tails, bits of the floor, dust, a scar and a light.
-        void BlastLanded(HazardState hazard)
+        // sparks with tails, bits of the floor, dust, a scar and a light. A boss with an element of its own burns the
+        // shape in that element's colours (E6) and may leave the sparks, the bits, the light or the wave to its own
+        // effect laid over this.
+        void BlastLanded(HazardState hazard, FxRamp? element = null, bool sparks = true, bool chunks = true, bool light = true, bool wave = true)
         {
             var field = FieldOf(hazard);
             var tone = ToneOf(hazard);
-            var ramp = HazardArt.Tone(tone);
+            var ramp = element.HasValue ? SkillFxArt.Ramp5(element.Value) : HazardArt.Tone(tone);
             var at = new Vector3(hazard.Position.X, hazard.Position.Y, 0);
             var stuff = StuffAt(hazard.Position);
             int pieces = 0;
@@ -202,7 +213,7 @@ namespace Game.Client
             pieces++;
 
             var bright = Tint(ramp[0], 0.95f);
-            if (field.Form == HazardForm.Circle || field.Form == HazardForm.Donut)
+            if (wave && (field.Form == HazardForm.Circle || field.Form == HazardForm.Donut))
             {
                 Shockwave(at, hazard.Size * 1.15f, bright, bold: hazard.Size >= 2.5f);
                 pieces++;
@@ -214,7 +225,7 @@ namespace Game.Client
             }
 
             // A short light where it fell (the light map's, no blending of its own): along a line, three of them.
-            int lights = field.Form == HazardForm.Band ? Mathf.Min(BlastMostLights, Mathf.Max(1, Mathf.RoundToInt(hazard.Size / 3))) : 1;
+            int lights = !light ? 0 : field.Form == HazardForm.Band ? Mathf.Min(BlastMostLights, Mathf.Max(1, Mathf.RoundToInt(hazard.Size / 3))) : 1;
             for (int i = 0; i < lights; i++)
             {
                 var where = field.Form == HazardForm.Band ? hazard.Position + hazard.Direction * (hazard.Size * (i + 0.5f) / lights)
@@ -227,13 +238,13 @@ namespace Game.Client
             {
                 // More for a bigger blow, within the limit.
                 float girth = field.Form == HazardForm.Band ? hazard.Size / 2 : field.Form == HazardForm.Cone ? hazard.Size * 0.6f : hazard.Size;
-                int sparks = Mathf.Clamp(Mathf.RoundToInt(5 + girth * 2.5f), 6, 14);
-                int chunks = Mathf.Clamp(Mathf.RoundToInt(3 + girth * 1.5f), 4, 9);
-                int puffs = HazardArt.Dusty(stuff) ? Mathf.Clamp(Mathf.RoundToInt(2 + girth), 3, 6) : 0;
-                var sparkSprite = Sprites.Centered($"fx/hazard/spark/{(int)tone}", () => HazardArt.Spark(HazardArt.Tone(tone)[0], HazardArt.Tone(tone)[2]));
-                for (int i = 0; i < sparks && pieces < BlastMostPieces; i++, pieces++)
+                int sparkCount = sparks ? Mathf.Clamp(Mathf.RoundToInt(5 + girth * 2.5f), 6, 14) : 0;
+                int chunkCount = chunks ? Mathf.Clamp(Mathf.RoundToInt(3 + girth * 1.5f), 4, 9) : 0;
+                int puffs = chunks && HazardArt.Dusty(stuff) ? Mathf.Clamp(Mathf.RoundToInt(2 + girth), 3, 6) : 0;
+                var sparkSprite = Sprites.Centered(element.HasValue ? $"fx/hazard/spark/e{(int)element.Value}" : $"fx/hazard/spark/{(int)tone}", () => HazardArt.Spark(ramp[0], ramp[2]));
+                for (int i = 0; i < sparkCount && pieces < BlastMostPieces; i++, pieces++)
                 {
-                    var (from, way) = BlastEdge(hazard, (i + Random.value * 0.6f) / sparks, i);
+                    var (from, way) = BlastEdge(hazard, (i + Random.value * 0.6f) / sparkCount, i);
                     var renderer = Renderer(_root.transform, "Spark", sparkSprite, Color.white);
                     renderer.transform.localPosition = from;
                     renderer.transform.localRotation = Quaternion.Euler(0, 0, Mathf.Atan2(way.y, way.x) * Mathf.Rad2Deg);
@@ -241,9 +252,9 @@ namespace Game.Client
                     // They slow as they go.
                     _bits.Add(new Bit { Renderer = renderer, Velocity = way * Random.Range(4.5f, 8f), Color = Color.white, Life = Random.Range(0.36f, 0.56f), Drag = 5, LateFade = true });
                 }
-                for (int i = 0; i < chunks && pieces < BlastMostPieces; i++, pieces++)
+                for (int i = 0; i < chunkCount && pieces < BlastMostPieces; i++, pieces++)
                 {
-                    var (from, way) = BlastEdge(hazard, (i + 0.5f) / chunks, i + 1);
+                    var (from, way) = BlastEdge(hazard, (i + 0.5f) / chunkCount, i + 1);
                     int variant = (hazard.Id + i) % HazardArt.Chunks;
                     var renderer = Renderer(_root.transform, "Chunk", Sprites.Centered($"fx/hazard/chunk/{(int)stuff}/{variant}", () => HazardArt.Chunk(stuff, variant)), Color.white);
                     // From inside the shape, thrown up and out, falling back.

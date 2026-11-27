@@ -285,6 +285,9 @@ namespace Game.Client
                         _ => HazardShape.Circle,
                     };
                     float warnTurn = Float(words[6]) * Mathf.Deg2Rad;
+                    // ... <boss> <attack> after them: laid as that boss's attack, so it lands with the boss's own effect
+                    // (WorldView.BossFx.cs, E6).
+                    if (words.Length > 9) root.View.StageWarningAs(words[8], words[9]);
                     root.View.StageWarning(warnShape, player.Position + new Vec2(Float(words[2]), Float(words[3])), new Vec2(Mathf.Cos(warnTurn), Mathf.Sin(warnTurn)),
                         Float(words[4]), Float(words[5]), words[1] != "path", Float(words[7]));
                     return null;

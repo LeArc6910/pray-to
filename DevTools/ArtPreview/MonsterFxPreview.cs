@@ -599,7 +599,7 @@ namespace Game.Client
 
         // A piece laid on the picture as a sprite would be: centred on its place, turned without smoothing, in its
         // monster's colour when it is one of the greys.
-        static void Blit(PixelImage image, float originX, float originY, FxStamp stamp)
+        internal static void Blit(PixelImage image, float originX, float originY, FxStamp stamp)
         {
             var piece = SkillFxArt.Draw(stamp.Shape, stamp.Ramp, stamp.Size, stamp.Frame);
             if (piece == null) return;
