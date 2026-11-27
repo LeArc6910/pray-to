@@ -172,12 +172,12 @@ namespace Game.Client
                     case AntlionPose.Scoop:
                     case AntlionPose.Plow:
                         // Sand heaped up on its head.
-                        if (puff) Kick(feet + ahead * 1.2f, Vector3.up * 0.5f + ahead * 0.3f, SandColor, 1);
+                        if (puff) Chips(feet + ahead * 1.2f, Vector3.up * 0.5f + ahead * 0.3f, FxRamp.Sand, 1);
                         break;
                     case AntlionPose.Dig:
                     case AntlionPose.Dive:
                         // Sand raked out behind it.
-                        if (puff) Kick(feet - ahead * 0.8f + (Vector3)(Random.insideUnitCircle * 0.5f), -ahead + Vector3.up * 0.4f, SandColor, 2);
+                        if (puff) Chips(feet - ahead * 0.8f + (Vector3)(Random.insideUnitCircle * 0.5f), -ahead + Vector3.up * 0.4f, FxRamp.Sand, 2, 18);
                         break;
                     case AntlionPose.Sink:
                     case AntlionPose.Submerge:
@@ -185,7 +185,7 @@ namespace Game.Client
                         if (puff)
                         {
                             var from = feet + (Vector3)(Random.insideUnitCircle.normalized * 1.8f);
-                            Kick(from, feet - from, SandColor, 1);
+                            Chips(from, feet - from, FxRamp.Sand, 1, 20, 20);
                         }
                         if (windUp == AntlionPose.Submerge && Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.02f + 0.08f * progress);
                         break;
@@ -194,7 +194,7 @@ namespace Game.Client
                         if (puff)
                         {
                             float a = Time.time * 9;
-                            Kick(feet + new Vector3(Mathf.Cos(a), Mathf.Sin(a) * 0.5f, 0) * 1.6f, Vector3.up, SandColor, 1);
+                            Chips(feet + new Vector3(Mathf.Cos(a), Mathf.Sin(a) * 0.5f, 0) * 1.6f, new Vector3(-Mathf.Sin(a), Mathf.Cos(a) * 0.5f + 0.6f, 0), FxRamp.Sand, 1, 18, 20);
                         }
                         break;
                 }
@@ -205,97 +205,83 @@ namespace Game.Client
                 var moved = body.Position - body.LastPosition;
                 if (puff)
                 {
-                    Kick(feet, -moved + Vector3.up * 0.3f, SandColor, 3);
+                    Chips(feet, -moved + Vector3.up * 0.3f, FxRamp.Sand, 3, 20);
                     if (Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.05f);
                     Hear(Sound.Dig, feet, 0.4f);
                 }
             }
         }
 
-        // Where one of its blows lands, a burst of its own; false for anyone else's.
+        // Where one of its blows lands, sand of its own over the blow's shape; false for anyone else's.
         bool AntlionLanded(HazardState hazard)
         {
-            var attack = AttackOf(hazard);
-            if (attack == null || _bossInView?.Id != "antlion") return false;
+            var (boss, id) = BlowOf(hazard);
+            if (boss != "antlion") return false;
             var at = new Vector3(hazard.Position.X, hazard.Position.Y, 0);
             var along = new Vector3(hazard.Direction.X, hazard.Direction.Y, 0);
-            switch (attack.Id)
+            var c = new BossContext { Ramp = FxRamp.Sand, Dir = hazard.Direction.Angle * Mathf.Rad2Deg, Size = hazard.Size * Ppu, Width = hazard.Width * Ppu };
+            switch (id)
             {
                 case "bite":
-                {
-                    // The jaws snapping shut on the sand ahead: a spray and a short stop.
-                    for (float a = -attack.Angle / 2; a <= attack.Angle / 2; a += 22)
-                    {
-                        var dir = Quaternion.Euler(0, 0, a) * along;
-                        Kick(at + dir * hazard.Size * 0.7f, dir, SandColor, 2);
-                    }
+                    // The jaws snapping shut on the sand ahead: sand sprayed on through the wedge and a short stop.
+                    BlastLanded(hazard, FxRamp.Sand, sparks: false, light: false);
+                    c.Width = hazard.Width;
+                    AddBossFx(BossFx.SandBurst, at, c);
                     AddFlash(at + along * hazard.Size * 0.5f, 1.2f, Color.white, FlashKind.Impact);
                     if (Settings.ScreenShake && Feel.HitStop) _hitStop = Mathf.Max(_hitStop, 0.07f);
                     if (Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.2f);
                     Hear(Sound.Bite, at, 1);
                     return true;
-                }
                 case "sand_jet":
-                    // A jet of sand along the line.
-                    for (float d = 0.5f; d < attack.Length; d += 1.2f) Kick(at + along * d, along + Vector3.up * 0.3f, SandColor, 1);
-                    AddFlash(at + along * attack.Length * 0.5f, attack.Width * 1.5f, SandColor, FlashKind.Burst);
+                    // A jet of sand along the line: streams of grains driven down it.
+                    BlastLanded(hazard, FxRamp.Sand, sparks: false, chunks: false, light: false);
+                    AddBossFx(BossFx.SandJet, at, c);
                     Hear(Sound.Splash, at, 0.6f);
                     return true;
                 case "pit":
                 case "sinkholes":
-                    // The floor sliding into a funnel: sand pouring down a whirl; the cave-in's hardest.
-                    AddFlash(at, hazard.Size * 1.4f, SandColor, FlashKind.Vortex);
-                    AddFlash(at, hazard.Size * 1.1f, SandDarkColor, FlashKind.Ring);
-                    for (int i = 0; i < 8; i++)
-                    {
-                        var dir = Quaternion.Euler(0, 0, i * 45) * Vector3.right;
-                        Kick(at + dir * hazard.Size, -dir + Vector3.up * 0.2f, SandColor, 1);
-                    }
-                    if (Settings.ScreenShake) _shake = Mathf.Max(_shake, attack.Id == "sinkholes" ? 0.3f : 0.18f);
+                    // The floor sliding into a funnel: grains running round and in, rings closing on a dark middle.
+                    BlastLanded(hazard, FxRamp.Sand, sparks: false, chunks: false, light: false, wave: false);
+                    AddBossFx(BossFx.Whirl, at, c);
+                    if (Settings.ScreenShake) _shake = Mathf.Max(_shake, id == "sinkholes" ? 0.3f : 0.18f);
                     Hear(Sound.Dig, at, 1);
                     Hear(Sound.Thump, at, 0.7f);
                     return true;
                 case "sand_trail":
-                    // Each burst of the furrow: sand flung up out of the floor.
-                    AddFlash(at, hazard.Size * 1.3f, SandColor, FlashKind.Burst);
-                    Kick(at, Vector3.up, SandColor, 4);
+                    // Each burst of the furrow: sand flung up out of the floor in a fan.
+                    BlastLanded(hazard, FxRamp.Sand, sparks: false, chunks: false, light: false, wave: false);
+                    c.Width = 0;
+                    AddBossFx(BossFx.SandBurst, at, c);
                     if (Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.12f);
                     Hear(Sound.Dig, at, 0.7f);
                     return true;
                 case "quicksand":
                 case "sand_ripple":
-                {
-                    // A ring of sand thrown out all round its edge.
-                    float inner = attack.Radius, outer = attack.Radius + 0.5f * (attack.Length - attack.Radius);
-                    for (int i = 0; i < 12; i++)
-                    {
-                        var dir = Quaternion.Euler(0, 0, i * 30 + Random.Range(-10f, 10f)) * Vector3.right;
-                        Kick(at + dir * Random.Range(inner, outer), dir + Vector3.up * 0.4f, SandColor, 1);
-                    }
-                    AddFlash(at, attack.Length, SandColor, FlashKind.Ring);
+                    // A ring of sand thrown out all round its band in streaks, over rolling dust.
+                    BlastLanded(hazard, FxRamp.Sand, sparks: false, chunks: false, light: false);
+                    c.Inner = hazard.Width * Ppu;
+                    AddBossFx(BossFx.Rumble, at, c);
                     if (Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.18f);
                     Hear(Sound.Dig, at, 0.8f);
                     return true;
-                }
                 case "sandstorm":
-                    // The front crashing down: sand blasted up where it is shared.
+                    // The front crashing down where it is shared (the gold circle burns gold): a whirl of sand thrown up.
+                    BlastLanded(hazard, null, sparks: false, chunks: false, light: false);
                     Impact(at, 0.9f);
-                    AddFlash(at, hazard.Size * 1.6f, SandColor, FlashKind.Vortex);
-                    Kick(at, Vector3.up, SandColor, 6);
+                    c.Big = true;
+                    AddBossFx(BossFx.Whirl, at, c);
                     return true;
                 case "sand_cross":
-                    // Sand sprayed out along the four arms.
-                    for (int i = 0; i < 4; i++)
-                    {
-                        var dir = Quaternion.Euler(0, 0, i * 90) * along;
-                        for (float d = 1; d < attack.Length; d += 1.5f) Kick(at + dir * d, dir + Vector3.up * 0.3f, SandColor, 1);
-                    }
-                    AddFlash(at, 1.4f, Color.white, FlashKind.Impact);
+                    // Sand driven out along the arm.
+                    BlastLanded(hazard, FxRamp.Sand, sparks: false, chunks: false, light: false);
+                    AddBossFx(BossFx.SandJet, at, c);
                     if (Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.2f);
                     Hear(Sound.Thump, at, 0.8f);
                     return true;
             }
-            return false;
+            // Any other of its blows: the shared landing, in sand.
+            BlastLanded(hazard, FxRamp.Sand, light: false);
+            return true;
         }
     }
 }

@@ -83,6 +83,14 @@ namespace Game.Client
             Add("stone", "shockwave", BossFx.Rumble, HazardForm.Donut, 5f, 2f, 0, dust, r => { r.Context.Inner = 2 * T; (r.Wide, r.Tall, r.AtY) = (184, 184, 0.5f); });
             Add("stone", "rock_trail", BossFx.Spike, HazardForm.Circle, 1.1f, 0, 0, dust);
             Add("stone", "stones", BossFx.Cinders, HazardForm.Circle, 1, 0, 0, dust, r => { r.NoShape = true; r.Tall = 64; r.Context = new BossContext { Ramp = dust, Size = 28, Count = 8, Width = 360, Dir = 90, Seed = 4 }; });
+            var sand = FxRamp.Sand;
+            Add("antlion", "bite", BossFx.SandBurst, HazardForm.Cone, 3.2f, 90, 0, sand, r => { r.Context.Width = 90; r.AtX = 0.25f; r.AtY = 0.5f; });
+            Add("antlion", "sand_jet", BossFx.SandJet, HazardForm.Band, 10f, 1.4f, 0, sand, r => { r.Wide = 184; r.Tall = 64; r.AtX = 0.06f; r.AtY = 0.5f; });
+            Add("antlion", "pit", BossFx.Whirl, HazardForm.Circle, 2.2f, 0, 0, sand);
+            Add("antlion", "sandstorm", BossFx.Whirl, HazardForm.Circle, 1.8f, 0, 0, null, r => { r.Tone = WarnTone.Gather; r.Context.Ramp = sand; r.Context.Big = true; });
+            Add("antlion", "sand_trail", BossFx.SandBurst, HazardForm.Circle, 1.1f, 0, 0, sand, r => r.Context.Width = 0);
+            Add("antlion", "quicksand", BossFx.Rumble, HazardForm.Donut, 6f, 2.4f, 0, sand, r => { r.Context.Inner = 2.4f * T; (r.Wide, r.Tall, r.AtY) = (216, 216, 0.5f); });
+            Add("antlion", "sand", BossFx.Cinders, HazardForm.Circle, 1, 0, 0, sand, r => { r.NoShape = true; r.Tall = 48; r.Context = new BossContext { Ramp = sand, Size = 20, Count = 3, Dir = 120, Seed = 4 }; });
             return rows;
         }
 

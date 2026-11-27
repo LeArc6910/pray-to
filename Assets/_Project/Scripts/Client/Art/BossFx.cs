@@ -55,6 +55,17 @@ namespace Game.Client
         Rumble,
         // Stone bursting up through the floor: a spike that stands a moment and crumbles. Size its radius.
         Spike,
+
+        // ---- the antlion ----
+        // A jet of sand along a line: streams of grains running down it, grains scattered off its sides, dust where
+        // it ends. Size its length, Width how wide, Dir its way.
+        SandJet,
+        // The floor sliding into a funnel: grains running round and in, broken rings closing, a dark middle. Size its
+        // radius. Big: the storm's front, thrown up as well.
+        Whirl,
+        // Sand flung up out of the floor in a fan, falling back, over rolling dust. Size its radius; Width, if set,
+        // the fan is thrown along Dir over that many degrees instead of straight up.
+        SandBurst,
     }
 
     // What one of the bosses' effects is told. Lengths in pixels, angles in degrees.
@@ -118,6 +129,9 @@ namespace Game.Client
                 case BossFx.Sweep: life = Sweep(c, t, o); break;
                 case BossFx.Rumble: life = Rumble(c, t, o); break;
                 case BossFx.Spike: life = Spike(c, t, o); break;
+                case BossFx.SandJet: life = SandJet(c, t, o); break;
+                case BossFx.Whirl: life = Whirl(c, t, o); break;
+                case BossFx.SandBurst: life = SandBurst(c, t, o); break;
                 default: return false;
             }
             return t < life;
@@ -574,6 +588,12 @@ namespace Game.Client
                 if (p < 0 || p >= 1) continue;
                 float dir = (i + 0.5f * Rnd(c.Seed, i, 26)) * 360f / count + 13, far = mid + (outer - mid) * 0.6f * p;
                 float x = Cos(dir) * far, y = Sin(dir) * far * 0.95f;
+                if (m == FxRamp.Sand)
+                {
+                    // Sand is thrown out along the floor in streaks, not up in stones.
+                    Put(o, FxShape.Grains, m, 12 + 4 * (i & 1), (int)(t * 12) + i, x, y + 5 * p * (1 - p) * 4, 1 - p * p, dir);
+                    continue;
+                }
                 Put(o, FxShape.Shadow, FxRamp.Smoke, 4, 0, x, y - 1, 0.7f, 0, true);
                 Put(o, FxShape.Chunk, FxRamp.Dust, 3 + (i & 1), 4 + (i & 3), x, y + 4 * (9 + 8 * Rnd(c.Seed, i, 27)) * p * (1 - p));
             }
@@ -609,6 +629,100 @@ namespace Game.Client
                 }
             }
             return 1.0f;
+        }
+
+        // ---- the antlion ----
+
+        static float SandJet(in BossContext c, float t, List<FxStamp> o)
+        {
+            const float life = 0.6f;
+            var m = c.Ramp;
+            float L = Math.Max(24, c.Size), W = Math.Max(8, c.Width), dx = Cos(c.Dir), dy = Sin(c.Dir), left = U(life - t, 0, 0.25f);
+            int each = Math.Clamp((int)(L / 40), 2, 5);
+            // Three streams side by side, each a run of streaks driven down the line.
+            for (int lane = -1; lane <= 1; lane++)
+            {
+                for (int k = 0; k < each; k++)
+                {
+                    float p = SkillFx.Frac(t * 2.6f + (k + 0.37f * (lane + 1)) / each), along = 12 + p * (L - 24), off = lane * W * 0.3f + 2 * Sin(p * 720 + k * 90);
+                    Put(o, FxShape.Grains, m, lane == 0 ? 32 : 24, (int)(t * 14) + k + lane, dx * along - dy * off, dy * along + dx * off, left * Math.Min(1, 4 * p) * Math.Min(1, 4 - 4 * p), c.Dir);
+                }
+            }
+            // Grains thrown off its sides, and dust where it runs out.
+            for (int i = 0; i < 8; i++)
+            {
+                float p = SkillFx.Frac(t * 2.2f + Rnd(c.Seed, i, 28)), along = Rnd(c.Seed, i, 29) * L, side = (i & 1) == 0 ? 1 : -1, off = side * (W / 2 + 10 * p);
+                Put(o, FxShape.Grains, m, 8, i, dx * along - dy * off, dy * along + dx * off + 5 * p * (1 - p), left * (1 - p), c.Dir + side * 50);
+            }
+            Dust(o, m, 4, t, 0.05f, 4, 12, c.Seed, c.Dir, 140, 0.5f);
+            for (int i = 0; i < 3; i++)
+            {
+                float p = (t - 0.08f - 0.05f * i) / 0.45f;
+                if (p < 0 || p >= 1) continue;
+                float turn = c.Dir + (i - 1) * 40;
+                PutLow(o, FxShape.Smoke, m, Even(10 + 6 * p), Math.Min(3, (int)(p * 4)), dx * L + Cos(turn) * 14 * Out(p), dy * L + Sin(turn) * 14 * Out(p), 0.8f * (1 - p));
+            }
+            return life;
+        }
+
+        static float Whirl(in BossContext c, float t, List<FxStamp> o)
+        {
+            const float life = 0.85f;
+            var m = c.Ramp;
+            float R = c.Size, left = U(life - t, 0, 0.3f), u = t / life;
+            // The hole in the middle and the rings closing on it.
+            Put(o, FxShape.Scorch, FxRamp.Smoke, SkillFxArt.Step4(R * (0.5f + 0.4f * Out(U(t, 0, 0.2f)))), 4 + (c.Seed & 3), 0, 0, 0.75f * left, 0, true);
+            int turn = (int)(t * 12);
+            Put(o, FxShape.Broken, m, SkillFxArt.Even(2 * R * (1 - 0.35f * u)), SkillFxArt.BrokenFrame(2, 5, turn), 0, 0, 0.9f * left, 0, true);
+            Put(o, FxShape.Broken, m, SkillFxArt.Even(2 * R * (0.62f - 0.3f * u)), SkillFxArt.BrokenFrame(1, 4, turn + 3), 0, 0, 0.8f * left, 0, true);
+            // Grains running round and in, faster as they near the middle.
+            int grains = c.Big ? 16 : 12;
+            for (int i = 0; i < grains; i++)
+            {
+                float p = SkillFx.Frac(t * 1.5f + (i * 7 % grains) / (float)grains), far = R * (1 - 0.82f * p), angle = i * 360f / grains + 380 * p * p + 60 * t;
+                Put(o, FxShape.Grains, m, 10 + 4 * (i & 1), (int)(t * 14) + i, Cos(angle) * far, Sin(angle) * far * 0.9f, left * Math.Min(1, 5 * p) * (1 - 0.5f * p), angle + 112);
+            }
+            Dust(o, m, 6, t, 0.02f, R * 0.85f, 10, c.Seed, 0, 360, 0.5f);
+            if (c.Big)
+            {
+                // The storm's front crashing down: sand thrown up off it as well.
+                for (int i = 0; i < 8; i++)
+                {
+                    float p = t / (0.4f + 0.15f * Rnd(c.Seed, i, 30));
+                    if (p >= 1) continue;
+                    float dir = 30 + i * 17;
+                    Put(o, FxShape.Grains, m, 12, i, Cos(dir) * R * 0.9f * Out(p), 4 + Sin(dir) * 34 * Out(p) - 26 * p * p, 1 - p * p, dir);
+                }
+            }
+            return life;
+        }
+
+        static float SandBurst(in BossContext c, float t, List<FxStamp> o)
+        {
+            var m = c.Ramp;
+            float R = c.Size;
+            bool thrown = c.Width > 0;
+            int count = thrown ? 9 : 8;
+            for (int i = 0; i < count; i++)
+            {
+                float own = 0.38f + 0.16f * Rnd(c.Seed, i, 31), p = t / own;
+                if (p >= 1) continue;
+                float turn = (i + 0.5f) / count - 0.5f;
+                if (thrown)
+                {
+                    float dir = c.Dir + turn * c.Width, far = R * (0.5f + 0.6f * Out(p));
+                    Put(o, FxShape.Grains, m, 12 + 4 * (i & 1), (int)(t * 14) + i, Cos(dir) * far, Sin(dir) * far + 22 * p * (1 - p), 1 - p * p, dir);
+                }
+                else
+                {
+                    float dir = 90 + turn * 130;
+                    Put(o, FxShape.Grains, m, 12 + 4 * (i & 1), (int)(t * 14) + i, Cos(dir) * R * 0.9f * Out(p), 3 + Sin(dir) * (26 + 10 * Rnd(c.Seed, i, 32)) * Out(p) - 24 * p * p, 1 - p * p, p < 0.55f ? dir : -dir);
+                }
+            }
+            if (thrown) Dust(o, m, 5, t, 0.02f, R * 0.75f, 12, c.Seed, c.Dir, c.Width, 0.5f);
+            else Dust(o, m, 5, t, 0.02f, R * 0.4f, R * 0.5f + 4, c.Seed, 0, 360, 0.5f);
+            if (!thrown && R * 2.2f <= 160) FxLayers.Shock(o, m, t, 0, R, 0, 0, 0.3f, true);
+            return 0.56f;
         }
     }
 }
