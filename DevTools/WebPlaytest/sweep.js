@@ -3277,7 +3277,7 @@ async function layers(browser) {
     await game.wait(400);
     await game.send(`skill ${Math.max(0, slot)}`);
     await pollState(game, st => st.projectiles > 0, 2000);
-    await game.wait(id === 'meteor' ? 250 : 120);
+    await game.wait(id === 'meteor' ? 40 : 120);
     await game.send('speed 0');
     const flying = await pollState(game, st => st.skillShots > 0 && st.skillFxLights > 0);
     check(flying.skillShots > 0 && flying.skillFxLights > 0, `${name}: 날아가는 동안 제 모습으로 그려지고 바닥을 밝힌다 (${flying.skillShots}발, 빛 ${flying.skillFxLights}개, 조각 ${flying.skillFxPieces}개)`);
