@@ -1,6 +1,6 @@
 # 녹음 효과음 출처 (2026-11-11)
 
-2차(2026-11-26, 효과음 더 많이와 배경음악·환경음)와 3차(2026-11-27, 빈칸 채우기)는 이 문서 아래 "2차"·"3차" 절에 있다.
+2차(2026-11-26, 효과음 더 많이와 배경음악·환경음)와 3차(2026-11-27, 빈칸 채우기)와 4차(2026-11-27, 장면을 보며 다시 고르기)는 이 문서 아래 "2차"·"3차"·"4차" 절에 있다.
 
 사람 요청 "걷는 사운드가 너무 시끄럽고 걷는 것 같지가 않아. 바닥 타일에 따라 소리가 달라졌으면 좋겠어. 무료로 공개되어 있는 효과음을 다운로드 받아서 사용해도 좋고 (다른 사운드도 이런 식으로)".
 
@@ -77,12 +77,12 @@ OpenGameArt 페이지에 CC0 외의 라이선스가 함께 붙은 팩(예: OGA-B
 | footstep_rock_2.wav | Fantozzi-StoneR1.flac | Fantozzi's Footsteps (Grass/Sand & Stone) | Fantozzi | https://opengameart.org/content/fantozzis-footsteps-grasssand-stone | CC0 1.0 |
 | footstep_rock_3.wav | Fantozzi-StoneL2.flac | Fantozzi's Footsteps (Grass/Sand & Stone) | Fantozzi | https://opengameart.org/content/fantozzis-footsteps-grasssand-stone | CC0 1.0 |
 | footstep_rock_4.wav | Fantozzi-StoneR2.flac | Fantozzi's Footsteps (Grass/Sand & Stone) | Fantozzi | https://opengameart.org/content/fantozzis-footsteps-grasssand-stone | CC0 1.0 |
-| footstep_dirt_1.wav | footstep00.ogg | RPG Audio (1.0) | Kenney | https://kenney.nl/assets/rpg-audio | CC0 1.0 |
-| footstep_dirt_2.wav | footstep01.ogg | RPG Audio (1.0) | Kenney | https://kenney.nl/assets/rpg-audio | CC0 1.0 |
-| footstep_dirt_3.wav | footstep02.ogg | RPG Audio (1.0) | Kenney | https://kenney.nl/assets/rpg-audio | CC0 1.0 |
-| footstep_dirt_4.wav | footstep03.ogg | RPG Audio (1.0) | Kenney | https://kenney.nl/assets/rpg-audio | CC0 1.0 |
-| footstep_dirt_5.wav | footstep06.ogg | RPG Audio (1.0) | Kenney | https://kenney.nl/assets/rpg-audio | CC0 1.0 |
-| footstep_dirt_6.wav | footstep07.ogg | RPG Audio (1.0) | Kenney | https://kenney.nl/assets/rpg-audio | CC0 1.0 |
+| footstep_dirt_1.wav (4차에서 바꿈) | footstep00.ogg | RPG Audio (1.0) | Kenney | https://kenney.nl/assets/rpg-audio | CC0 1.0 |
+| footstep_dirt_2.wav (4차에서 바꿈) | footstep01.ogg | RPG Audio (1.0) | Kenney | https://kenney.nl/assets/rpg-audio | CC0 1.0 |
+| footstep_dirt_3.wav (4차에서 바꿈) | footstep02.ogg | RPG Audio (1.0) | Kenney | https://kenney.nl/assets/rpg-audio | CC0 1.0 |
+| footstep_dirt_4.wav (4차에서 바꿈) | footstep03.ogg | RPG Audio (1.0) | Kenney | https://kenney.nl/assets/rpg-audio | CC0 1.0 |
+| footstep_dirt_5.wav (4차에서 바꿈) | footstep06.ogg | RPG Audio (1.0) | Kenney | https://kenney.nl/assets/rpg-audio | CC0 1.0 |
+| footstep_dirt_6.wav (4차에서 바꿈) | footstep07.ogg | RPG Audio (1.0) | Kenney | https://kenney.nl/assets/rpg-audio | CC0 1.0 |
 | footstep_wood_1.wav | footstep_wood_000.ogg | Impact Sounds (1.0) | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 |
 | footstep_wood_2.wav | footstep_wood_001.ogg | Impact Sounds (1.0) | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 |
 | footstep_wood_3.wav | footstep_wood_002.ogg | Impact Sounds (1.0) | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 |
@@ -106,19 +106,19 @@ OpenGameArt 페이지에 CC0 외의 라이선스가 함께 붙은 팩(예: OGA-B
 | footstep_grass_5.wav | footstep_grass_004.ogg | Impact Sounds (1.0) | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 |
 | footstep_leaves_1.wav | leaves01.ogg | Different steps on wood, stone, leaves, gravel and mud | TinyWorlds | https://opengameart.org/content/different-steps-on-wood-stone-leaves-gravel-and-mud | CC0 1.0 |
 | footstep_leaves_2.wav | leaves02.ogg | Different steps on wood, stone, leaves, gravel and mud | TinyWorlds | https://opengameart.org/content/different-steps-on-wood-stone-leaves-gravel-and-mud | CC0 1.0 |
-| footstep_metal_1.wav | metal_steps_01.wav | Metal footsteps on concrete | Thimras | https://opengameart.org/content/metal-footsteps-on-concrete | CC0 1.0 |
-| footstep_metal_2.wav | metal_steps_02.wav | Metal footsteps on concrete | Thimras | https://opengameart.org/content/metal-footsteps-on-concrete | CC0 1.0 |
-| footstep_metal_3.wav | metal_steps_04.wav | Metal footsteps on concrete | Thimras | https://opengameart.org/content/metal-footsteps-on-concrete | CC0 1.0 |
-| footstep_metal_4.wav | metal_steps_05.wav | Metal footsteps on concrete | Thimras | https://opengameart.org/content/metal-footsteps-on-concrete | CC0 1.0 |
+| footstep_metal_1.wav (4차에서 바꿈) | metal_steps_01.wav | Metal footsteps on concrete | Thimras | https://opengameart.org/content/metal-footsteps-on-concrete | CC0 1.0 |
+| footstep_metal_2.wav (4차에서 바꿈) | metal_steps_02.wav | Metal footsteps on concrete | Thimras | https://opengameart.org/content/metal-footsteps-on-concrete | CC0 1.0 |
+| footstep_metal_3.wav (4차에서 바꿈) | metal_steps_04.wav | Metal footsteps on concrete | Thimras | https://opengameart.org/content/metal-footsteps-on-concrete | CC0 1.0 |
+| footstep_metal_4.wav (4차에서 바꿈) | metal_steps_05.wav | Metal footsteps on concrete | Thimras | https://opengameart.org/content/metal-footsteps-on-concrete | CC0 1.0 |
 | footstep_water_1.wav | sfx100v2_footstep_wet_01.ogg | 100 CC0 SFX #2 | rubberduck | https://opengameart.org/content/100-cc0-sfx-2 | CC0 1.0 |
 | footstep_water_2.wav | sfx100v2_footstep_wet_02.ogg | 100 CC0 SFX #2 | rubberduck | https://opengameart.org/content/100-cc0-sfx-2 | CC0 1.0 |
 | footstep_water_3.wav | sfx100v2_footstep_wet_03.ogg | 100 CC0 SFX #2 | rubberduck | https://opengameart.org/content/100-cc0-sfx-2 | CC0 1.0 |
-| footstep_carpet_1.wav | footstep_carpet_000.ogg | Impact Sounds (1.0) | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 |
-| footstep_carpet_2.wav | footstep_carpet_001.ogg | Impact Sounds (1.0) | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 |
-| footstep_carpet_3.wav | footstep_carpet_003.ogg | Impact Sounds (1.0) | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 |
-| sfx_pickaxe_1.wav | impactMining_000.ogg | Impact Sounds (1.0) | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 |
-| sfx_pickaxe_2.wav | impactMining_001.ogg | Impact Sounds (1.0) | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 |
-| sfx_pickaxe_3.wav | impactMining_003.ogg | Impact Sounds (1.0) | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 |
+| footstep_carpet_1.wav (4차에서 바꿈) | footstep_carpet_000.ogg | Impact Sounds (1.0) | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 |
+| footstep_carpet_2.wav (4차에서 바꿈) | footstep_carpet_001.ogg | Impact Sounds (1.0) | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 |
+| footstep_carpet_3.wav (4차에서 바꿈) | footstep_carpet_003.ogg | Impact Sounds (1.0) | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 |
+| sfx_pickaxe_1.wav (4차에서 바꿈) | impactMining_000.ogg | Impact Sounds (1.0) | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 |
+| sfx_pickaxe_2.wav (4차에서 바꿈) | impactMining_001.ogg | Impact Sounds (1.0) | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 |
+| sfx_pickaxe_3.wav (4차에서 바꿈) | impactMining_003.ogg | Impact Sounds (1.0) | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 |
 | sfx_rockbreak_1.wav | bfh1_rock_breaking_02.ogg | 75 CC0 breaking / falling / hit sfx | rubberduck | https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx | CC0 1.0 |
 | sfx_rockbreak_2.wav | bfh1_rock_breaking_01.ogg | 75 CC0 breaking / falling / hit sfx | rubberduck | https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx | CC0 1.0 |
 | sfx_rockbreak_3.wav | bfh1_rock_breaking_03.ogg | 75 CC0 breaking / falling / hit sfx | rubberduck | https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx | CC0 1.0 |
@@ -128,29 +128,29 @@ OpenGameArt 페이지에 CC0 외의 라이선스가 함께 붙은 팩(예: OGA-B
 | sfx_hit_1.wav | impactPunch_medium_000.ogg | Impact Sounds (1.0) | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 |
 | sfx_hit_2.wav | impactPunch_medium_002.ogg | Impact Sounds (1.0) | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 |
 | sfx_hit_3.wav | impactPunch_medium_004.ogg | Impact Sounds (1.0) | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 |
-| sfx_pickup_1.wav | drop_002.ogg | Interface Sounds (1.0) | Kenney | https://kenney.nl/assets/interface-sounds | CC0 1.0 |
-| sfx_pickup_2.wav | drop_003.ogg | Interface Sounds (1.0) | Kenney | https://kenney.nl/assets/interface-sounds | CC0 1.0 |
-| sfx_ui_click_1.wav | click_001.ogg | Interface Sounds (1.0) | Kenney | https://kenney.nl/assets/interface-sounds | CC0 1.0 |
-| sfx_ui_click_2.wav | select_001.ogg | Interface Sounds (1.0) | Kenney | https://kenney.nl/assets/interface-sounds | CC0 1.0 |
-| sfx_ui_hover_1.wav | tick_001.ogg | Interface Sounds (1.0) | Kenney | https://kenney.nl/assets/interface-sounds | CC0 1.0 |
+| sfx_pickup_1.wav (4차에서 바꿈) | drop_002.ogg | Interface Sounds (1.0) | Kenney | https://kenney.nl/assets/interface-sounds | CC0 1.0 |
+| sfx_pickup_2.wav (4차에서 바꿈) | drop_003.ogg | Interface Sounds (1.0) | Kenney | https://kenney.nl/assets/interface-sounds | CC0 1.0 |
+| sfx_ui_click_1.wav (4차에서 바꿈) | click_001.ogg | Interface Sounds (1.0) | Kenney | https://kenney.nl/assets/interface-sounds | CC0 1.0 |
+| sfx_ui_click_2.wav (4차에서 바꿈) | select_001.ogg | Interface Sounds (1.0) | Kenney | https://kenney.nl/assets/interface-sounds | CC0 1.0 |
+| sfx_ui_hover_1.wav (4차에서 바꿈) | tick_001.ogg | Interface Sounds (1.0) | Kenney | https://kenney.nl/assets/interface-sounds | CC0 1.0 |
 | sfx_door_open_1.wav | doorOpen_1.ogg | RPG Audio (1.0) | Kenney | https://kenney.nl/assets/rpg-audio | CC0 1.0 |
 | sfx_door_close_1.wav | doorClose_1.ogg | RPG Audio (1.0) | Kenney | https://kenney.nl/assets/rpg-audio | CC0 1.0 |
-| sfx_chest_open_1.wav | open chest_0.wav | open chest SFX | Oiboo | https://opengameart.org/content/open-chest-sfx | CC0 1.0 |
-| sfx_chest_open_2.wav | creak1.ogg | RPG Audio (1.0) | Kenney | https://kenney.nl/assets/rpg-audio | CC0 1.0 |
+| sfx_chest_open_1.wav (4차에서 바꿈) | open chest_0.wav | open chest SFX | Oiboo | https://opengameart.org/content/open-chest-sfx | CC0 1.0 |
+| sfx_chest_open_2.wav (4차에서 바꿈) | creak1.ogg | RPG Audio (1.0) | Kenney | https://kenney.nl/assets/rpg-audio | CC0 1.0 |
 | sfx_splash_1.wav | splash_03.ogg | 40 CC0 water / splash / slime SFX | rubberduck | https://opengameart.org/content/40-cc0-water-splash-slime-sfx | CC0 1.0 |
 | sfx_splash_2.wav | splash_09.ogg | 40 CC0 water / splash / slime SFX | rubberduck | https://opengameart.org/content/40-cc0-water-splash-slime-sfx | CC0 1.0 |
 | sfx_coin_1.wav | handleCoins2.ogg | RPG Audio (1.0) | Kenney | https://kenney.nl/assets/rpg-audio | CC0 1.0 |
 | sfx_coin_2.wav | item_coins_01.ogg | 80 CC0 RPG SFX | rubberduck | https://opengameart.org/content/80-cc0-rpg-sfx | CC0 1.0 |
-| footstep_stone_alt_1.wav | step1.wav | Sound Effects Pack (Owlish Media Sound Effects.zip) | OwlishMedia | https://opengameart.org/content/sound-effects-pack | CC0 1.0 |
-| footstep_stone_alt_2.wav | step2.wav | Sound Effects Pack (Owlish Media Sound Effects.zip) | OwlishMedia | https://opengameart.org/content/sound-effects-pack | CC0 1.0 |
-| footstep_stone_alt_3.wav | step3.wav | Sound Effects Pack (Owlish Media Sound Effects.zip) | OwlishMedia | https://opengameart.org/content/sound-effects-pack | CC0 1.0 |
-| footstep_stone_alt_4.wav | step4.wav | Sound Effects Pack (Owlish Media Sound Effects.zip) | OwlishMedia | https://opengameart.org/content/sound-effects-pack | CC0 1.0 |
-| footstep_stone_alt_5.wav | stone01.ogg | Different steps on wood, stone, leaves, gravel and mud | TinyWorlds | https://opengameart.org/content/different-steps-on-wood-stone-leaves-gravel-and-mud | CC0 1.0 |
-| footstep_wood_alt_1.wav | sfx100v2_footstep_wood_01.ogg | 100 CC0 SFX #2 | rubberduck | https://opengameart.org/content/100-cc0-sfx-2 | CC0 1.0 |
-| footstep_wood_alt_2.wav | sfx100v2_footstep_wood_03.ogg | 100 CC0 SFX #2 | rubberduck | https://opengameart.org/content/100-cc0-sfx-2 | CC0 1.0 |
-| footstep_wood_alt_3.wav | sfx100v2_footstep_wood_04.ogg | 100 CC0 SFX #2 | rubberduck | https://opengameart.org/content/100-cc0-sfx-2 | CC0 1.0 |
-| footstep_wood_alt_4.wav | wood01.ogg | Different steps on wood, stone, leaves, gravel and mud | TinyWorlds | https://opengameart.org/content/different-steps-on-wood-stone-leaves-gravel-and-mud | CC0 1.0 |
-| footstep_wood_alt_5.wav | wood03.ogg | Different steps on wood, stone, leaves, gravel and mud | TinyWorlds | https://opengameart.org/content/different-steps-on-wood-stone-leaves-gravel-and-mud | CC0 1.0 |
+| footstep_stone_alt_1.wav (4차에서 바꿈) | step1.wav | Sound Effects Pack (Owlish Media Sound Effects.zip) | OwlishMedia | https://opengameart.org/content/sound-effects-pack | CC0 1.0 |
+| footstep_stone_alt_2.wav (4차에서 바꿈) | step2.wav | Sound Effects Pack (Owlish Media Sound Effects.zip) | OwlishMedia | https://opengameart.org/content/sound-effects-pack | CC0 1.0 |
+| footstep_stone_alt_3.wav (4차에서 바꿈) | step3.wav | Sound Effects Pack (Owlish Media Sound Effects.zip) | OwlishMedia | https://opengameart.org/content/sound-effects-pack | CC0 1.0 |
+| footstep_stone_alt_4.wav (4차에서 바꿈) | step4.wav | Sound Effects Pack (Owlish Media Sound Effects.zip) | OwlishMedia | https://opengameart.org/content/sound-effects-pack | CC0 1.0 |
+| footstep_stone_alt_5.wav (4차에서 바꿈) | stone01.ogg | Different steps on wood, stone, leaves, gravel and mud | TinyWorlds | https://opengameart.org/content/different-steps-on-wood-stone-leaves-gravel-and-mud | CC0 1.0 |
+| footstep_wood_alt_1.wav (4차에서 바꿈) | sfx100v2_footstep_wood_01.ogg | 100 CC0 SFX #2 | rubberduck | https://opengameart.org/content/100-cc0-sfx-2 | CC0 1.0 |
+| footstep_wood_alt_2.wav (4차에서 바꿈) | sfx100v2_footstep_wood_03.ogg | 100 CC0 SFX #2 | rubberduck | https://opengameart.org/content/100-cc0-sfx-2 | CC0 1.0 |
+| footstep_wood_alt_3.wav (4차에서 바꿈) | sfx100v2_footstep_wood_04.ogg | 100 CC0 SFX #2 | rubberduck | https://opengameart.org/content/100-cc0-sfx-2 | CC0 1.0 |
+| footstep_wood_alt_4.wav (4차에서 바꿈) | wood01.ogg | Different steps on wood, stone, leaves, gravel and mud | TinyWorlds | https://opengameart.org/content/different-steps-on-wood-stone-leaves-gravel-and-mud | CC0 1.0 |
+| footstep_wood_alt_5.wav (4차에서 바꿈) | wood03.ogg | Different steps on wood, stone, leaves, gravel and mud | TinyWorlds | https://opengameart.org/content/different-steps-on-wood-stone-leaves-gravel-and-mud | CC0 1.0 |
 | footstep_dirt_alt_1.wav | mud02.ogg | Different steps on wood, stone, leaves, gravel and mud | TinyWorlds | https://opengameart.org/content/different-steps-on-wood-stone-leaves-gravel-and-mud | CC0 1.0 |
 | footstep_grass_alt_1.wav | grassy-footstep2.wav | Sound Effects Pack (Owlish Media Sound Effects.zip) | OwlishMedia | https://opengameart.org/content/sound-effects-pack | CC0 1.0 |
 | footstep_grass_alt_2.wav | grassy-footstep3.wav | Sound Effects Pack (Owlish Media Sound Effects.zip) | OwlishMedia | https://opengameart.org/content/sound-effects-pack | CC0 1.0 |
@@ -217,25 +217,25 @@ OpenGameArt 페이지에 CC0 외의 라이선스가 함께 붙은 팩(예: OGA-B
 
 | 파일 | 원본 파일 이름 | 팩 | 저자 | 출처 페이지 | 라이선스 |
 |---|---|---|---|---|---|
-| sfx_ui_open_1.wav | open_001.ogg | Interface Sounds | Kenney | https://opengameart.org/content/interface-sounds | CC0 1.0 |
-| sfx_ui_open_2.wav | open_002.ogg | Interface Sounds | Kenney | https://opengameart.org/content/interface-sounds | CC0 1.0 |
-| sfx_ui_close_1.wav | close_001.ogg | Interface Sounds | Kenney | https://opengameart.org/content/interface-sounds | CC0 1.0 |
-| sfx_ui_close_2.wav | close_002.ogg | Interface Sounds | Kenney | https://opengameart.org/content/interface-sounds | CC0 1.0 |
-| sfx_ui_confirm_1.wav | select_001.ogg | Interface Sounds | Kenney | https://opengameart.org/content/interface-sounds | CC0 1.0 |
-| sfx_ui_confirm_2.wav | select_002.ogg | Interface Sounds | Kenney | https://opengameart.org/content/interface-sounds | CC0 1.0 |
+| sfx_ui_open_1.wav (4차에서 바꿈) | open_001.ogg | Interface Sounds | Kenney | https://opengameart.org/content/interface-sounds | CC0 1.0 |
+| sfx_ui_open_2.wav (4차에서 바꿈) | open_002.ogg | Interface Sounds | Kenney | https://opengameart.org/content/interface-sounds | CC0 1.0 |
+| sfx_ui_close_1.wav (4차에서 바꿈) | close_001.ogg | Interface Sounds | Kenney | https://opengameart.org/content/interface-sounds | CC0 1.0 |
+| sfx_ui_close_2.wav (4차에서 바꿈) | close_002.ogg | Interface Sounds | Kenney | https://opengameart.org/content/interface-sounds | CC0 1.0 |
+| sfx_ui_confirm_1.wav (4차에서 바꿈) | select_001.ogg | Interface Sounds | Kenney | https://opengameart.org/content/interface-sounds | CC0 1.0 |
+| sfx_ui_confirm_2.wav (4차에서 바꿈) | select_002.ogg | Interface Sounds | Kenney | https://opengameart.org/content/interface-sounds | CC0 1.0 |
 | sfx_ui_cancel_1.wav | back_001.ogg | Interface Sounds | Kenney | https://opengameart.org/content/interface-sounds | CC0 1.0 |
 | sfx_ui_cancel_2.wav | back_002.ogg | Interface Sounds | Kenney | https://opengameart.org/content/interface-sounds | CC0 1.0 |
-| sfx_ui_fail_1.wav | error_001.ogg | Interface Sounds | Kenney | https://opengameart.org/content/interface-sounds | CC0 1.0 |
-| sfx_ui_fail_2.wav | error_002.ogg | Interface Sounds | Kenney | https://opengameart.org/content/interface-sounds | CC0 1.0 |
-| sfx_roll_1.wav | cloth1.ogg | 50 RPG sound effects | Kenney | https://opengameart.org/content/50-rpg-sound-effects | CC0 1.0 |
-| sfx_roll_2.wav | cloth3.ogg | 50 RPG sound effects | Kenney | https://opengameart.org/content/50-rpg-sound-effects | CC0 1.0 |
-| sfx_roll_3.wav | cloth4.ogg | 50 RPG sound effects | Kenney | https://opengameart.org/content/50-rpg-sound-effects | CC0 1.0 |
-| sfx_whoosh_1.wav | sfx100v2_air_01.ogg | 100 CC0 SFX #2 | rubberduck | https://opengameart.org/content/100-cc0-sfx-2 | CC0 1.0 |
-| sfx_whoosh_2.wav | sfx100v2_air_02.ogg | 100 CC0 SFX #2 | rubberduck | https://opengameart.org/content/100-cc0-sfx-2 | CC0 1.0 |
-| sfx_whoosh_3.wav | sfx100v2_air_03.ogg | 100 CC0 SFX #2 | rubberduck | https://opengameart.org/content/100-cc0-sfx-2 | CC0 1.0 |
-| sfx_crit_1.wav | slam_01.ogg | 100 CC0 SFX | rubberduck | https://opengameart.org/content/100-cc0-sfx | CC0 1.0 |
-| sfx_crit_2.wav | slam_02.ogg | 100 CC0 SFX | rubberduck | https://opengameart.org/content/100-cc0-sfx | CC0 1.0 |
-| sfx_crit_3.wav | slam_03.ogg | 100 CC0 SFX | rubberduck | https://opengameart.org/content/100-cc0-sfx | CC0 1.0 |
+| sfx_ui_fail_1.wav (4차에서 바꿈) | error_001.ogg | Interface Sounds | Kenney | https://opengameart.org/content/interface-sounds | CC0 1.0 |
+| sfx_ui_fail_2.wav (4차에서 바꿈) | error_002.ogg | Interface Sounds | Kenney | https://opengameart.org/content/interface-sounds | CC0 1.0 |
+| sfx_roll_1.wav (4차에서 바꿈) | cloth1.ogg | 50 RPG sound effects | Kenney | https://opengameart.org/content/50-rpg-sound-effects | CC0 1.0 |
+| sfx_roll_2.wav (4차에서 바꿈) | cloth3.ogg | 50 RPG sound effects | Kenney | https://opengameart.org/content/50-rpg-sound-effects | CC0 1.0 |
+| sfx_roll_3.wav (4차에서 바꿈) | cloth4.ogg | 50 RPG sound effects | Kenney | https://opengameart.org/content/50-rpg-sound-effects | CC0 1.0 |
+| sfx_whoosh_1.wav (4차에서 바꿈) | sfx100v2_air_01.ogg | 100 CC0 SFX #2 | rubberduck | https://opengameart.org/content/100-cc0-sfx-2 | CC0 1.0 |
+| sfx_whoosh_2.wav (4차에서 바꿈) | sfx100v2_air_02.ogg | 100 CC0 SFX #2 | rubberduck | https://opengameart.org/content/100-cc0-sfx-2 | CC0 1.0 |
+| sfx_whoosh_3.wav (4차에서 바꿈) | sfx100v2_air_03.ogg | 100 CC0 SFX #2 | rubberduck | https://opengameart.org/content/100-cc0-sfx-2 | CC0 1.0 |
+| sfx_crit_1.wav (4차에서 바꿈) | slam_01.ogg | 100 CC0 SFX | rubberduck | https://opengameart.org/content/100-cc0-sfx | CC0 1.0 |
+| sfx_crit_2.wav (4차에서 바꿈) | slam_02.ogg | 100 CC0 SFX | rubberduck | https://opengameart.org/content/100-cc0-sfx | CC0 1.0 |
+| sfx_crit_3.wav (4차에서 바꿈) | slam_03.ogg | 100 CC0 SFX | rubberduck | https://opengameart.org/content/100-cc0-sfx | CC0 1.0 |
 | sfx_hurt_1.wav | bfh1_hit_01.ogg | 75 CC0 breaking / falling / hit sfx | rubberduck | https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx | CC0 1.0 |
 | sfx_hurt_2.wav | bfh1_hit_02.ogg | 75 CC0 breaking / falling / hit sfx | rubberduck | https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx | CC0 1.0 |
 | sfx_hurt_3.wav | bfh1_hit_03.ogg | 75 CC0 breaking / falling / hit sfx | rubberduck | https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx | CC0 1.0 |
@@ -273,20 +273,20 @@ OpenGameArt 페이지에 CC0 외의 라이선스가 함께 붙은 팩(예: OGA-B
 | sfx_anvil_1.wav | bfh1_metal_hit_01.ogg | 75 CC0 breaking / falling / hit sfx | rubberduck | https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx | CC0 1.0 |
 | sfx_anvil_2.wav | bfh1_metal_hit_02.ogg | 75 CC0 breaking / falling / hit sfx | rubberduck | https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx | CC0 1.0 |
 | sfx_anvil_3.wav | bfh1_metal_hit_03.ogg | 75 CC0 breaking / falling / hit sfx | rubberduck | https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx | CC0 1.0 |
-| sfx_craft_1.wav | metalLatch.ogg | 50 RPG sound effects | Kenney | https://opengameart.org/content/50-rpg-sound-effects | CC0 1.0 |
-| sfx_craft_2.wav | metalClick.ogg | 50 RPG sound effects | Kenney | https://opengameart.org/content/50-rpg-sound-effects | CC0 1.0 |
-| sfx_place_1.wav | item_stone_01.ogg | 80 CC0 RPG SFX | rubberduck | https://opengameart.org/content/80-cc0-rpg-sfx | CC0 1.0 |
-| sfx_place_2.wav | item_stone_02.ogg | 80 CC0 RPG SFX | rubberduck | https://opengameart.org/content/80-cc0-rpg-sfx | CC0 1.0 |
-| sfx_place_3.wav | item_stone_03.ogg | 80 CC0 RPG SFX | rubberduck | https://opengameart.org/content/80-cc0-rpg-sfx | CC0 1.0 |
-| sfx_place_4.wav | item_stone_04.ogg | 80 CC0 RPG SFX | rubberduck | https://opengameart.org/content/80-cc0-rpg-sfx | CC0 1.0 |
+| sfx_craft_1.wav (4차에서 바꿈) | metalLatch.ogg | 50 RPG sound effects | Kenney | https://opengameart.org/content/50-rpg-sound-effects | CC0 1.0 |
+| sfx_craft_2.wav (4차에서 바꿈) | metalClick.ogg | 50 RPG sound effects | Kenney | https://opengameart.org/content/50-rpg-sound-effects | CC0 1.0 |
+| sfx_place_1.wav (4차에서 바꿈) | item_stone_01.ogg | 80 CC0 RPG SFX | rubberduck | https://opengameart.org/content/80-cc0-rpg-sfx | CC0 1.0 |
+| sfx_place_2.wav (4차에서 바꿈) | item_stone_02.ogg | 80 CC0 RPG SFX | rubberduck | https://opengameart.org/content/80-cc0-rpg-sfx | CC0 1.0 |
+| sfx_place_3.wav (4차에서 바꿈) | item_stone_03.ogg | 80 CC0 RPG SFX | rubberduck | https://opengameart.org/content/80-cc0-rpg-sfx | CC0 1.0 |
+| sfx_place_4.wav (4차에서 바꿈) | item_stone_04.ogg | 80 CC0 RPG SFX | rubberduck | https://opengameart.org/content/80-cc0-rpg-sfx | CC0 1.0 |
 | sfx_harvest_1.wav | chop.ogg | 50 RPG sound effects | Kenney | https://opengameart.org/content/50-rpg-sound-effects | CC0 1.0 |
 | sfx_harvest_2.wav | handleSmallLeather.ogg | 50 RPG sound effects | Kenney | https://opengameart.org/content/50-rpg-sound-effects | CC0 1.0 |
 | sfx_eat_1.wav | eat_01.ogg | 80 CC0 creature SFX | rubberduck | https://opengameart.org/content/80-cc0-creature-sfx | CC0 1.0 |
 | sfx_eat_2.wav | eat_02.ogg | 80 CC0 creature SFX | rubberduck | https://opengameart.org/content/80-cc0-creature-sfx | CC0 1.0 |
 | sfx_eat_3.wav | eat_03.ogg | 80 CC0 creature SFX | rubberduck | https://opengameart.org/content/80-cc0-creature-sfx | CC0 1.0 |
 | sfx_eat_4.wav | eat_04.ogg | 80 CC0 creature SFX | rubberduck | https://opengameart.org/content/80-cc0-creature-sfx | CC0 1.0 |
-| sfx_coin_buy_1.wav | chips-stack-1.ogg | 54 casino sound effects | Kenney | https://opengameart.org/content/54-casino-sound-effects-cards-dice-chips | CC0 1.0 |
-| sfx_coin_buy_2.wav | handleCoins.ogg | 50 RPG sound effects | Kenney | https://opengameart.org/content/50-rpg-sound-effects | CC0 1.0 |
+| sfx_coin_buy_1.wav (4차에서 바꿈) | chips-stack-1.ogg | 54 casino sound effects | Kenney | https://opengameart.org/content/54-casino-sound-effects-cards-dice-chips | CC0 1.0 |
+| sfx_coin_buy_2.wav (4차에서 바꿈) | handleCoins.ogg | 50 RPG sound effects | Kenney | https://opengameart.org/content/50-rpg-sound-effects | CC0 1.0 |
 | jingle_victory_1.wav | jingles_NES12.ogg | 85 short music jingles | Kenney | https://opengameart.org/content/85-short-music-jingles | CC0 1.0 |
 | jingle_levelup_1.wav | jingles_NES03.ogg | 85 short music jingles | Kenney | https://opengameart.org/content/85-short-music-jingles | CC0 1.0 |
 | jingle_learn_1.wav | jingles_NES14.ogg | 85 short music jingles | Kenney | https://opengameart.org/content/85-short-music-jingles | CC0 1.0 |
@@ -358,8 +358,8 @@ OpenGameArt 페이지에 CC0 외의 라이선스가 함께 붙은 팩(예: OGA-B
 | 파일 | 원본 이름 | 저자 | 출처 페이지 | 쓰는 곳 | 라이선스 |
 |---|---|---|---|---|---|
 | footstep_ice_1~5 | footsteps - ice 09.wav | Anthousai | https://freesound.org/people/Anthousai/sounds/539683/ | 얼음 바닥 발소리 | CC0 1.0 |
-| footstep_brick_1~4 | Footsteps on concrete | florianreichelt | https://freesound.org/people/florianreichelt/sounds/459964/ | 벽돌 바닥 발소리 | CC0 1.0 |
-| footstep_grate_1~5 | Metal Grate Running | Oilcan03 | https://freesound.org/people/Oilcan03/sounds/786977/ | 쇠 격자 발소리 | CC0 1.0 |
+| footstep_brick_1~4 (4차에서 바꿈) | Footsteps on concrete | florianreichelt | https://freesound.org/people/florianreichelt/sounds/459964/ | 벽돌 바닥 발소리 | CC0 1.0 |
+| footstep_grate_1~5 (4차에서 바꿈) | Metal Grate Running | Oilcan03 | https://freesound.org/people/Oilcan03/sounds/786977/ | 쇠 격자 발소리 | CC0 1.0 |
 | footstep_splash_1~4 | Splashing Footsteps Shallow Water | ChristopherJngs | https://freesound.org/people/ChristopherJngs/sounds/861369/ | 얕은 물(철벅) 발소리 | CC0 1.0 |
 | sfx_sizzle_1~2 | G39-24-Steam Hiss.wav | craigsmith | https://freesound.org/people/craigsmith/sounds/438641/ | 김·불과 물(Sizzle) | CC0 1.0 |
 | sfx_sizzle_3 | Water Poured onto a Burning Fireplace – Hissing Steam and Sizzling Embers | bassimat | https://freesound.org/people/bassimat/sounds/870180/ | 김·불과 물(Sizzle) | CC0 1.0 |
@@ -369,3 +369,91 @@ OpenGameArt 페이지에 CC0 외의 라이선스가 함께 붙은 팩(예: OGA-B
 | voice_crab_attack_1~3 | crab walking | stuniverso | https://freesound.org/people/stuniverso/sounds/761559/ | 게 공격(집게 딸깍) | CC0 1.0 |
 | voice_crab_cry_1~3 | Crab - Legs | Vrymaa | https://freesound.org/people/Vrymaa/sounds/770031/ | 게 알아챔(다리 소리) | CC0 1.0 |
 | voice_mushroom_cry_1~3 | puff.wav | Melilaura | https://freesound.org/people/Melilaura/sounds/531522/ | 버섯 알아챔(퍽) | CC0 1.0 |
+
+## 4차: 장면을 보며 다시 고르기 (2026-11-27, 로컬)
+
+사람 요청 "효과음이 어울리지 않는 게 많은데 Sonniss, Kenney는 로컬에서 Claude in Chrome으로 진행하면 접근이 될 것 같다", 이어서 "발소리, 배경음악 포함한 모든 사운드 다 다시 골라줘", "사운드만 보고 판단하기는 힘든데 예시 이미지 gif나 다른 샘플을 보여주고 선택하는게 나을 것 같아".
+
+- **Kenney**: kenney.nl에서 오디오 팩 8개(Impact Sounds, RPG Audio, Interface Sounds, UI Audio, Sci-fi Sounds, Digital Audio, Casino Audio, Music Jingles)를 사람의 브라우저로 받았다. 페이지마다 'License: Creative Commons CC0'(creativecommons.org/publicdomain/zero/1.0/), 팩 안의 License.txt도 'License: (Creative Commons Zero, CC0)'와 'This content is free to use in personal, educational and commercial projects'를 2026-11-27에 직접 확인했다. 출처 표기는 의무가 아니다(Kenney: 'this is not mandatory').
+- **Sonniss GDC 번들은 이번에도 쓰지 않았다.** 공식 라이선스(https://sonniss.com/gdc-bundle-license/, Version 2.0, 2026-08-27 시행)를 직접 열어 봤다. 상업용·출처 표기 없이·평생 무제한 프로젝트에 쓸 수 있지만, RESTRICTIONS c)가 효과음을 가공했든 아니든 파일로 다른 사람에게 배포·게시하는 것을 서면 허락 없이 금한다('Re-designed and manipulated sounds remain licensed material'). 이 저장소는 공개라 `Resources/Sfx`의 wav를 넣으면 누구나 그 파일을 받을 수 있게 되므로 애매하다고 보고 뺐다. 저장소를 비공개로 하거나 Sonniss에 서면 허락을 받으면 다시 볼 수 있다. AI 학습에 쓰는 것도 금지다.
+- **고른 방법**: 세트마다 지금 소리와 Kenney 후보 2~3개를 1차와 같은 방식으로 가공하고(모노 22050 Hz, 50 Hz 고역 통과, 앞 4 ms 여유로 무음 자르기, 꼬리 자르기와 30 ms 페이드, 길이 상한, 피크 정규화: 효과음 -6, UI -8, 마우스오버 -12, 발소리 -14 dBFS, 16-bit PCM), 웹 데모를 로컬에서 띄워 시험 명령으로 장면 약 60개(때리기, 맞기, 구르기, 캐기, 상자, 먹기, 바닥 14종 걷기, 몬스터 9종, 보스, 가방 창 등)를 녹화했다. 녹화 중 게임이 낸 녹음 소리는 파형으로 어느 세트인지 알아내 끄고 시각만 적어, 듣기 페이지에서 장면을 틀며 그 순간에 후보 소리를 넣었다. 사람이 장면을 보며 98세트 가운데 94세트를 골랐다.
+- **바꾼 것**: 아래 표 19세트(Kenney 후보). 그 밖에 치명타 `sfx_crit`는 지금 맞힘(`sfx_hit`) 소리를 +3 반음 높여 만들었고(사람: "원래 타격음이 살짝 더 높은 톤으로"), 제작 `sfx_craft`는 모루 소리(`sfx_anvil`, 2차 rubberduck "75 CC0 breaking / falling / hit sfx")를 그대로 썼고(사람: "모루를 내리치는 소리로"), 피하기·돌진 `sfx_whoosh`는 지금 소리를 0.28초로 줄였다(사람: "더 짧았으면").
+- **지금 소리 그대로**(사람이 "지금 소리"를 고름): 휘두르기, 깨짐, 보스 포효, 바위 부서짐, 모루, 문, 먹기, 물(보글·튀김), 얼음 바닥·얕은 물 발소리, 몬스터 울음 20세트 전부, 배경음악 15곡, 환경음 3개.
+
+### 4차에서 아직 못 한 것 (다음에)
+
+사람이 "다른 곳에서 새로 찾기"를 고른 것. Kenney에 맞는 것이 없어 다른 CC0 출처나 생성 도구로 후보를 만들어 다시 장면과 함께 들려준다.
+
+- 뒤로·취소 `sfx_ui_cancel`
+- 내려찍기 `sfx_thump`: "땅을 쿵 찍는 소리"
+- 몬스터 부르기·수정 울림 `sfx_bell`: "좀 더 마법을 쓰는 느낌"
+- 불 `sfx_fire`: "불이 타오르는 듯한 소리에 폭발음은 너무 크지 않게 깔리게"(지금 폭발음이 너무 큼), 김 `sfx_sizzle`도 "불이 타오르는 듯한 소리로"
+- 얼음 `sfx_ice`: "쩌적 갈라지는 청량한 소리", 번개 `sfx_zap`: "지지직거리는 소리"
+- 징글: 승리 "더 신나게", 레벨업 "더 높은 음으로 기쁘게", 기술 배움, 쓰러짐 "슬픈 음악으로"
+- 발소리: 눈 "뽀드득", 낙엽 "바스락", 젖은 발(호수) "더 끈적거리는 듯", 거친 바위, 모래
+- 배경음악: 용암 지대 "용암이 흐르는 듯한", 모래 동굴 "더 이집트 느낌", 보스전·오두막·왕국 "비프음 같으니 기조는 두고 소리를 다듬어"
+
+코드가 필요한 것(클라우드에 부탁, `CLOUD_LOG.md` 2026-11-27 로컬 항목): 마지막 휘두르기가 너무 큼, 내가 맞음을 캐릭터 성별에 따른 짧은 신음으로(새 세트), 보스 경고음 빼기, 버섯 소환 때 칼 휘두르는 이펙트가 나오는 것, 마법 폭발(Nova)을 원소별 소리로, 수확을 수확 물건마다 다르게(새 세트), 보스 포효를 보스마다 다르게(나중).
+
+### 4차 효과음 파일 (Kenney, kenney.nl에서 받음)
+
+| 파일 | 원본 파일 이름 | 팩 | 저자 | 출처 페이지 | 라이선스 | 받은 날 |
+|---|---|---|---|---|---|---|
+| sfx_ui_click_1.wav | click1.ogg | UI Audio | Kenney | https://kenney.nl/assets/ui-audio | CC0 1.0 | 2026-11-27 |
+| sfx_ui_click_2.wav | click3.ogg | UI Audio | Kenney | https://kenney.nl/assets/ui-audio | CC0 1.0 | 2026-11-27 |
+| sfx_ui_hover_1.wav | rollover4.ogg | UI Audio | Kenney | https://kenney.nl/assets/ui-audio | CC0 1.0 | 2026-11-27 |
+| sfx_ui_hover_2.wav | rollover5.ogg | UI Audio | Kenney | https://kenney.nl/assets/ui-audio | CC0 1.0 | 2026-11-27 |
+| sfx_ui_open_1.wav | bookFlip3.ogg | RPG Audio | Kenney | https://kenney.nl/assets/rpg-audio | CC0 1.0 | 2026-11-27 |
+| sfx_ui_open_2.wav | bookOpen.ogg | RPG Audio | Kenney | https://kenney.nl/assets/rpg-audio | CC0 1.0 | 2026-11-27 |
+| sfx_ui_close_1.wav | bookClose.ogg | RPG Audio | Kenney | https://kenney.nl/assets/rpg-audio | CC0 1.0 | 2026-11-27 |
+| sfx_ui_close_2.wav | bookPlace3.ogg | RPG Audio | Kenney | https://kenney.nl/assets/rpg-audio | CC0 1.0 | 2026-11-27 |
+| sfx_ui_confirm_1.wav | switch3.ogg | UI Audio | Kenney | https://kenney.nl/assets/ui-audio | CC0 1.0 | 2026-11-27 |
+| sfx_ui_confirm_2.wav | switch4.ogg | UI Audio | Kenney | https://kenney.nl/assets/ui-audio | CC0 1.0 | 2026-11-27 |
+| sfx_ui_fail_1.wav | error_004.ogg | Interface Sounds | Kenney | https://kenney.nl/assets/interface-sounds | CC0 1.0 | 2026-11-27 |
+| sfx_ui_fail_2.wav | error_008.ogg | Interface Sounds | Kenney | https://kenney.nl/assets/interface-sounds | CC0 1.0 | 2026-11-27 |
+| sfx_roll_1.wav | cloth1.ogg | RPG Audio | Kenney | https://kenney.nl/assets/rpg-audio | CC0 1.0 | 2026-11-27 |
+| sfx_roll_2.wav | cloth2.ogg | RPG Audio | Kenney | https://kenney.nl/assets/rpg-audio | CC0 1.0 | 2026-11-27 |
+| sfx_roll_3.wav | cloth3.ogg | RPG Audio | Kenney | https://kenney.nl/assets/rpg-audio | CC0 1.0 | 2026-11-27 |
+| sfx_pickaxe_1.wav | impactMining_002.ogg | Impact Sounds | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 | 2026-11-27 |
+| sfx_pickaxe_2.wav | impactMining_004.ogg | Impact Sounds | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 | 2026-11-27 |
+| sfx_pickup_1.wav | handleSmallLeather.ogg | RPG Audio | Kenney | https://kenney.nl/assets/rpg-audio | CC0 1.0 | 2026-11-27 |
+| sfx_pickup_2.wav | handleSmallLeather2.ogg | RPG Audio | Kenney | https://kenney.nl/assets/rpg-audio | CC0 1.0 | 2026-11-27 |
+| sfx_place_1.wav | impactWood_medium_000.ogg | Impact Sounds | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 | 2026-11-27 |
+| sfx_place_2.wav | impactWood_medium_001.ogg | Impact Sounds | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 | 2026-11-27 |
+| sfx_place_3.wav | impactWood_medium_002.ogg | Impact Sounds | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 | 2026-11-27 |
+| sfx_chest_open_1.wav | metalClick.ogg | RPG Audio | Kenney | https://kenney.nl/assets/rpg-audio | CC0 1.0 | 2026-11-27 |
+| sfx_chest_open_2.wav | metalLatch.ogg | RPG Audio | Kenney | https://kenney.nl/assets/rpg-audio | CC0 1.0 | 2026-11-27 |
+| sfx_coin_buy_1.wav | handleCoins.ogg | RPG Audio | Kenney | https://kenney.nl/assets/rpg-audio | CC0 1.0 | 2026-11-27 |
+| sfx_coin_buy_2.wav | handleCoins2.ogg | RPG Audio | Kenney | https://kenney.nl/assets/rpg-audio | CC0 1.0 | 2026-11-27 |
+| footstep_dirt_1.wav | footstep_grass_000.ogg | Impact Sounds | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 | 2026-11-27 |
+| footstep_dirt_2.wav | footstep_grass_001.ogg | Impact Sounds | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 | 2026-11-27 |
+| footstep_dirt_3.wav | footstep_grass_002.ogg | Impact Sounds | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 | 2026-11-27 |
+| footstep_dirt_4.wav | footstep_grass_004.ogg | Impact Sounds | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 | 2026-11-27 |
+| footstep_stone_alt_1.wav | footstep_concrete_000.ogg | Impact Sounds | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 | 2026-11-27 |
+| footstep_stone_alt_2.wav | footstep_concrete_001.ogg | Impact Sounds | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 | 2026-11-27 |
+| footstep_stone_alt_3.wav | footstep_concrete_002.ogg | Impact Sounds | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 | 2026-11-27 |
+| footstep_stone_alt_4.wav | footstep_concrete_003.ogg | Impact Sounds | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 | 2026-11-27 |
+| footstep_stone_alt_5.wav | footstep_concrete_004.ogg | Impact Sounds | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 | 2026-11-27 |
+| footstep_wood_alt_1.wav | footstep_wood_000.ogg | Impact Sounds | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 | 2026-11-27 |
+| footstep_wood_alt_2.wav | footstep_wood_001.ogg | Impact Sounds | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 | 2026-11-27 |
+| footstep_wood_alt_3.wav | footstep_wood_002.ogg | Impact Sounds | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 | 2026-11-27 |
+| footstep_wood_alt_4.wav | footstep_wood_003.ogg | Impact Sounds | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 | 2026-11-27 |
+| footstep_wood_alt_5.wav | footstep_wood_004.ogg | Impact Sounds | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 | 2026-11-27 |
+| footstep_carpet_1.wav | footstep_carpet_000.ogg | Impact Sounds | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 | 2026-11-27 |
+| footstep_carpet_2.wav | footstep_carpet_001.ogg | Impact Sounds | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 | 2026-11-27 |
+| footstep_carpet_3.wav | footstep_carpet_002.ogg | Impact Sounds | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 | 2026-11-27 |
+| footstep_carpet_4.wav | footstep_carpet_003.ogg | Impact Sounds | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 | 2026-11-27 |
+| footstep_carpet_5.wav | footstep_carpet_004.ogg | Impact Sounds | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 | 2026-11-27 |
+| footstep_brick_1.wav | footstep_concrete_000.ogg | Impact Sounds | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 | 2026-11-27 |
+| footstep_brick_2.wav | footstep_concrete_002.ogg | Impact Sounds | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 | 2026-11-27 |
+| footstep_brick_3.wav | footstep_concrete_004.ogg | Impact Sounds | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 | 2026-11-27 |
+| footstep_grate_1.wav | impactMetal_light_000.ogg | Impact Sounds | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 | 2026-11-27 |
+| footstep_grate_2.wav | impactMetal_light_001.ogg | Impact Sounds | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 | 2026-11-27 |
+| footstep_grate_3.wav | impactMetal_light_002.ogg | Impact Sounds | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 | 2026-11-27 |
+| footstep_grate_4.wav | impactMetal_light_004.ogg | Impact Sounds | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 | 2026-11-27 |
+| footstep_metal_1.wav | impactMetal_light_001.ogg | Impact Sounds | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 | 2026-11-27 |
+| footstep_metal_2.wav | impactMetal_light_002.ogg | Impact Sounds | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 | 2026-11-27 |
+| footstep_metal_3.wav | impactMetal_light_004.ogg | Impact Sounds | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 | 2026-11-27 |
+| sfx_crit_1~3.wav | (sfx_hit_1~3 = impactPunch_medium_000·002·004를 +3 반음) | Impact Sounds | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 | 2026-11-27 |
+| sfx_craft_1~3.wav | (sfx_anvil_1~3 그대로) | 75 CC0 breaking / falling / hit sfx | rubberduck | https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx | CC0 1.0 | 2026-11-27 |
+| sfx_whoosh_1~3.wav | (2차 sfx_whoosh를 0.28초로) | 100 CC0 SFX #2 | rubberduck | https://opengameart.org/content/100-cc0-sfx-2 | CC0 1.0 | 2026-11-27 |

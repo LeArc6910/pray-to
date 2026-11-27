@@ -1763,3 +1763,39 @@ DevTools/Local/setup.sh --commit
 
 - 영상의 "과한" 예는 히트 스톱 0.45초와 매번 흔들림이다(끊기고 어지럽다). 지금 우리 쪽에는 그런 곳이 없다
 - 영상은 효과를 이름과 숫자로 정해 부탁하라고 권한다. `Docs/Feel.md`의 표가 이미 그렇게 되어 있다
+
+### 2026-11-27 21:49 setup.ps1 (Unity 6000.6.3f1)
+
+- 프로젝트 설정: 성공
+- 패키지: com.unity.netcode.gameobjects 2.13.3, com.unity.transport 6.6.0, com.unity.render-pipelines.universal 17.6.0, com.unity.inputsystem 1.20.0, com.unity.multiplayer.playmode 3.0.0, com.unity.test-framework 1.8.0
+- EditMode 테스트: 1190개 중 1190개 통과, 0개 실패
+- PlayMode 테스트: 68개 중 49개 통과, 19개 실패
+  - `Game.Client.Tests.FeatureTests.APackNoticesTogetherWithMarks: The nearest saw the player.`
+  - `Game.Client.Tests.FeatureTests.ElitesWearTheirNamesAndWarnOfTheirBigAttack: A name over the leader and each champion.`
+  - `Game.Client.Tests.FeatureTests.EveryKindHasItsOwnAttacks: It is drawn as a mound.`
+  - `Game.Client.Tests.FeatureTests.MonstersWarnAndStrikeFromTheSheet: The landing's mark and the ring made from the wisp's state are both drawn.`
+  - `Game.Client.Tests.FeatureTests.MonsterWarningsFillAsShapesAndLeavePools: The sac's circle, the charge's path and the wall's line are each a picture of their shape.`
+  - `Game.Client.Tests.FeatureTests.RumoursAndSlowRest: The goal list says only which way:`
+  - `Game.Client.Tests.FeatureTests.TheAntlionBurstsUpAndWindsUp: The bite can be forced once it fights.`
+  - `Game.Client.Tests.FeatureTests.TheBagAndHudDraw: The food's buff has no icon.`
+  - `Game.Client.Tests.FeatureTests.TheCaveWardenWakesAndWindsUp: Expected: True`
+  - `Game.Client.Tests.FeatureTests.TheCrystalQueenHatchesAndWindsUp: Expected: True`
+  - `Game.Client.Tests.FeatureTests.TheDirtCaveStandsItsPropsAndALampIsLit: Expected string length 8 but was 6. Strings differ at index 0.`
+  - `Game.Client.Tests.FeatureTests.TheEncounterWindowsDraw: Her portrait is in the talk box.`
+  - `Game.Client.Tests.FeatureTests.TheIceAndSandCavesStandTheirPropsAndThePlacesTakeTheirLooks: LampPost in the Ice's look`
+  - `Game.Client.Tests.FeatureTests.TheLavaZoneAndTheAbyssStandTheirPropsAndThePlacesTakeTheirLooks: Well in the Abyss's look`
+  - `Game.Client.Tests.FeatureTests.TheMadGeneralRisesAndGivesOrders: The order can be forced once he fights.`
+  - `Game.Client.Tests.LayoutTests.TheBagAndHudFit: 작은 휴대폰 가로 667×375: 배너가 [메뉴] 판에 겹친다 (x:0.00, y:301.00, width:667.00, height:64.00) (x:353.00, y:186.00, width:304.00, height:160.00)`
+  - `Game.Client.Tests.LayoutTests.TheFixedPartsKeepToTheSafeArea: 작은 휴대폰 가로(안전 영역 32 0 32 16) 667×375, 스킬 1: 겹침 - 시간·장소 줄 / 구르기`
+  - `Game.Client.Tests.LayoutTests.TheGrowthScreensFit: 작은 휴대폰 세로 360×640, 특성: 고른 점과 서랍이 하늘을 거의 다 덮는다 (84)`
+  - `Game.Client.Tests.TitleScreenTests.TheTestGroundsPanelAndHitLogDraw: The hit log is on the screen.`
+
+### 2026-11-27 22:00 녹음 소리 4차: 장면을 보며 다시 고르기 (로컬)
+
+- 사람 요청: Kenney·Sonniss로 어울리지 않는 효과음 바꾸기 → "발소리, 배경음악 포함한 모든 사운드 다 다시 골라줘" → "사운드만 보고 판단하기는 힘든데 예시 이미지 gif나 다른 샘플을 보여주고 선택하는게 나을 것 같아"
+- Kenney 오디오 팩 8개(CC0)를 사람의 Chrome으로 받았다(원본은 저장소 밖). Sonniss는 라이선스가 효과음 파일의 배포를 막아(공개 저장소) 쓰지 않았다. 자세한 것은 `Docs/SoundCredits.md` 4차
+- 웹 데모 빌드(GitHub Pages 아티팩트)를 로컬에서 띄워 시험 명령으로 장면 약 60개를 녹화하고, 세트마다 지금 소리·Kenney 후보 A~C를 그 장면의 실제 순간에 넣어 들려주는 페이지를 만들었다. 사람이 98세트 중 94세트를 골랐다
+- **바꾼 것(같은 파일 이름, 코드 그대로)**: UI 클릭(A)·마우스오버(C)·창 열기(C, 책 넘김)·닫기(C, 책 덮음)·누름(C)·실패(A), 구르기(A), 곡괭이(A), 줍기(A), 놓기(A), 상자(B, 쇠 걸쇠), 사고팔기(A), 발소리 흙(B, 풀 밟는 소리)·돌·나무·카펫·벽돌·쇠 격자·레일(A). 치명타는 맞힘을 +3 반음 높여, 제작은 모루 소리로, 피하기·돌진은 0.28초로 줄였다. 세트 개수가 준 것은 남는 번호의 wav를 지웠다(곡괭이 3, 놓기 4, 흙 5·6, 벽돌 4, 쇠 격자 5, 레일 4. 이 폴더의 .meta는 원래 저장소에 없다). 새로 생긴 4개(마우스오버 2, 카펫 4·5, 제작 3)의 .meta를 커밋했다
+- 가져오기: 위 setup.ps1(-NoPull -NoScreens, 이 작업 폴더)에서 Unity가 새 wav를 모노·22050 Hz·Vorbis·불러올 때 풀기로 가져왔다(`SoundImport.cs`). PlayMode 실패 19개는 소리와 관계없는 그림·배치·보스 확인이다(클라우드 확인 필요). 이번 실행에서 바뀐 `GameSheets.asset`과 테스트 스크립트들의 .meta는 이 작업 범위 밖이라 커밋하지 않았다
+- **아직 못 한 것**: 사람이 "새로 찾기"를 고른 23세트(취소, 내려찍기, 부르기, 불·김, 얼음, 번개, 징글 넷, 발소리 다섯, 곡 다섯)는 Kenney에 맞는 것이 없어 다음에 한다(`Docs/SoundCredits.md` 4차 "아직 못 한 것"). 코드가 필요한 것 7가지는 `CLOUD_LOG.md` 2026-11-27 22:00 로컬 항목에 클라우드에 부탁으로 적었다
+- 사람이 다시 들어 볼 것: `Docs/HumanChecklist.md` "녹음 소리 4차"
