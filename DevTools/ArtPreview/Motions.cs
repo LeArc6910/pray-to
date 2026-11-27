@@ -409,13 +409,16 @@ namespace Game.Client
                 case "antlion":
                     Antlion(folder, arena);
                     return true;
+                case "crystal_queen":
+                    CrystalQueen(folder, arena);
+                    return true;
                 case "entrances":
                     Entrances(folder, arena);
                     return true;
                 case "hero":
                     return HeroPreview.Write(folder, TileArt.Ground(TileArt.Index(GroundKind.Floor, 0, 0))) == 0;
                 default:
-                    Console.Error.WriteLine($"--only {name}: warden, antlion, spider, knight, samurai, vein_eater, hero, entrances or arenas");
+                    Console.Error.WriteLine($"--only {name}: warden, antlion, crystal_queen, spider, knight, samurai, vein_eater, hero, entrances or arenas");
                     return false;
             }
         }
