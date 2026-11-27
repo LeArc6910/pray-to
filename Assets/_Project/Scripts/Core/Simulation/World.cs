@@ -339,7 +339,8 @@ namespace Game.Core
         static bool IsRock(TileDefinition tile) => tile.Tile == TileType.Wall || tile.Tile == TileType.IronWall || tile.Drillable;
 
         // An arrow or bolt toward where the player faces, its damage and crit rolled now (see FlyFriendly). A finisher's
-        // is bigger and hits harder.
+        // is bigger and hits harder. The weapon's kind says how fast and far it flies, how many it goes through, whether it
+        // comes back to the thrower and how wide it bursts (BasicAttack, Docs/Weapons.md).
         void Shoot(Player player, bool finisher = false)
         {
             var stats = player.Stats;
@@ -347,7 +348,8 @@ namespace Game.Core
             bool critical = _random.Chance(stats.CritChance / 100f);
             float damage = stats.Damage * (critical ? stats.CritDamage / 100f : 1f) * (finisher ? FinisherDamagePercent / 100f : 1);
             var direction = player.Facing;
-            _projectiles.Add(new Projectile(
+            int flight = Ticks(shot.Range / shot.Speed);
+            var projectile = new Projectile(
                 _nextId++,
                 player.Id,
                 -1,
@@ -355,11 +357,18 @@ namespace Game.Core
                 direction * shot.Speed,
                 shot.Radius * (finisher ? FinisherShotRadius : 1),
                 damage,
-                Ticks(shot.Range / shot.Speed),
+                // One that comes back has the way back too, and a little over.
+                shot.Returns ? flight * 3 : flight,
                 friendly: true,
                 tags: stats.AttackTags,
                 critical: critical,
-                more: finisher ? FinisherDamagePercent / 100f : 1));
+                more: finisher ? FinisherDamagePercent / 100f : 1)
+            {
+                PiercesLeft = shot.Pierce,
+                TurnTicks = shot.Returns ? Math.Max(1, flight) : 0,
+                Burst = shot.Burst * (finisher ? FinisherShotRadius : 1),
+            };
+            _projectiles.Add(projectile);
         }
 
         // Returns whether anything was hit. A finisher reaches further round and further out, hits harder and pushes
@@ -367,10 +376,13 @@ namespace Game.Core
         bool Swing(Player player, bool finisher = false)
         {
             var stats = player.Stats;
+            var swing = stats.Attack;
             bool hit = false;
-            float reach = MeleeReach + (finisher ? FinisherReach : 0);
-            float arc = finisher ? FinisherArcDegrees : MeleeArcDegrees;
+            // A finisher reaches further out and wider round than the weapon's own swing (a sword's 120° becomes 170°).
+            float reach = swing.Reach + (finisher ? FinisherReach : 0);
+            float arc = finisher ? Math.Min(360, swing.Arc + FinisherArcDegrees - MeleeArcDegrees) : swing.Arc;
             float more = finisher ? FinisherDamagePercent / 100f : 1;
+            float push = swing.Push * (finisher ? FinisherPush : 1);
 
             foreach (var enemy in _enemies)
             {
@@ -381,8 +393,10 @@ namespace Game.Core
                 if (!ClearLine(player.Position, enemy.Position, ThinLine)) continue;
 
                 float damage = RollDamage(stats, out bool critical) * more;
-                HitEnemy(player, enemy, damage, critical, player.Position, stats.AttackTags, push: finisher ? FinisherPush : 1);
+                HitEnemy(player, enemy, damage, critical, player.Position, stats.AttackTags, push: push);
                 AddElements(player, enemy, null, critical, more);
+                // A hammer's finisher dazes (Docs/Weapons.md).
+                if (finisher && swing.Stun > 0) Daze(enemy, swing.Stun);
                 hit = true;
             }
 

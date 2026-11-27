@@ -100,8 +100,9 @@ namespace Game.Core
     {
         readonly List<SkillDefinition> _skills = new List<SkillDefinition>();
 
-        internal ClassDefinition(string id, string name, string description, IReadOnlyList<Modifier> passive)
+        internal ClassDefinition(string id, string name, string description, IReadOnlyList<Modifier> passive, SkillTag weapon = SkillTag.None)
         {
+            Weapon = weapon;
             Id = id;
             Name = name;
             Description = description;
@@ -113,6 +114,9 @@ namespace Game.Core
         public string Description { get; }
         // Always on while the class is chosen, added up like gear.
         public IReadOnlyList<Modifier> Passive { get; }
+        // The branch of weapon its skills draw on (classes.csv weapon: melee, ranged or magic; Docs/Weapons.md), or None
+        // for the weapon in hand.
+        public SkillTag Weapon { get; }
         // In the order they take skill slots.
         public IReadOnlyList<SkillDefinition> Skills => _skills;
 
@@ -413,7 +417,10 @@ namespace Game.Core
                     string id = row["id"];
                     if (!SheetValues.IsValidId(id)) throw new FormatException($"id '{id}'에는 영문, 숫자, _, -만 쓸 수 있습니다.");
                     if (classes.Any(c => c.Id == id)) throw new FormatException($"id '{id}'가 이미 있습니다.");
-                    classes.Add(new ClassDefinition(id, Required(row, "name"), row["description"], FixedModifiers(row["passive"])));
+                    var weapon = row["weapon"].Length == 0 ? SkillTag.None : SheetValues.ParseEnum<SkillTag>(row["weapon"], "weapon");
+                    if (weapon != SkillTag.None && weapon != SkillTag.Melee && weapon != SkillTag.Ranged && weapon != SkillTag.Magic)
+                        throw new FormatException("weapon은 melee, ranged, magic 가운데 하나이거나 비웁니다.");
+                    classes.Add(new ClassDefinition(id, Required(row, "name"), row["description"], FixedModifiers(row["passive"]), weapon));
                 });
             }
             return classes;

@@ -279,6 +279,8 @@ namespace Game.Core
                     var item = loot == null ? SavedItems.Skip(r) : SavedItems.Read(r, loot, warnings);
                     if (item == null) continue;
                     if (equipment[item.Base.Slot] == null) equipment.Equip(item);
+                    // A second weapon is the spare (Docs/Weapons.md); a save from before had one at most.
+                    else if (item.Base.Slot == ItemSlot.Weapon && equipment.Spare == null) equipment.EquipSpare(item);
                     else if (!bag.TryAdd(item)) warnings.Add($"가방이 가득 차서 {item.Base.Name}을(를) 버렸습니다.");
                 }
                 int carried = r.ReadUInt16();

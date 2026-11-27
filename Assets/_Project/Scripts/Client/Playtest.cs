@@ -429,6 +429,14 @@ namespace Game.Client
                     // Each base given at its best plain rolls, worn at once whatever its level.
                     foreach (string id in words.Skip(1)) player.Equip(Plain(loot, id, Rarity.Rare, 0));
                     return null;
+                case "spare":
+                    // The second weapon (Docs/Weapons.md, 무기 두 벌): a base into the spare slot, or "none" to take it off.
+                    if (words[1] == "none") player.UnequipSpare();
+                    else player.EquipSpare(Plain(loot, words[1], Rarity.Rare, 0));
+                    return null;
+                case "swap":
+                    // As the X key or the swap button does: through the client to the host.
+                    return root.SwapWeapons() ? null : "error swap: nothing to swap";
                 case "hero":
                     // The hero's attack with a weapon (2026-11-19, HeroArt): the weapon in hand (none: bare hands), three
                     // sturdy slimes the way given, and the attack held that way so the three steps go round.
@@ -2598,6 +2606,7 @@ namespace Game.Client
                     list.Item(new Json('{').Field("label", label).Field("rect", Rect(OnScreen(SkillBar.Area(slot, skills)))).Field("enabled", true).Field("shown", true).Raw('}'));
                 }
                 list.Item(new Json('{').Field("label", "roll").Field("rect", Rect(OnScreen(SkillBar.RollArea(skills)))).Field("enabled", true).Field("shown", true).Raw('}'));
+                list.Item(new Json('{').Field("label", "swap").Field("rect", Rect(OnScreen(SkillBar.WeaponArea(skills)))).Field("enabled", true).Field("shown", true).Raw('}'));
                 for (int slot = 0; slot < Hotbar.Slots; slot++)
                 {
                     list.Item(new Json('{').Field("label", $"quick {slot}").Field("rect", Rect(OnScreen(Hotbar.Area(slot, skills)))).Field("enabled", true).Field("shown", true).Raw('}'));
@@ -2844,6 +2853,9 @@ namespace Game.Client
                 json.Field("rollsShown", root.RollsShown);
                 json.Field("dodgesShown", root.DodgesShown);
                 json.Field("weapon", player.Equipment[ItemSlot.Weapon]?.Base.Id);
+                // The second weapon and the kind in hand (Docs/Weapons.md).
+                json.Field("spare", player.Equipment.Spare?.Base.Id);
+                json.Field("weaponKind", player.Stats.Kind.Id);
                 json.Field("day", world.Today);
                 json.Field("clock", Calendar.Text(world.Clock));
                 json.Field("clockTicks", world.Clock);

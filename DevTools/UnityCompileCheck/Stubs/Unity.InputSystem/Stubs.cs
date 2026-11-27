@@ -67,6 +67,7 @@ namespace UnityEngine.InputSystem
         Enter,
         Tab,
         I,
+        X,
         M,
         Q,
         E,

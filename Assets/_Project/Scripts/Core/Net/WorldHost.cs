@@ -529,6 +529,15 @@ namespace Game.Core
                 case InventoryCommand.Unequip:
                     World.UnequipItem(player.Id, command.Slot);
                     break;
+                case InventoryCommand.EquipSpare:
+                    World.EquipSpare(player.Id, command.Item);
+                    break;
+                case InventoryCommand.UnequipSpare:
+                    World.UnequipSpare(player.Id);
+                    break;
+                case InventoryCommand.SwapWeapons:
+                    World.SwapWeapons(player.Id);
+                    break;
                 case InventoryCommand.InsertRune:
                     if (command.Index < _loot.Runes.Count) World.InsertRune(player.Id, command.Item, _loot.Runes[command.Index]);
                     break;

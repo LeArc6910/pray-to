@@ -264,6 +264,22 @@ namespace Game.Core
             return previous;
         }
 
+        public Item EquipSpare(Item item)
+        {
+            var previous = Equipment.EquipSpare(item);
+            RefreshStats();
+            InventoryVersion++;
+            return previous;
+        }
+
+        public Item UnequipSpare()
+        {
+            var item = Equipment.UnequipSpare();
+            RefreshStats();
+            InventoryVersion++;
+            return item;
+        }
+
         public Item Unequip(ItemSlot slot)
         {
             var item = Equipment.Unequip(slot);
@@ -666,6 +682,8 @@ namespace Game.Core
         // its gate (DungeonLeft), got up at its entrance after falling (DungeonRose), was stopped (DungeonBroken), or found
         // every slot of the pocket taken (DungeonFull).
         Dungeon,
+        // Source, a player, swapped the weapon in hand for the spare (World.SwapWeapons, Docs/Weapons.md).
+        Swapped,
     }
 
     public readonly struct SimEvent
@@ -1021,6 +1039,8 @@ namespace Game.Core
         // How many more monsters it goes on through, and those it has gone through.
         internal int PiercesLeft { get; set; }
         internal HashSet<int> Pierced { get; } = new HashSet<int>();
+        // A basic attack's: how wide it bursts where it stops (an orb's, Docs/Weapons.md); 0 for only what it touches.
+        public float Burst { get; internal set; }
         public bool Friendly { get; }
         // A player's: the tags it hits with, buffs included.
         public SkillTag Tags { get; }

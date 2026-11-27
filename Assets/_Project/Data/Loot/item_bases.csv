@@ -1,68 +1,111 @@
-id,name,slot,level,tags,implicit,sockets,weight,tool,legendary,chance,require,set,effects,class,class_bonus,tint
+id,name,slot,level,tags,implicit,sockets,weight,tool,legendary,chance,require,set,effects,class,class_bonus,tint,kind
 # 1단계: 구리
-copper_sword,구리 검,weapon,1,melee,Damage+4~6,3,100,
-copper_bow,구리 활,weapon,1,ranged,Damage+3~5;AttackSpeed+5%,3,100,
-copper_staff,구리 지팡이,weapon,1,magic,Damage+3~5;Magic:Damage+30%;AttackSpeed-15%,3,100,
-copper_pickaxe,구리 곡괭이,weapon,1,melee,Damage+2~3,1,0,pickaxe,
-copper_helmet,구리 투구,helmet,1,,Armor+3~5,2,100,
-copper_armor,구리 갑옷,chest,1,,Armor+6~9;MaxHealth+5~10,3,100,
-copper_boots,구리 장화,boots,1,,Armor+2~3,2,100,
-copper_ring,구리 반지,ring,1,,MaxHealth+5~8,1,60,
-copper_amulet,구리 목걸이,amulet,1,,Damage+3~5%,1,60,
+copper_sword,구리 검,weapon,1,melee,Damage+4~6,3,28
+copper_bow,구리 활,weapon,1,ranged,Damage+3~5;AttackSpeed+5%,3,28
+copper_staff,구리 지팡이,weapon,1,magic,Damage+3~5;Magic:Damage+30%;AttackSpeed-15%,3,28
+copper_pickaxe,구리 곡괭이,weapon,1,melee,Damage+2~3,1,0,pickaxe
+copper_helmet,구리 투구,helmet,1,,Armor+3~5,2,100
+copper_armor,구리 갑옷,chest,1,,Armor+6~9;MaxHealth+5~10,3,100
+copper_boots,구리 장화,boots,1,,Armor+2~3,2,100
+copper_ring,구리 반지,ring,1,,MaxHealth+5~8,1,60
+copper_amulet,구리 목걸이,amulet,1,,Damage+3~5%,1,60
 # 2단계: 철
-iron_sword,철 검,weapon,10,melee,Damage+9~12,3,100,
-iron_bow,철 활,weapon,10,ranged,Damage+7~10;AttackSpeed+5%,3,100,
-iron_staff,철 지팡이,weapon,10,magic,Damage+7~10;Magic:Damage+35%;AttackSpeed-15%,3,100,
-iron_pickaxe,철 곡괭이,weapon,10,melee,Damage+5~6;MiningSpeed+60%,1,0,pickaxe,
-frost_staff,서리 지팡이,weapon,10,magic|cold,Damage+7~10;Magic:Damage+30%;AttackSpeed-15%,3,0,,
-storm_bow,폭풍 활,weapon,10,ranged|lightning,Damage+6~9;AttackSpeed+5%,3,0,,
-iron_helmet,철 투구,helmet,10,,Armor+7~10,2,100,
-iron_armor,철 갑옷,chest,10,,Armor+13~17;MaxHealth+12~18,3,100,
-iron_boots,철 장화,boots,10,,Armor+5~7,2,100,
-iron_ring,철 반지,ring,10,,MaxHealth+10~15,1,60,
-iron_amulet,철 목걸이,amulet,10,,Damage+5~7%,1,60,
+iron_sword,철 검,weapon,10,melee,Damage+9~12,3,28
+iron_bow,철 활,weapon,10,ranged,Damage+7~10;AttackSpeed+5%,3,28
+iron_staff,철 지팡이,weapon,10,magic,Damage+7~10;Magic:Damage+35%;AttackSpeed-15%,3,28
+iron_pickaxe,철 곡괭이,weapon,10,melee,Damage+5~6;MiningSpeed+60%,1,0,pickaxe
+frost_staff,서리 지팡이,weapon,10,magic|cold,Damage+7~10;Magic:Damage+30%;AttackSpeed-15%,3,0
+storm_bow,폭풍 활,weapon,10,ranged|lightning,Damage+6~9;AttackSpeed+5%,3,0
+iron_helmet,철 투구,helmet,10,,Armor+7~10,2,100
+iron_armor,철 갑옷,chest,10,,Armor+13~17;MaxHealth+12~18,3,100
+iron_boots,철 장화,boots,10,,Armor+5~7,2,100
+iron_ring,철 반지,ring,10,,MaxHealth+10~15,1,60
+iron_amulet,철 목걸이,amulet,10,,Damage+5~7%,1,60
 # 3단계: 미스릴
-mithril_sword,미스릴 검,weapon,20,melee,Damage+21~26,3,100,
-mithril_bow,미스릴 활,weapon,20,ranged,Damage+17~22;AttackSpeed+5%,3,100,
-mithril_staff,미스릴 지팡이,weapon,20,magic,Damage+17~22;Magic:Damage+40%;AttackSpeed-15%,3,100,
-flame_blade,불꽃 칼,weapon,20,melee,Damage+17~21;FireDamage+7~9,3,40,
-frost_bow,서리 활,weapon,20,ranged,Damage+14~18;ColdDamage+7~9;AttackSpeed+5%,3,40,
-thunder_staff,벼락 지팡이,weapon,20,magic,Damage+14~18;Magic:Damage+30%;LightningDamage+8~10;AttackSpeed-15%,3,40,
-mithril_pickaxe,미스릴 곡괭이,weapon,20,melee,Damage+9~11;MiningSpeed+120%,1,0,pickaxe,
-mithril_helmet,미스릴 투구,helmet,20,,Armor+15~19,2,100,
-mithril_armor,미스릴 갑옷,chest,20,,Armor+27~33;MaxHealth+24~32,3,100,
-mithril_boots,미스릴 장화,boots,20,,Armor+11~13,2,100,
-mithril_ring,미스릴 반지,ring,20,,MaxHealth+21~27,1,60,
-mithril_amulet,미스릴 목걸이,amulet,20,,Damage+8~10%,1,60,
+mithril_sword,미스릴 검,weapon,20,melee,Damage+21~26,3,28
+mithril_bow,미스릴 활,weapon,20,ranged,Damage+17~22;AttackSpeed+5%,3,28
+mithril_staff,미스릴 지팡이,weapon,20,magic,Damage+17~22;Magic:Damage+40%;AttackSpeed-15%,3,28
+flame_blade,불꽃 칼,weapon,20,melee,Damage+17~21;FireDamage+7~9,3,40
+frost_bow,서리 활,weapon,20,ranged,Damage+14~18;ColdDamage+7~9;AttackSpeed+5%,3,40
+thunder_staff,벼락 지팡이,weapon,20,magic,Damage+14~18;Magic:Damage+30%;LightningDamage+8~10;AttackSpeed-15%,3,40
+mithril_pickaxe,미스릴 곡괭이,weapon,20,melee,Damage+9~11;MiningSpeed+120%,1,0,pickaxe
+mithril_helmet,미스릴 투구,helmet,20,,Armor+15~19,2,100
+mithril_armor,미스릴 갑옷,chest,20,,Armor+27~33;MaxHealth+24~32,3,100
+mithril_boots,미스릴 장화,boots,20,,Armor+11~13,2,100
+mithril_ring,미스릴 반지,ring,20,,MaxHealth+21~27,1,60
+mithril_amulet,미스릴 목걸이,amulet,20,,Damage+8~10%,1,60
 # 4단계: 흑요석
-obsidian_sword,흑요석 검,weapon,30,melee,Damage+44~52,3,100,
-obsidian_bow,흑요석 활,weapon,30,ranged,Damage+36~43;AttackSpeed+5%,3,100,
-obsidian_staff,흑요석 지팡이,weapon,30,magic,Damage+36~43;Magic:Damage+45%;AttackSpeed-15%,3,100,
-obsidian_helmet,흑요석 투구,helmet,30,,Armor+30~36,2,100,
-obsidian_armor,흑요석 갑옷,chest,30,,Armor+52~62;MaxHealth+46~58,3,100,
-obsidian_boots,흑요석 장화,boots,30,,Armor+21~25,2,100,
-obsidian_ring,흑요석 반지,ring,30,,MaxHealth+42~52,1,60,
-obsidian_amulet,흑요석 목걸이,amulet,30,,Damage+12~15%,1,60,
-obsidian_pickaxe,흑요석 곡괭이,weapon,30,melee,Damage+14~16;MiningSpeed+180%,1,0,pickaxe,
+obsidian_sword,흑요석 검,weapon,30,melee,Damage+44~52,3,28
+obsidian_bow,흑요석 활,weapon,30,ranged,Damage+36~43;AttackSpeed+5%,3,28
+obsidian_staff,흑요석 지팡이,weapon,30,magic,Damage+36~43;Magic:Damage+45%;AttackSpeed-15%,3,28
+obsidian_helmet,흑요석 투구,helmet,30,,Armor+30~36,2,100
+obsidian_armor,흑요석 갑옷,chest,30,,Armor+52~62;MaxHealth+46~58,3,100
+obsidian_boots,흑요석 장화,boots,30,,Armor+21~25,2,100
+obsidian_ring,흑요석 반지,ring,30,,MaxHealth+42~52,1,60
+obsidian_amulet,흑요석 목걸이,amulet,30,,Damage+12~15%,1,60
+obsidian_pickaxe,흑요석 곡괭이,weapon,30,melee,Damage+14~16;MiningSpeed+180%,1,0,pickaxe
 # 5단계: 공허
-void_sword,공허 검,weapon,40,melee,Damage+88~102,3,100,
-void_bow,공허 활,weapon,40,ranged,Damage+72~84;AttackSpeed+5%,3,100,
-void_staff,공허 지팡이,weapon,40,magic,Damage+72~84;Magic:Damage+50%;AttackSpeed-15%,3,100,
-void_helmet,공허 투구,helmet,40,,Armor+56~66,2,100,
-void_armor,공허 갑옷,chest,40,,Armor+96~112;MaxHealth+85~105,3,100,
-void_boots,공허 장화,boots,40,,Armor+38~46,2,100,
-void_ring,공허 반지,ring,40,,MaxHealth+80~95,1,60,
-void_amulet,공허 목걸이,amulet,40,,Damage+18~22%,1,60,
+void_sword,공허 검,weapon,40,melee,Damage+88~102,3,28
+void_bow,공허 활,weapon,40,ranged,Damage+72~84;AttackSpeed+5%,3,28
+void_staff,공허 지팡이,weapon,40,magic,Damage+72~84;Magic:Damage+50%;AttackSpeed-15%,3,28
+void_helmet,공허 투구,helmet,40,,Armor+56~66,2,100
+void_armor,공허 갑옷,chest,40,,Armor+96~112;MaxHealth+85~105,3,100
+void_boots,공허 장화,boots,40,,Armor+38~46,2,100
+void_ring,공허 반지,ring,40,,MaxHealth+80~95,1,60
+void_amulet,공허 목걸이,amulet,40,,Damage+18~22%,1,60
+
+# 무기 종류(2026-11-27, Docs/Weapons.md): 구간마다 광석 무기 11종. 같은 구간의 초당 피해가 비슷하게 피해를 적었다(검 × 단검 0.6, 대검 1.7, 창 1.15, 망치 1.9 / 활 × 석궁 2.2, 부메랑 0.85 / 지팡이 × 완드 0.49, 오브 1.2)
+copper_dagger,구리 단검,weapon,1,melee,Damage+2~4;CritChance+8,3,27,,,,,,,,,,dagger
+copper_greatsword,구리 대검,weapon,1,melee,Damage+7~10,3,27,,,,,,,,,,greatsword
+copper_spear,구리 창,weapon,1,melee,Damage+5~7,3,27,,,,,,,,,,spear
+copper_hammer,구리 망치,weapon,1,melee,Damage+8~11,3,27,,,,,,,,,,hammer
+copper_crossbow,구리 석궁,weapon,1,ranged,Damage+7~11,3,27,,,,,,,,,,crossbow
+copper_boomerang,구리 부메랑,weapon,1,ranged,Damage+3~4,3,27,,,,,,,,,,throwing
+copper_wand,구리 완드,weapon,1,magic,Damage+1~3;Magic:Damage+30%,3,27,,,,,,,,,,wand
+copper_orb,구리 오브,weapon,1,magic,Damage+4~6;Magic:Damage+30%,3,27,,,,,,,,,,orb
+iron_dagger,철 단검,weapon,10,melee,Damage+5~7;CritChance+8,3,27,,,,,,,,,,dagger
+iron_greatsword,철 대검,weapon,10,melee,Damage+15~20,3,27,,,,,,,,,,greatsword
+iron_spear,철 창,weapon,10,melee,Damage+10~14,3,27,,,,,,,,,,spear
+iron_hammer,철 망치,weapon,10,melee,Damage+17~23,3,27,,,,,,,,,,hammer
+iron_crossbow,철 석궁,weapon,10,ranged,Damage+15~22,3,27,,,,,,,,,,crossbow
+iron_boomerang,철 부메랑,weapon,10,ranged,Damage+6~8,3,27,,,,,,,,,,throwing
+iron_wand,철 완드,weapon,10,magic,Damage+3~5;Magic:Damage+35%,3,27,,,,,,,,,,wand
+iron_orb,철 오브,weapon,10,magic,Damage+8~12;Magic:Damage+35%,3,27,,,,,,,,,,orb
+mithril_dagger,미스릴 단검,weapon,20,melee,Damage+13~16;CritChance+8,3,27,,,,,,,,,,dagger
+mithril_greatsword,미스릴 대검,weapon,20,melee,Damage+36~44,3,27,,,,,,,,,,greatsword
+mithril_spear,미스릴 창,weapon,20,melee,Damage+24~30,3,27,,,,,,,,,,spear
+mithril_hammer,미스릴 망치,weapon,20,melee,Damage+40~49,3,27,,,,,,,,,,hammer
+mithril_crossbow,미스릴 석궁,weapon,20,ranged,Damage+37~48,3,27,,,,,,,,,,crossbow
+mithril_boomerang,미스릴 부메랑,weapon,20,ranged,Damage+14~19,3,27,,,,,,,,,,throwing
+mithril_wand,미스릴 완드,weapon,20,magic,Damage+8~11;Magic:Damage+40%,3,27,,,,,,,,,,wand
+mithril_orb,미스릴 오브,weapon,20,magic,Damage+20~26;Magic:Damage+40%,3,27,,,,,,,,,,orb
+obsidian_dagger,흑요석 단검,weapon,30,melee,Damage+26~31;CritChance+8,3,27,,,,,,,,,,dagger
+obsidian_greatsword,흑요석 대검,weapon,30,melee,Damage+75~88,3,27,,,,,,,,,,greatsword
+obsidian_spear,흑요석 창,weapon,30,melee,Damage+51~60,3,27,,,,,,,,,,spear
+obsidian_hammer,흑요석 망치,weapon,30,melee,Damage+84~99,3,27,,,,,,,,,,hammer
+obsidian_crossbow,흑요석 석궁,weapon,30,ranged,Damage+79~95,3,27,,,,,,,,,,crossbow
+obsidian_boomerang,흑요석 부메랑,weapon,30,ranged,Damage+31~37,3,27,,,,,,,,,,throwing
+obsidian_wand,흑요석 완드,weapon,30,magic,Damage+17~21;Magic:Damage+45%,3,27,,,,,,,,,,wand
+obsidian_orb,흑요석 오브,weapon,30,magic,Damage+43~52;Magic:Damage+45%,3,27,,,,,,,,,,orb
+void_dagger,공허 단검,weapon,40,melee,Damage+53~61;CritChance+8,3,27,,,,,,,,,,dagger
+void_greatsword,공허 대검,weapon,40,melee,Damage+150~173,3,27,,,,,,,,,,greatsword
+void_spear,공허 창,weapon,40,melee,Damage+101~117,3,27,,,,,,,,,,spear
+void_hammer,공허 망치,weapon,40,melee,Damage+167~194,3,27,,,,,,,,,,hammer
+void_crossbow,공허 석궁,weapon,40,ranged,Damage+158~185,3,27,,,,,,,,,,crossbow
+void_boomerang,공허 부메랑,weapon,40,ranged,Damage+61~71,3,27,,,,,,,,,,throwing
+void_wand,공허 완드,weapon,40,magic,Damage+35~41;Magic:Damage+50%,3,27,,,,,,,,,,wand
+void_orb,공허 오브,weapon,40,magic,Damage+86~101;Magic:Damage+50%,3,27,,,,,,,,,,orb
+
 # 전설: 보스만 떨어뜨린다(legendary, chance%). 정해진 능력치, 소켓은 모두 열려 있다
-warden_maul,수호자의 바위망치,weapon,10,melee,Damage+15~18;Armor+8~10;AttackSpeed-10%,2,0,,cave_warden,25,,warden
+warden_maul,수호자의 바위망치,weapon,10,melee,Damage+28~34;Armor+8~10;AttackSpeed-10%,2,0,,cave_warden,25,,warden,,,,,hammer
 warden_heart,수호자의 심장석,amulet,10,,MaxHealth+20~25;HealthRegen+2;Armor+4~6,1,0,,cave_warden,25,,warden
-queen_fang,여왕의 독니,weapon,20,ranged,Damage+28~33;AttackSpeed+15%;CritChance+4,2,0,,crystal_queen,25,,queen
+queen_fang,여왕의 독니,weapon,20,ranged,Damage+24~28;AttackSpeed+15%;CritChance+4,2,0,,crystal_queen,25,,queen,,,,,throwing
 queen_crown,수정 왕관,helmet,20,,Armor+25~29;Magic:Damage+20%;CritDamage+20,2,0,,crystal_queen,25,,queen
-titan_cinder,거인의 불씨,weapon,30,magic|fire,Damage+57~67;Magic:Damage+50%;Fire:Damage+25%;AttackSpeed-15%,3,0,,lava_titan,25,,titan
+titan_cinder,거인의 불씨,weapon,30,magic|fire,Damage+68~80;Magic:Damage+50%;Fire:Damage+25%,3,0,,lava_titan,25,,titan,,,,,orb
 titan_plate,용암 거인의 갑주,chest,30,,Armor+83~97;MaxHealth+75~88;HealthRegen+3,3,0,,lava_titan,25,,titan
-lord_scepter,공허 군주의 홀,weapon,40,magic|lightning,Damage+113~133;Magic:Damage+60%;Lightning:Damage+30%;AttackSpeed-15%,3,0,,void_lord,25,,voidlord
+lord_scepter,공허 군주의 홀,weapon,40,magic|lightning,Damage+55~65;Magic:Damage+60%;Lightning:Damage+30%,3,0,,void_lord,25,,voidlord,,,,,wand
 void_band,공허의 고리,ring,40,,MaxHealth+127~149;Damage+15%;CritChance+5;AttackSpeed+8%,1,0,,void_lord,25,,voidlord
-general_blade,모르그의 불꽃 대검,weapon,20,melee,Damage+34~40;FireDamage+13~17;CritDamage+20;AttackSpeed-10%,2,0,,mad_general,25,,general
+general_blade,모르그의 불꽃 대검,weapon,20,melee,Damage+58~68;FireDamage+22~29;CritDamage+20;AttackSpeed-10%,2,0,,mad_general,25,,general,,,,,greatsword
 legion_mantle,군단장의 망토,chest,20,,Armor+43~51;MaxHealth+41~48;MoveSpeed+5%,2,0,,mad_general,25,,general
 wraith_circlet,망령의 관,helmet,30,,Armor+48~56;MaxMana+71~85;Lightning:Damage+20%,2,0,,crown_wraith,25,,wraith
 drowned_mantle,물에 젖은 왕의 망토,chest,30,,Armor+83~97;MaxHealth+75~88;HealthRegen+2,2,0,,crown_wraith,25,,wraith
@@ -70,19 +113,19 @@ drowned_mantle,물에 젖은 왕의 망토,chest,30,,Armor+83~97;MaxHealth+75~88
 pilgrim_hood,공허 순례자의 두건,helmet,45,,Armor+62~72;MaxHealth+60~70;CritChance+3,2,0,,rift,4,,pilgrim
 pilgrim_robe,공허 순례자의 옷,chest,45,,Armor+105~120;MaxHealth+100~115;HealthRegen+3,3,0,,rift,4,,pilgrim
 pilgrim_treads,공허 순례자의 신,boots,45,,Armor+44~52;MoveSpeed+10%;MaxHealth+45~52,2,0,,rift,4,,pilgrim
-rift_edge,균열 칼날,weapon,45,melee,Damage+108~122;CritChance+6;CritDamage+40,3,0,,rift,4,,
-rift_eye,균열의 눈,amulet,45,,Damage+24%;MaxHealth+90~100;AttackSpeed+10%;MaxMana+40;ManaRegen+3,1,0,,rift,4,,
+rift_edge,균열 칼날,weapon,45,melee,Damage+108~122;CritChance+6;CritDamage+40,3,0,,rift,4
+rift_eye,균열의 눈,amulet,45,,Damage+24%;MaxHealth+90~100;AttackSpeed+10%;MaxMana+40;ManaRegen+3,1,0,,rift,4
 # 균열 조각으로 모루에서 만든다(떨어지지 않는다, 2026-11-09)
 rift_band,균열 고리,ring,45,,SkillRank+1;MaxHealth+60~75,1,0,,,,,,,,,#D8C8FF
 rift_charm,균열 부적,amulet,45,,CooldownRecovery+12~15%;Damage+10~12%,1,0,,,,,,,,,#D8C8FF
 tide_amulet,물살의 목걸이,amulet,25,,MaxMana+30~40;ManaRegen+3~4,1,0,,,,,,,,,#4AB8D8
 sandstride_boots,모래걸음 장화,boots,15,,Armor+7~9;MoveSpeed+6~8%,2,0,,,,,,,,,#D8B060
-antlion_mandible,개미귀신의 턱칼,weapon,20,melee,Damage+34~40;CritChance+5;AttackSpeed+10%,2,0,,antlion,25,,antlion
+antlion_mandible,개미귀신의 턱칼,weapon,20,melee,Damage+20~24;CritChance+13;AttackSpeed+10%,2,0,,antlion,25,,antlion,,,,,dagger
 sandwhirl_boots,모래 회오리 장화,boots,20,,Armor+17~20;MaxHealth+35~42;MoveSpeed+8%,2,0,,antlion,25,,antlion
-abyssal_harpoon,심해의 작살,weapon,30,ranged,Damage+57~67;ColdDamage+17~22;CritChance+3,2,0,,tide_serpent,25,,serpent
+abyssal_harpoon,심해의 작살,weapon,30,ranged,Damage+125~147;ColdDamage+37~48;CritChance+3,2,0,,tide_serpent,25,,serpent,,,,,crossbow
 scale_mail,뱀비늘 갑옷,chest,30,,Armor+83~97;MaxHealth+75~88;HealthRegen+2,2,0,,tide_serpent,25,,serpent
-rift_scepter,끝없는 균열의 홀,weapon,48,magic,Damage+100~112;Magic:Damage+50%;CritChance+5,3,0,,rift,1,,
-rift_loop,끝없는 고리,ring,48,,Damage+15~18%;MaxHealth+80~95;CooldownRecovery+8~10%,1,0,,rift,1,,
+rift_scepter,끝없는 균열의 홀,weapon,48,magic,Damage+140~157;Magic:Damage+50%;CritChance+5,3,0,,rift,1,,,,,,,orb
+rift_loop,끝없는 고리,ring,48,,Damage+15~18%;MaxHealth+80~95;CooldownRecovery+8~10%,1,0,,rift,1
 # 사냥 재료 세트(2026-11-27, Docs/Gear.md): 그 구간 광석 장비 × 1.15, 작업대에서 광석 제작법 + 사냥 재료
 beetle_weapon,딱정벌레 껍질 검,weapon,1,melee,Damage+5~6,3,0,,,,1,beetle,,,,#6E8A4A
 beetle_helmet,딱정벌레 껍질 투구,helmet,1,,Armor+4~5,2,0,,,,1,beetle,,,,#6E8A4A
@@ -108,7 +151,7 @@ scorpion_armor,전갈 독침 갑옷,chest,10,,Armor+16~19;MaxHealth+16~19,3,0,,,
 scorpion_boots,전갈 독침 장화,boots,10,,Armor+6~7,2,0,,,,5,scorpion,,,,#C8962E
 scorpion_ring,전갈 독침 반지,ring,10,,MaxHealth+13~16,1,0,,,,5,scorpion,,,,#C8962E
 scorpion_amulet,전갈 독침 목걸이,amulet,10,,Damage+6~7%,1,0,,,,5,scorpion,,,,#C8962E
-crab_weapon,게 껍데기 검,weapon,20,melee,Damage+25~29,3,0,,,,15,crab,,,,#D2603C
+crab_weapon,게 껍데기 망치,weapon,20,melee,Damage+48~55,3,0,,,,15,crab,,,,#D2603C,hammer
 crab_helmet,게 껍데기 투구,helmet,20,,Armor+18~21,2,0,,,,15,crab,,,,#D2603C
 crab_armor,게 껍데기 갑옷,chest,20,,Armor+32~37;MaxHealth+30~35,3,0,,,,15,crab,,,,#D2603C
 crab_boots,게 껍데기 장화,boots,20,,Armor+13~15,2,0,,,,15,crab,,,,#D2603C
@@ -147,7 +190,7 @@ rift_amulet,균열 정수 목걸이,amulet,40,,Damage+19~24%,1,0,,,,35,rift,,,,#
 # 정예 고유(legendary=elite): 그 구간 정예가 떨군다. 광석 × 1.3과 특이 기능
 chief_fang,우두머리의 송곳니 목걸이,amulet,1,,Damage+4~5%,1,0,,elite,10,1,,kill_heal:5,,,#E8D2A0
 champion_spikes,챔피언의 가시 장화,boots,1,,Armor+3~4,2,0,,elite,10,1,,thorns:40,,,#A07050
-ratking_dagger,쥐왕의 단검,weapon,1,melee,Damage+6~7,3,0,,elite,10,1,,first_strike:50,,,#C8B090
+ratking_dagger,쥐왕의 단검,weapon,1,melee,Damage+3~5;CritChance+8,3,0,,elite,10,1,,first_strike:50,,,#C8B090,dagger
 moss_ring,이끼 반지,ring,1,,MaxHealth+8~9,1,0,,elite,10,1,,low_health:35/25/15,,,#6EA050
 frostfang_bow,서리 송곳니 활,weapon,10,ranged|cold,Damage+10~12;AttackSpeed+5%,3,0,,elite,10,5,,vs_chilled:30,,,#A8E8FF
 stinger_ring,전갈 꼬리 반지,ring,10,,MaxHealth+15~18,1,0,,elite,10,5,,crit_burn:30,,,#E8A040
@@ -171,7 +214,7 @@ antlion_carapace,개미귀신 껍질 갑옷,chest,20,,Armor+43~51;MaxHealth+41~4
 queen_shroud,여왕의 실 망토,chest,20,,Armor+43~51;MaxHealth+41~48;CritChance+3,2,0,,crystal_queen,25,,queen
 general_greaves,장군의 군화,boots,20,,Armor+17~20;Fire:Damage+10%,2,0,,mad_general,25,,general
 serpent_helm,물살 비늘 투구,helmet,30,,Armor+48~56;Cold:Damage+10%,2,0,,tide_serpent,25,,serpent
-wraith_staff,망령의 홀,weapon,30,magic|lightning,Damage+57~67;Magic:Damage+54%;AttackSpeed-15%;MaxMana+20,2,0,,crown_wraith,25,,wraith
+wraith_staff,망령의 홀,weapon,30,magic|lightning,Damage+28~33;Magic:Damage+54%;MaxMana+20,2,0,,crown_wraith,25,,wraith,,,,,wand
 titan_treads,거인의 용암 장화,boots,30,,Armor+33~39;Fire:Damage+10%,2,0,,lava_titan,25,,titan
 vein_staff,포식자의 광맥 지팡이,weapon,30,magic,Damage+57~67;Magic:Damage+54%;AttackSpeed-15%;MiningSpeed+40%,2,0,,vein_eater,25,,vein
 vein_plate,광맥 갑주,chest,30,,Armor+83~97;MaxHealth+75~88;HealthRegen+2,2,0,,vein_eater,25,,vein
@@ -180,7 +223,7 @@ sakura_blade,벚꽃 검,weapon,40,melee,Damage+138~162;AttackSpeed+10%,2,0,,shri
 samurai_helm,검귀의 투구,helmet,40,,Armor+88~104;CritChance+3,2,0,,shrine_samurai,25,,samurai
 petal_boots,꽃잎 장화,boots,40,,Armor+61~71;MoveSpeed+6%,2,0,,shrine_samurai,25,,samurai
 lord_crown,군주의 왕관,helmet,40,,Armor+88~104;MaxMana+30,2,0,,void_lord,25,,voidlord
-knight_greatsword,흑철 대검,weapon,45,melee,Damage+144~169;AttackSpeed-10%,2,0,,black_knight,25,,knight
+knight_greatsword,흑철 대검,weapon,45,melee,Damage+245~287;AttackSpeed-10%,2,0,,black_knight,25,,knight,,,,,greatsword
 knight_helm,흑철 투구,helmet,45,,Armor+93~109;HealthRegen+2,2,0,,black_knight,25,,knight
 knight_plate,흑철 갑옷,chest,45,,Armor+158~185;MaxHealth+144~169;HealthRegen+3,2,0,,black_knight,25,,knight
 mother_staff,실 잣는 지팡이,weapon,45,magic,Damage+118~139;Magic:Damage+61%;AttackSpeed-15%;MaxMana+30,2,0,,silk_mother,25,,mother

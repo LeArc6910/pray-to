@@ -1,0 +1,16 @@
+id,name,branch,attack,speed,reach,arc,push,stun,shot_speed,range,radius,pierce,returns,burst,description
+# 무기 종류(Docs/Weapons.md). speed는 기본 공격 횟수의 배율(1이면 초당 2번). 피해는 item_bases.csv의 무기마다 적는다(같은 단계의 초당 피해가 비슷하게)
+# 휘두르기(swing): reach는 몸 가장자리에서 닿는 칸, arc는 부채꼴 각도, push는 밀치는 배율, stun은 마무리 일격(3단)의 기절 초
+# 쏘기(arrow, bolt): shot_speed 초당 칸, range 칸, radius 굵기, pierce 꿰뚫고 지나가는 적 수, returns는 되돌아오며 다시 맞힘, burst는 멈춘 곳의 폭발 반지름
+sword,검,melee,swing,1,1.1,120,1,,,,,,,,균형 잡힌 휘두르기
+dagger,단검,melee,swing,1.6,0.8,90,0.7,,,,,,,,빠르고 짧다. 치명타가 잘 난다
+greatsword,대검,melee,swing,0.6,1.4,160,1.5,,,,,,,,느리지만 넓고 세게 밀친다
+spear,창,melee,swing,0.85,1.9,30,1,,,,,,,,길고 좁게 찌른다. 줄지은 적을 모두 맞힌다
+hammer,망치,melee,swing,0.5,1,100,1.3,0.6,,,,,,,가장 느리다. 마무리 일격이 적을 기절시킨다
+pickaxe,곡괭이,,swing,1,1.1,120,1,,,,,,,,벽과 광맥을 캔다. 클래스 무기로 치지 않는다
+bow,활,ranged,arrow,1,,,,,16,8,0.12,,,,균형 잡힌 화살
+crossbow,석궁,ranged,arrow,0.45,,,,,24,10,0.12,1,,,장전이 느린 대신 한 발이 세고 적 하나를 꿰뚫는다
+throwing,부메랑,ranged,arrow,0.6,,,,,12,5,0.25,,yes,,짧게 날아갔다 돌아오며 오가는 길의 적을 두 번 맞힌다
+staff,지팡이,magic,bolt,1,,,,,11,7,0.2,,,,균형 잡힌 마법 탄
+wand,완드,magic,bolt,1.75,,,,,14,6,0.1,,,,빠르게 연사한다. 한 발은 약하다
+orb,오브,magic,bolt,0.68,,,,,9,4,0.3,,,1.3,가까이 날아가 닿은 곳에서 터져 둘레의 적을 모두 맞힌다

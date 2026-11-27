@@ -89,7 +89,8 @@ namespace Game.Client
         void DrawDoll(string row = "캐릭터")
         {
             float cell = Controls.UsingTouch ? 52 : 48;
-            float column = cell * 3 + CellGap * 2;
+            // Four rows: the spare weapon sits under the one in hand (Docs/Weapons.md).
+            float column = cell * 4 + CellGap * 3;
             float hero = Mathf.Min(_textWidth - 2 * cell - 24, 150);
             var doll = Room(column + 8);
             float left = doll.x + (doll.width - (2 * cell + hero + 16)) / 2;
@@ -106,19 +107,20 @@ namespace Game.Client
                 int scale = Mathf.Max(2, Mathf.FloorToInt(Mathf.Min((stage.width - 8) / GrowthArt.HeroWidth, (stage.height - 12) / GrowthArt.HeroHeight)));
                 Picture(new Rect(stage.x, stage.y + 2, stage.width, stage.height - 10), sprite, scale);
             }
-            var places = new (ItemSlot Slot, float X, int Row)[]
+            // A null slot is the spare weapon's.
+            var places = new (ItemSlot? Slot, float X, int Row)[]
             {
-                (ItemSlot.Weapon, left, 0), (ItemSlot.Ring, left, 1), (ItemSlot.Amulet, left, 2),
+                (ItemSlot.Weapon, left, 0), (null, left, 1), (ItemSlot.Ring, left, 2), (ItemSlot.Amulet, left, 3),
                 (ItemSlot.Helmet, stage.xMax + 8, 0), (ItemSlot.Chest, stage.xMax + 8, 1), (ItemSlot.Boots, stage.xMax + 8, 2),
             };
             Ui.Row(row);
             foreach (var (slot, columnX, line) in places)
             {
                 var area = new Rect(columnX, doll.y + 4 + line * (cell + CellGap), cell, cell);
-                var item = _client.Equipment[slot];
+                var item = slot is ItemSlot worn ? _client.Equipment[worn] : _client.Equipment.Spare;
                 if (item == null)
                 {
-                    EmptyCell(area, ItemText.SlotName(slot));
+                    EmptyCell(area, slot is ItemSlot empty ? ItemText.SlotName(empty) : ItemText.SpareName);
                     continue;
                 }
                 if (Cell(area, Sprites.Icon(item.Base), ItemText.Name(item), item.Upgrade > 0 ? $"+{item.Upgrade}" : null, Palette.Of(item.Rarity), _picked == item.Id, ItemTooltip(item)))
@@ -143,7 +145,7 @@ namespace Game.Client
             // What each damaging skill would hit for now: the same tag rules as the host, so swapping gear or starting a
             // buff shows on every skill.
             foreach (var skill in _client.Skills.Where(s => s.Damage > 0))
-                attack.Add((GrowthArt.Rank, skill.Name, $"{stats.DamageFor(stats.ContextFor(skill)) * skill.Damage / 100f * SkillRules.DamageScale(_client.PowerOf(skill)):0.#}"));
+                attack.Add((GrowthArt.Rank, skill.Name, $"{stats.ForSkill(skill).DamageFor(stats.ContextFor(skill)) * skill.Damage / 100f * SkillRules.DamageScale(_client.PowerOf(skill)):0.#}"));
             var defence = new List<(string[], string, string)>
             {
                 (UiIcons.Heart, "생명력", $"{stats.MaxHealth:0}"),

@@ -175,6 +175,17 @@ async function playPc(browser, profile) {
   check(hit.hurtMonsters > 0, `마우스를 누르고 있으면 슬라임을 친다 (맞은 슬라임 ${hit.hurtMonsters})`);
   await send(game, 'clear; heal');
 
+  // The second weapon (Docs/Weapons.md): X swaps the weapon in hand for the spare (the phone's button: sweep.js weapons).
+  await send(game, 'equip copper_sword; spare copper_bow');
+  await game.page.waitForTimeout(400);
+  await game.page.keyboard.press('KeyX');
+  await game.page.waitForTimeout(800);
+  const swapped = await state(game);
+  check(swapped.weapon === 'copper_bow' && swapped.spare === 'copper_sword', `X 키로 무기를 바꾼다 (손 ${swapped.weapon}, 보조 ${swapped.spare})`);
+  await shot(game, profile, 'swap', '무기를 바꾼 뒤의 스킬 줄 무기 칸');
+  await game.page.keyboard.press('KeyX');
+  await game.page.waitForTimeout(500);
+
   // The bot by the game's state (bot.js, Client/PlaytestBot.cs, 2026-11-11): the game's path finding says where to go
   // next, and the real keys walk there; the nearest monster, wherever it is, and then rock dug for stone.
   await huntAndDig(game, profile);

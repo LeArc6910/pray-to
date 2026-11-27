@@ -835,6 +835,7 @@ namespace Game.Client
             var slots = Controls.TakeSkillPresses();
             bool potion = Controls.TakePotionPress();
             bool roll = Controls.TakeRollPress();
+            bool swap = Controls.TakeSwapPress();
             var quick = Controls.TakeHotbarPresses();
             bool machine = Controls.MachinePressed();
             bool advance = Controls.AdvancePressed();
@@ -853,6 +854,7 @@ namespace Game.Client
             if (slots.Count > 0) LastSkillAim = aim;
             foreach (int slot in slots) UseSkill(slot, aim);
             if (potion) DrinkPotion();
+            if (swap) SwapWeapons();
             foreach (int slot in quick) UseQuickSlot(slot);
             // G meets what is in reach (Docs/UiRework.md 4-1, the person's pick of 2026-11-22): see Meet.
             if (machine) Meet();
@@ -1217,6 +1219,15 @@ namespace Game.Client
             byte[] command = _client?.UseConsumableCommand(_client.QuickConsumable);
             if (command == null) return false;
             SendToHost(command);
+            return true;
+        }
+
+        // The weapon in hand for the spare (Docs/Weapons.md). Also called by the play mode tests. False with neither.
+        internal bool SwapWeapons()
+        {
+            if (_client == null || _client.Equipment[ItemSlot.Weapon] == null && _client.Equipment.Spare == null) return false;
+            Sounds.Play(Sound.Click);
+            SendToHost(_client.SwapWeaponsCommand());
             return true;
         }
 

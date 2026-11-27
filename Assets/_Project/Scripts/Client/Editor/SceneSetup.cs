@@ -60,6 +60,7 @@ namespace Game.Client.Editor
             sheets.materials = Sheet(LootFolder + LootSheets.MaterialsFile);
             sheets.recipes = Sheet(LootFolder + LootSheets.RecipesFile);
             sheets.sets = Sheet(LootFolder + LootSheets.SetsFile);
+            sheets.weaponKinds = Sheet(LootFolder + WeaponKind.File);
             sheets.tiles = Sheet(WorldFolder + TileSheet.File);
             sheets.crops = Sheet(WorldFolder + TileSheet.CropsFile);
             sheets.machines = Sheet(WorldFolder + TileSheet.MachinesFile);

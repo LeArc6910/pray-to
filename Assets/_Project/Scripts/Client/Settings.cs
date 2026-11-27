@@ -264,6 +264,8 @@ namespace Game.Client
         Passives,
         Journal,
         Character,
+        // The weapon in hand for the spare (Docs/Weapons.md, 무기 두 벌).
+        SwapWeapon,
     }
 
     // Which key does what, changed in the menu and kept on this device (Prefs, by key name). Every action has
@@ -274,7 +276,7 @@ namespace Game.Client
         static readonly Key[] Defaults =
         {
             Key.Q, Key.E, Key.R, Key.F, Key.C, Key.Tab, Key.M, Key.Digit1, Key.Digit2, Key.Digit3, Key.Digit4, Key.Digit5, Key.Digit6, Key.G, Key.LeftShift,
-            Key.K, Key.P, Key.J, Key.U,
+            Key.K, Key.P, Key.J, Key.U, Key.X,
         };
         static readonly Key[] Fixed =
         {
@@ -319,6 +321,7 @@ namespace Game.Client
             KeyAction.Passives => "특성 창",
             KeyAction.Journal => "일지",
             KeyAction.Character => "캐릭터",
+            KeyAction.SwapWeapon => "무기 바꾸기",
             _ => $"퀵슬롯 {action - KeyAction.Hotbar1 + 1}",
         };
 

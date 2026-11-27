@@ -89,10 +89,9 @@ namespace Game.Core.Tests
         {
             foreach (var legendary in Gear.Data.Bases.Where(b => b.Legendary.Length > 0 && b.Slot == ItemSlot.Weapon))
             {
-                // The ordinary weapon of the same kind (melee, ranged, magic) at or below its level.
-                var kind = legendary.Tags & (SkillTag.Melee | SkillTag.Ranged | SkillTag.Magic);
+                // The ordinary (ore) weapon of the same kind (Docs/Weapons.md) at or below its level.
                 var ordinary = Gear.Data.Bases
-                    .Where(b => b.Legendary.Length == 0 && b.Weight == 100 && b.Slot == ItemSlot.Weapon && b.Level <= legendary.Level && (b.Tags & kind) == kind)
+                    .Where(b => b.Legendary.Length == 0 && b.Weight > 0 && b.Weight < 40 && b.Slot == ItemSlot.Weapon && b.Level <= legendary.Level && b.Kind == legendary.Kind)
                     .OrderByDescending(b => b.Level).First();
                 int Damage(ItemBase b) => b.Implicits.First(m => m.Stat == StatType.Damage && m.Kind == ModifierKind.Flat).Min;
                 Assert.GreaterOrEqual(Damage(legendary), Damage(ordinary), $"{legendary.Id} against {ordinary.Id}");

@@ -17,6 +17,8 @@ namespace Game.Client
         public TextAsset materials;
         public TextAsset recipes;
         public TextAsset sets;
+        // The kinds of weapon (weapon_kinds.csv, 2026-11-27, Docs/Weapons.md).
+        public TextAsset weaponKinds;
         public TextAsset tiles;
         public TextAsset crops;
         public TextAsset machines;
@@ -59,7 +61,7 @@ namespace Game.Client
         public static GameSheets Load() => Resources.Load<GameSheets>(ResourcePath);
 
         public LootData LoadLoot() =>
-            LootSheets.Parse(Text(itemBases), Text(affixes), Text(runes), Text(runewords), Text(consumables), Text(materials), Text(recipes), Text(sets));
+            LootSheets.Parse(Text(itemBases), Text(affixes), Text(runes), Text(runewords), Text(consumables), Text(materials), Text(recipes), Text(sets), Text(weaponKinds));
 
         // Without the terrain sheet (an asset made before it existed) the rooms are carved by the copy in code.
         public TileData LoadTiles(LootData loot) => TileSheet.Parse(Text(tiles), loot, Text(crops), Text(machines), Text(terrain), Text(rooms), Text(roomRoles), Text(pois),

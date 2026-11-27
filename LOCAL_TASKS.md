@@ -1306,6 +1306,11 @@ DevTools/Local/setup.sh --commit
   - 명령 한 줄을 다시 돌린다(`-NoPull` 없이, 새 파일 없음). 다음이 통과하는지 결과 보고에 적는다: `FeatureTests`의 `MonstersWarnAndStrikeFromTheSheet`·`MonsterWarningsFillAsShapesAndLeavePools`·`APackNoticesTogetherWithMarks`·`ElitesWearTheirNamesAndWarnOfTheirBigAttack`·`EveryKindHasItsOwnAttacks`(들판으로 가서 놓는다), `TheMadGeneralRisesAndGivesOrders`·`TheCaveWardenWakesAndWindsUp`·`TheAntlionBurstsUpAndWindsUp`·`TheCrystalQueenHatchesAndWindsUp`(공허 장비를 입고 싸운다), `TheDirtCaveStandsItsPropsAndALampIsLit`(흙 동굴의 방에서), `TheIceAndSandCavesStandTheirPropsAndThePlacesTakeTheirLooks`·`TheLavaZoneAndTheAbyssStandTheirPropsAndThePlacesTakeTheirLooks`(생물군계가 방 전체를 덮는 방에서)
   - **실패하면 메시지만이 아니라 Console 로그(그 시험의 전체 메시지와 스택, 앞뒤의 경고·에러)까지** 결과 보고에 붙인다. 고치지 않은 일곱(`RumoursAndSlowRest`, `TheBagAndHudDraw`, `TheEncounterWindowsDraw`, 배치 셋, `TheTestGroundsPanelAndHitLogDraw`)도 실패하면 전체 메시지(여러 줄)와 Console 로그를 붙인다. 지난 보고는 첫 줄만 있어 원인을 다 볼 수 없었다(`Docs/NextTasks.md`)
   - 감시(`watch.ps1 -Install`)가 켜져 있는지 본다: 11-11 뒤 결과 보고가 11-27 손 실행 한 번뿐이고 `origin`에 `local-screens` 브랜치가 없다
+- [ ] 201단계: 무기 종류와 무기 두 벌(묶음 A) — 무기 종류 11가지(새 광석 무기 40점), 보조 무기 칸과 바꾸기(PC X, 휴대폰 단추), 클래스 스킬은 제 갈래 무기의 힘(`Docs/Weapons.md`)
+  - 명령 한 줄을 다시 돌린다. 새 시트 `Data/Loot/weapon_kinds.csv`는 `Game > Set Up Project`(명령 한 줄이 한다)가 `GameSheets`의 `weaponKinds`에 넣는다. 새 파일 `Core/Items/WeaponKinds.cs`, `Data/Loot/weapon_kinds.csv`, `Tests/EditMode/WeaponTests.cs`의 `.meta`가 생기면 커밋한다. 통신 0.116.0(메뉴의 키 바꾸기에 "무기 바꾸기" X가 새로 생긴다)
+  - PlayMode `Screens` 사진 넷이 `local-screens`에 올라오는지: `weapons`·`weapons-swapped`·`weapons-touch`·`weapons-bag`(`FeatureTests.TheTwoWeaponsDraw`)
+  - (클라우드 웹 점검) `sweep.js --only weapons`
+  - (사람) 새 무기 8종을 시험장(시험판 [장비]의 "한 벌씩"·"보조 무기")에서 들어 보고 속도·사거리의 손맛이 다른지, 망치 3단의 기절과 부메랑이 돌아오는 것이 느껴지는지. 그림은 아직 검·활·지팡이의 것이다(묶음 B에서 그린다)
 
 - [ ] 201단계: 소리 코드 일곱과 성별(2026-11-28) — `Docs/SoundCredits.md` 5차, `Docs/Gender.md`
   - 명령 한 줄을 다시 돌린다. 새 파일 `Assets/Tests/EditMode/GenderTests.cs`의 `.meta`가 생기면 커밋한다

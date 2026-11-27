@@ -537,6 +537,31 @@ namespace Game.Client.Tests
             Assert.IsTrue(_root.Playing);
         }
 
+        // The second weapon (Docs/Weapons.md): the weapons' slot left of the skills with a sword in hand and a bow behind,
+        // swapped, on a touch screen, and the bag's worn slots with the spare under the weapon in hand.
+        [UnityTest, Category(Screens.Category)]
+        public IEnumerator TheTwoWeaponsDraw()
+        {
+            yield return Start();
+            Playtest.Run(_root, "equip iron_sword; spare iron_bow");
+            yield return new WaitForSecondsRealtime(SceneSeconds);
+            yield return Screens.Take("weapons");
+            Assert.IsTrue(_root.SwapWeapons());
+            yield return new WaitForSecondsRealtime(0.6f);
+            Assert.AreEqual("iron_bow", Player.Equipment[ItemSlot.Weapon].Base.Id);
+            Assert.AreEqual("iron_sword", Player.Equipment.Spare.Base.Id);
+            yield return Screens.Take("weapons-swapped");
+            Controls.ForceTouch(true);
+            yield return new WaitForSecondsRealtime(0.4f);
+            yield return Screens.Take("weapons-touch");
+            Controls.ForceTouch(false);
+            _root.BagOpen = true;
+            yield return new WaitForSecondsRealtime(0.5f);
+            yield return Screens.Take("weapons-bag");
+            _root.BagOpen = false;
+            Assert.IsTrue(_root.Playing);
+        }
+
         // Mana spent and drunk back, and the set and rift legendaries worn.
         [UnityTest, Category(Screens.Category)]
         public IEnumerator ManaAndSetsDraw()

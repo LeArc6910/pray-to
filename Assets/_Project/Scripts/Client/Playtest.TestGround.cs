@@ -92,6 +92,23 @@ namespace Game.Client
                     world.WearForTest(player, item);
                     return Done("piece", $"{ItemText.Name(item)}({ItemText.RarityName(item.Rarity)}) · {Stats(player)}");
                 }
+                case "spare":
+                {
+                    // A weapon into the spare slot (Docs/Weapons.md, 무기 두 벌); "none" takes it off.
+                    if (words[2] == "none")
+                    {
+                        player.UnequipSpare();
+                        return Done("spare none", "보조 무기를 뺐다 · " + Stats(player));
+                    }
+                    var itemBase = loot.FindBase(words[2]) ?? throw new ArgumentException($"no item base '{words[2]}'");
+                    var roll = words.Length > 3 ? (TestKit.Roll)Enum.Parse(typeof(TestKit.Roll), words[3], ignoreCase: true) : TestKit.Roll.Middle;
+                    var item = TestKit.Make(loot, itemBase, Rarity.Common, roll, words.Length > 4 ? Int(words[4]) : 0);
+                    world.WearSpareForTest(player, item);
+                    return Done("spare", $"보조 무기: {ItemText.Name(item)} ({itemBase.Kind.Name}) · {Stats(player)}");
+                }
+                case "swap":
+                    if (!world.SwapWeapons(player.Id)) throw new InvalidOperationException("nothing to swap");
+                    return Done("swap", $"손에: {player.Equipment[ItemSlot.Weapon]?.Base.Name ?? "맨손"} · 보조: {player.Equipment.Spare?.Base.Name ?? "없음"} · {Stats(player)}");
                 case "set":
                 {
                     // Every piece of a set (sets.csv), at the roll and upgrade (Docs/Gear.md).
@@ -104,6 +121,7 @@ namespace Game.Client
                 case "bare":
                     foreach (ItemSlot slot in Enum.GetValues(typeof(ItemSlot)))
                         if (player.Equipment[slot] != null) player.Unequip(slot);
+                    if (player.Equipment.Spare != null) player.UnequipSpare();
                     return Done("bare", "맨몸 · " + Stats(player));
                 case "rune":
                 {

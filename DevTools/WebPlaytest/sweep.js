@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu title testground hunt harvest zones towns time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight warden antlion serpent queen general spider arenas world farm life npc factory defense gear skills skillfx layers monsterfx hazards bossfx hits shots blast mobwarn map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
+// Sections: menu title testground hunt harvest zones towns time basics first firstphone hour bag combat hero roll weapons bosses patterns veineater samurai knight warden antlion serpent queen general spider arenas world farm life npc factory defense gear skills skillfx layers monsterfx hazards bossfx hits shots blast mobwarn map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -5092,6 +5092,71 @@ async function hero(browser) {
 // its distance, does not come again inside its cooldown, lets a blow through in its first moment and not after, and
 // stops at a wall. The button's place on a phone held upright and sideways is photographed with four skills beside
 // it, and checked against every other button drawn.
+// Kinds of weapon and the second weapon (Docs/Weapons.md): the weapons' slot on the skill bar (drawn, on screen, on no
+// other button), the swap by X or by the button, the spare in the bag's worn slots, and each new kind's basic attack
+// landing on the slimes (PC only: the phone's pictures are for size and fit).
+async function weapons(browser) {
+  for (const name of ['pc', 'phone', 'phone-wide']) {
+    const profile = Profiles[name];
+    note(`\n## 무기 두 벌 (${name === 'pc' ? 'PC, X' : name === 'phone' ? '휴대폰 세로, 단추' : '휴대폰 가로, 단추'})\n`);
+    const game = await open(browser, run, profile, url);
+    if (game.touch) {
+      await game.startThroughMenu();
+      await game.until(s => s.playing, 25000);
+      await game.wait(800);
+      await game.send('classes warrior,archer');
+    } else {
+      await game.startSolo('playtest', false, 'warrior,archer');
+    }
+    await game.wait(1000);
+    await game.send('teach; goto wild; heal; equip iron_sword; spare iron_bow');
+    await game.wait(1200);
+    let s = await game.state();
+    check(s.weapon === 'iron_sword' && s.spare === 'iron_bow', `${name}: 손에 철 검, 보조에 철 활 (${s.weapon}, ${s.spare})`);
+
+    const buttons = (await game.buttons()).filter(b => b.shown);
+    const button = buttons.find(b => b.label === 'swap');
+    check(!!button, `${name}: 무기 칸(바꾸기 단추)이 그려진다`);
+    if (button) {
+      const [x, y, w, h] = button.rect;
+      check(x >= 0 && y >= 0 && x + w <= button.screen.width + 0.5 && y + h <= button.screen.height + 0.5, `${name}: 무기 칸이 화면 안에 있다 (${x.toFixed(0)},${y.toFixed(0)} ${w}×${h})`);
+      const over = buttons.filter(b => b !== button && b.rect[0] < x + w && x < b.rect[0] + b.rect[2] && b.rect[1] < y + h && y < b.rect[1] + b.rect[3]);
+      check(over.length === 0, `${name}: 무기 칸이 다른 단추와 겹치지 않는다${over.length ? ` (겹침: ${over.map(b => b.label).join(', ')})` : ''}`);
+    }
+    await game.shot(`weapons-hud-${name}`, '스킬 줄의 무기 칸: 손에 철 검, 구석에 보조 철 활');
+
+    // The swap: X on the PC, the button on a phone.
+    if (game.touch) await game.press('swap');
+    else await game.page.keyboard.press('KeyX');
+    s = await game.until(t => t.weapon === 'iron_bow', 4000);
+    check(!!s && s.spare === 'iron_sword' && s.weaponKind === 'bow', `${name}: 바꾸면 활을 들고 검이 보조로 (${s ? `${s.weapon}, ${s.spare}, ${s.weaponKind}` : '바뀌지 않음'})`);
+    await game.wait(400);
+    await game.shot(`weapons-swapped-${name}`, '바꾼 뒤: 손에 철 활, 구석에 철 검');
+
+    // The bag: the spare in the worn slots.
+    await game.send('bag on');
+    await game.wait(900);
+    await game.shot(`weapons-bag-${name}`, '가방의 착용 칸: 무기 아래 보조 무기');
+    await game.send('bag off');
+    await game.wait(500);
+
+    if (name === 'pc') {
+      await clearRoom(game, 4, 4);
+      for (const [kind, label] of [['dagger', '단검'], ['greatsword', '대검'], ['spear', '창'], ['hammer', '망치'], ['crossbow', '석궁'], ['boomerang', '부메랑'], ['wand', '완드'], ['orb', '오브']]) {
+        await game.send(`heal; hero iron_${kind} 1 0`);
+        const struck = await game.until(t => t.hurtMonsters > 0, 5000);
+        const held = await game.state();
+        check(!!struck && held.weaponKind === (kind === 'boomerang' ? 'throwing' : kind), `${name} ${label}: 기본 공격이 슬라임에 닿는다 (${held.weaponKind})`);
+        await game.wait(300);
+        await game.shot(`weapons-${kind}`, `${label}의 기본 공격 (그림은 아직 검·활·지팡이의 것)`);
+        await game.send('attack off; clear');
+        await game.wait(400);
+      }
+    }
+    await game.context.close();
+  }
+}
+
 async function roll(browser) {
   for (const name of ['pc', 'phone', 'phone-wide']) {
     const profile = Profiles[name];
@@ -8849,7 +8914,7 @@ async function towns(browser) {
   }
 }
 
-const Sections = { menu, title, testground, hunt, harvest, zones, towns, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, warden, antlion, serpent, queen, general, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, layers, monsterfx, hazards, bossfx, hits, shots, blast, mobwarn, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
+const Sections = { menu, title, testground, hunt, harvest, zones, towns, time, basics, first, firstphone, hour, bag, combat, hero, roll, weapons, bosses, patterns, veineater, samurai, knight, warden, antlion, serpent, queen, general, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, layers, monsterfx, hazards, bossfx, hits, shots, blast, mobwarn, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

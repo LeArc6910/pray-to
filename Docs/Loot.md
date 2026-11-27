@@ -195,7 +195,7 @@
 
 ## 장비 확장 (2026-11-27)
 
-사냥 재료 세트(구간마다 둘), 정예 고유(구간마다 넷, 등급 이름 "고유"), 보스 세트(보스마다 셋)와 효과·클래스 보너스는 `Docs/Gear.md`. `item_bases.csv`에 `effects`·`class`·`class_bonus`·`tint`, `sets.csv`에 `effects`·`class`·`class_bonus` 칸이 생겼다(모두 비워도 된다). `legendary`가 `elite`이면 정예가 떨군다. 보스 전설은 이제 보스마다 세 조각이고, 착용 레벨이 보스 다음 구간 시작이다.
+사냥 재료 세트(구간마다 둘), 정예 고유(구간마다 넷, 등급 이름 "고유"), 보스 세트(보스마다 셋)와 효과·클래스 보너스는 `Docs/Gear.md`. `item_bases.csv`에 `effects`·`class`·`class_bonus`·`tint`(2026-11-27에 무기 종류 `kind`, `Docs/Weapons.md`), `sets.csv`에 `effects`·`class`·`class_bonus` 칸이 생겼다(모두 비워도 된다). `legendary`가 `elite`이면 정예가 떨군다. 보스 전설은 이제 보스마다 세 조각이고, 착용 레벨이 보스 다음 구간 시작이다.
 
 ## 아직 정하지 않은 것
 

@@ -15,8 +15,9 @@ namespace Game.Core.Tests
                 && (m.Stat == StatType.Damage || m.Stat == StatType.Armor || m.Stat == StatType.MaxHealth))
             .Sum(m => (m.Min + m.Max) / 2f);
 
+        // A weapon is held against the ore weapon of its own kind (Docs/Weapons.md): each kind writes its damage for its pace.
         static string Piece(ItemBase b) => b.Slot == ItemSlot.Weapon
-            ? (b.Tags & SkillTag.Ranged) != 0 ? "bow" : (b.Tags & SkillTag.Magic) != 0 ? "staff" : "sword"
+            ? b.Kind.Id == "throwing" ? "boomerang" : b.Kind.Id
             : b.Slot == ItemSlot.Chest ? "armor" : b.Slot.ToString().ToLowerInvariant();
 
         static ItemBase Ore(int band, string piece) => Data.FindBase($"{Bands[band - 1]}_{piece}");

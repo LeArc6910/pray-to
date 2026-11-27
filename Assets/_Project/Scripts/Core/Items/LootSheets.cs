@@ -36,6 +36,8 @@ namespace Game.Core
         public IReadOnlyList<Recipe> Recipes { get; }
         // Gear sets and what wearing several of a set gives (sets.csv).
         public IReadOnlyList<GearSet> Sets { get; internal set; } = Array.Empty<GearSet>();
+        // The kinds of weapon (weapon_kinds.csv, Docs/Weapons.md); without the sheet, the sword, bow, staff and pickaxe.
+        public IReadOnlyList<WeaponKind> WeaponKinds { get; internal set; } = WeaponKind.Defaults;
         public IReadOnlyList<string> Errors { get; }
         public bool Success => Errors.Count == 0;
 
@@ -79,10 +81,26 @@ namespace Game.Core
             string consumablesCsv = "",
             string materialsCsv = "",
             string recipesCsv = "",
-            string setsCsv = "")
+            string setsCsv = "",
+            string kindsCsv = "")
         {
             var errors = new List<string>();
             var bases = ParseBases(basesCsv, errors);
+            var kinds = WeaponKind.Parse(kindsCsv, errors);
+            // A base names its kind (item_bases.csv kind); one that names no known kind is an error.
+            foreach (var itemBase in bases.Where(b => b.KindId.Length > 0))
+            {
+                if (itemBase.Slot != ItemSlot.Weapon) errors.Add($"{BasesFile}: '{itemBase.Id}'은 무기가 아니라 kind를 쓸 수 없습니다.");
+                else if (kinds.Count == 0) continue;
+                else if ((itemBase.Kind = kinds.FirstOrDefault(k => k.Id == itemBase.KindId)) == null)
+                    errors.Add($"{BasesFile}: '{itemBase.Id}'의 종류 '{itemBase.KindId}'가 {WeaponKind.File}에 없습니다.");
+            }
+            // One that names none takes the sheet's row of its default kind (sword, bow, staff, pickaxe) where there is one.
+            foreach (var itemBase in bases.Where(b => b.Slot == ItemSlot.Weapon && b.KindId.Length == 0))
+            {
+                var own = kinds.FirstOrDefault(k => k.Id == WeaponKind.DefaultFor(itemBase).Id);
+                if (own != null) itemBase.Kind = own;
+            }
             var sets = ParseSets(setsCsv, errors);
             // A base names its set (item_bases.csv set); one that names no known set is an error.
             foreach (var itemBase in bases.Where(b => b.SetId.Length > 0))
@@ -96,7 +114,11 @@ namespace Game.Core
             var consumables = ParseConsumables(consumablesCsv, errors);
             var materials = ParseMaterials(materialsCsv, errors);
             var recipes = ParseRecipes(recipesCsv, bases, consumables, materials, errors);
-            return new LootData(bases, affixes, runes, runewords, consumables, materials, recipes, errors) { Sets = sets };
+            return new LootData(bases, affixes, runes, runewords, consumables, materials, recipes, errors)
+            {
+                Sets = sets,
+                WeaponKinds = kinds.Count > 0 ? kinds : WeaponKind.Defaults,
+            };
         }
 
         static IReadOnlyList<Modifier> ClassBonusOf(CsvRow row)
@@ -197,6 +219,7 @@ namespace Game.Core
                         ClassId = row["class"],
                         ClassBonus = ClassBonusOf(row),
                         Tint = TintOf(row["tint"]),
+                        KindId = row["kind"],
                     });
                 });
             }

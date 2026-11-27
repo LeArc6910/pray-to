@@ -255,7 +255,11 @@ namespace Game.Client
 
         // ---- 장비 ----
 
-        static readonly (string Id, string Name)[] WeaponKinds = { ("sword", "검"), ("bow", "활"), ("staff", "지팡이") };
+        static readonly (string Id, string Name)[] WeaponKinds =
+        {
+            ("sword", "검"), ("dagger", "단검"), ("greatsword", "대검"), ("spear", "창"), ("hammer", "망치"),
+            ("bow", "활"), ("crossbow", "석궁"), ("boomerang", "부메랑"), ("staff", "지팡이"), ("wand", "완드"), ("orb", "오브"),
+        };
         static readonly Rarity[] Rarities = { Rarity.Common, Rarity.Uncommon, Rarity.Rare, Rarity.Epic };
         static readonly (TestKit.Roll Roll, string Name)[] Rolls = { (TestKit.Roll.Low, "낮은 값"), (TestKit.Roll.Middle, "가운데"), (TestKit.Roll.High, "높은 값") };
 
@@ -284,6 +288,16 @@ namespace Game.Client
             Heading("한 벌씩");
             var pieces = loot.Bases.Where(b => !b.IsLegendary && b.Weight > 0 && b.Level == BandBaseLevel(_band) && !b.Id.EndsWith("_pickaxe", StringComparison.Ordinal)).ToList();
             Grid("한 벌씩", width, 104, pieces.Select(b => Cell(b.Name, player.Equipment[b.Slot]?.Base == b, () => Run(root, $"test piece {b.Id} {options}"))));
+            // The second weapon (Docs/Weapons.md, 무기 두 벌): the band's eleven into the spare slot, and the swap.
+            Heading("보조 무기 (무기 종류 11, 바꾸기 X)");
+            string tierName = DamageBands.TierNames[_band - 1];
+            var spares = TestKit.Weapons.Select(w => loot.Bases.FirstOrDefault(b => b.Id == $"{tierName}_{w}")).Where(b => b != null).ToList();
+            Grid("보조 무기", width, 104, spares.Select(b => Cell(b.Name, player.Equipment.Spare?.Base == b, () => Run(root, $"test spare {b.Id} {_roll} {_upgrade}"))));
+            Grid("무기 바꾸기", width, 120, new[]
+            {
+                Cell("손과 보조 바꾸기", false, () => Run(root, "test swap")),
+                Cell("보조 빼기", false, () => Run(root, "test spare none")),
+            });
             // The band's hunting sets and the boss sets worn in it, all their pieces at once (Docs/Gear.md).
             Heading("세트 (사냥·보스, 한 번에 모두)");
             var sets = loot.Sets.Where(set => loot.Bases.Any(b => b.Set == set && GearBand(b) == _band)).ToList();

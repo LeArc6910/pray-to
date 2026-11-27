@@ -46,7 +46,8 @@ namespace Game.Core.Tests
                 Read(LootSheets.ConsumablesFile),
                 Read(LootSheets.MaterialsFile),
                 Read(LootSheets.RecipesFile),
-                Read(LootSheets.SetsFile));
+                Read(LootSheets.SetsFile),
+                Read(WeaponKind.File));
         }
     }
 

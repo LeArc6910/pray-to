@@ -248,12 +248,13 @@ namespace Game.Client
             {
                 GUILayout.Label(Fit("착용", _textWidth));
                 var slots = (ItemSlot[])Enum.GetValues(typeof(ItemSlot));
-                var worn = Grid(slots.Length, cell);
-                for (int i = 0; i < slots.Length; i++)
+                // The six and the spare weapon last (Docs/Weapons.md).
+                var worn = Grid(slots.Length + 1, cell);
+                for (int i = 0; i <= slots.Length; i++)
                 {
-                    var item = _client.Equipment[slots[i]];
+                    var item = i < slots.Length ? _client.Equipment[slots[i]] : _client.Equipment.Spare;
                     var area = CellAt(worn, i, cell);
-                    if (item == null) EmptyCell(area, ItemText.SlotName(slots[i]));
+                    if (item == null) EmptyCell(area, i < slots.Length ? ItemText.SlotName(slots[i]) : ItemText.SpareName);
                     else if (Cell(area, Sprites.Icon(item.Base), ItemText.Name(item), item.Upgrade > 0 ? $"+{item.Upgrade}" : null, Palette.Of(item.Rarity), _picked == item.Id, ItemTooltip(item)))
                         Pick(item.Id, null);
                 }
@@ -421,16 +422,29 @@ namespace Game.Client
         BagCard ItemCard(Item item)
         {
             bool wearing = _client.Equipment[item.Base.Slot] == item;
-            var card = new BagCard { Icon = Sprites.Icon(item.Base), Title = ItemText.Name(item) + (wearing ? " (착용 중)" : ""), TitleColor = Palette.Of(item.Rarity) };
+            bool spare = _client.Equipment.Spare == item;
+            var card = new BagCard
+            {
+                Icon = Sprites.Icon(item.Base),
+                Title = ItemText.Name(item) + (wearing ? " (착용 중)" : spare ? " (보조 무기)" : ""),
+                TitleColor = Palette.Of(item.Rarity),
+            };
             if (wearing)
             {
                 Add(card, "벗기", () => Send(_client.UnequipCommand(item.Base.Slot), Sound.Click));
+            }
+            else if (spare)
+            {
+                // The spare (Docs/Weapons.md, 무기 두 벌): into the hand, or back to the bag.
+                Add(card, "손에 들기", () => Send(_client.SwapWeaponsCommand(), Sound.Click), Ui.Look.Primary);
+                Add(card, "벗기", () => Send(_client.UnequipSpareCommand(), Sound.Click));
             }
             else
             {
                 // Too high a level to wear yet: the button says which level instead.
                 bool wearable = item.Base.RequiredLevel <= _client.Level;
                 Add(card, wearable ? "장착" : $"Lv{item.Base.RequiredLevel}", () => Send(_client.EquipCommand(item.Id), Sound.Place), Ui.Look.Primary, wearable);
+                if (item.Base.Slot == ItemSlot.Weapon && wearable) Add(card, "보조로", () => Send(_client.EquipSpareCommand(item.Id), Sound.Place));
                 Add(card, "버리기", () => Send(_client.DiscardCommand(item.Id), Sound.Click), Ui.Look.Danger);
             }
             if (_selectedRune != null && item.Sockets.Contains(null))

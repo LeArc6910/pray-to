@@ -258,10 +258,11 @@ namespace Game.Core
             if (Vec2.Distance(start, player.Position) > 1e-4f) player.Corrections++;
         }
 
-        // Damage before armor for the skill's tags and those buffs grant.
+        // Damage before armor for the skill's tags and those buffs grant, from the worn weapon of the skill's class's
+        // branch (PlayerStats.ForSkill, Docs/Weapons.md).
         float RollSkill(Player player, SkillDefinition skill, out bool critical)
         {
-            var stats = player.Stats;
+            var stats = player.Stats.ForSkill(skill);
             var context = player.ContextFor(skill);
             critical = _random.Chance(stats.CritChanceFor(context) / 100f);
             return stats.DamageFor(context) * skill.Damage / 100f * SkillRules.DamageScale(player.PowerOf(skill)) * SkillSupports.DamageFactor(skill, player.SupportsOf(skill))
@@ -471,18 +472,23 @@ namespace Game.Core
             bool touching = _enemies.Any(e => !e.IsDead && !e.Away && !pierced.Contains(e.Id) && Vec2.Distance(e.Position, at) <= projectile.Radius + e.Definition.Radius)
                 || _bosses.Any(b => !b.IsDead && !pierced.Contains(b.Id) && Vec2.Distance(b.Position, at) <= projectile.Radius + b.Definition.Radius);
             if (!touching && !ended) return false;
-            // One that goes through hits what it touches and flies on, softer, while it has monsters left to pass.
-            if (touching && !ended && projectile.PiercesLeft > 0)
+            // One that goes through hits what it touches and flies on, softer, while it has monsters left to pass; one
+            // thrown to come back (TurnTicks) goes through everything, as hard, striking each once each way.
+            bool returns = projectile.TurnTicks != 0;
+            if (touching && !ended && (projectile.PiercesLeft > 0 || returns))
             {
                 HitArea(owner, at, projectile.Radius, projectile.Damage, projectile.Critical, projectile.Cause + 1, projectile.Tags, pierced,
                     projectile.Skill == null ? projectile.More : 0);
+                if (returns) return false;
                 projectile.PiercesLeft--;
                 projectile.Damage *= SkillSupports.PierceFalloff;
                 return false;
             }
+            // Back in the thrower's hand it is simply caught.
+            if (returns && ended && !touching) return true;
 
             if (projectile.Skill?.Radius > 0) _events.Add(new SimEvent(SimEventType.Burst, owner.Id, amount: projectile.Cause, position: at));
-            float burst = projectile.Skill == null ? 0 : SkillSupports.Radius(projectile.Skill, owner.SupportsOf(projectile.Skill));
+            float burst = projectile.Skill == null ? projectile.Burst : SkillSupports.Radius(projectile.Skill, owner.SupportsOf(projectile.Skill));
             HitArea(owner, at, Math.Max(burst, projectile.Radius), projectile.Damage, projectile.Critical, projectile.Cause + 1,
                 projectile.Tags, pierced.Count > 0 ? pierced : null, projectile.Skill == null ? projectile.More : 0);
             return true;

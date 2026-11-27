@@ -109,6 +109,121 @@ namespace Game.Client
             "hH........",
         };
 
+        // The kinds of weapon (Docs/Weapons.md) by shape until their own drawings (묶음 B): a short blade, a broad one,
+        // a spear's head on a long haft, a hammer's block, a crossbow's prod on its stock, a boomerang's bend, a
+        // wand's small stone and an orb in its holder.
+        static readonly string[] Dagger =
+        {
+            "..........",
+            "..........",
+            "........L.",
+            ".......LM.",
+            "......LMm.",
+            "..y..LMm..",
+            "...yLMm...",
+            "....yy....",
+            "...ryy....",
+            "..r.......",
+        };
+
+        static readonly string[] Greatsword =
+        {
+            "........LL",
+            ".......LMM",
+            "......LMMm",
+            ".....LMMm.",
+            "....LMMm..",
+            ".y.LMMm...",
+            "..yMMm....",
+            "..yyy.....",
+            ".ryy.y....",
+            "rr........",
+        };
+
+        static readonly string[] Spear =
+        {
+            ".......LL.",
+            "......LMML",
+            ".......MmL",
+            "......hm..",
+            ".....hH...",
+            "....hH....",
+            "...hH.....",
+            "..hH......",
+            ".hH.......",
+            "hH........",
+        };
+
+        static readonly string[] Hammer =
+        {
+            "....LLLL..",
+            "...LMMMMm.",
+            "...LMMMMm.",
+            "....mmmm..",
+            ".....hH...",
+            "....hH....",
+            "...hH.....",
+            "..hH......",
+            ".hH.......",
+            "hH........",
+        };
+
+        static readonly string[] Crossbow =
+        {
+            "..........",
+            "LMm....mML",
+            ".sMm..mMs.",
+            "..s.hH.s..",
+            "...shHs...",
+            "....hH....",
+            "....hH....",
+            "....hH....",
+            "...rHHr...",
+            "....rr....",
+        };
+
+        static readonly string[] Boomerang =
+        {
+            "..........",
+            ".LL.......",
+            ".LMm......",
+            "..MMm.....",
+            "...MMm....",
+            "....MMmMML",
+            ".....mMMm.",
+            "..........",
+            "..........",
+            "..........",
+        };
+
+        static readonly string[] Wand =
+        {
+            "..........",
+            "..........",
+            "......gG..",
+            ".....gwgM.",
+            ".....MGm..",
+            "....LM....",
+            "....hH....",
+            "...hH.....",
+            "..hH......",
+            "..........",
+        };
+
+        static readonly string[] OrbRows =
+        {
+            "..........",
+            "...gggg...",
+            "..gwwggG..",
+            "..gwgggG..",
+            "..ggggGG..",
+            "...GGGG...",
+            "...MmMm...",
+            "....hH....",
+            "....hH....",
+            "...LMMm...",
+        };
+
         static readonly string[] Helmet =
         {
             "...LLLL...",
@@ -214,7 +329,9 @@ namespace Game.Client
         {
             var marks = new List<(int X, int Y, char C)>();
             bool bow = (item.Tags & SkillTag.Ranged) != 0, staff = (item.Tags & SkillTag.Magic) != 0;
-            if (item.Slot == ItemSlot.Weapon && !item.IsLegendary && ElementOf(item) != default)
+            // Only the sword, bow and staff drawings have the marks' places (Docs/Weapons.md: the other kinds have no element pieces).
+            bool plain = item.Kind == null || item.Kind.Id is "sword" or "bow" or "staff";
+            if (item.Slot == ItemSlot.Weapon && plain && !item.IsLegendary && ElementOf(item) != default)
             {
                 if (bow) for (int y = 2; y <= 7; y++) marks.Add((6, y, y % 2 == 0 ? 'g' : 'G'));
                 else if (staff) marks.AddRange(new[] { (9, 0, 'g'), (4, 1, 'g'), (9, 4, 'G') });
@@ -261,7 +378,7 @@ namespace Game.Client
             }
             string[] rows = item.Slot switch
             {
-                ItemSlot.Weapon => item.IsPickaxe ? PickaxeRows : (item.Tags & SkillTag.Ranged) != 0 ? Bow : (item.Tags & SkillTag.Magic) != 0 ? Staff : Sword,
+                ItemSlot.Weapon => item.IsPickaxe ? PickaxeRows : WeaponRows(item),
                 ItemSlot.Helmet => Helmet,
                 ItemSlot.Chest => Armor,
                 ItemSlot.Boots => Boots,
@@ -270,6 +387,22 @@ namespace Game.Client
             };
             return PixelImage.FromRows(colors, Marked(rows, item)).Outlined(Outline);
         }
+
+        // The icon of a weapon's kind (Docs/Weapons.md).
+        static string[] WeaponRows(ItemBase item) => item.Kind?.Id switch
+        {
+            "dagger" => Dagger,
+            "greatsword" => Greatsword,
+            "spear" => Spear,
+            "hammer" => Hammer,
+            "crossbow" => Crossbow,
+            "throwing" => Boomerang,
+            "wand" => Wand,
+            "orb" => OrbRows,
+            "bow" => Bow,
+            "staff" => Staff,
+            _ => (item.Tags & SkillTag.Ranged) != 0 ? Bow : (item.Tags & SkillTag.Magic) != 0 ? Staff : Sword,
+        };
 
         // A legendary's stones are its boss's colour (2026-11-11, the content audit: the legendaries of one slot were
         // drawn alike whichever boss they came from).

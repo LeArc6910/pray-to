@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -30,6 +31,19 @@ namespace Game.Core
         {
             string mark = classes == null ? "" : classes.Contains(classId) ? " (적용)" : " (다른 클래스)";
             return $"{ClassName(classId)} 보너스: {string.Join(", ", bonus.Select(StatText.Describe))}{mark}";
+        }
+
+        // The second weapon's slot (Docs/Weapons.md, 무기 두 벌).
+        public const string SpareName = "보조 무기";
+
+        // A weapon's kind and how its basic attack goes, for the tooltip: "대검 · 근접 · 공격 속도 ×0.6 — 느리지만 …".
+        public static string KindLine(ItemBase itemBase)
+        {
+            var kind = itemBase?.Kind;
+            if (kind == null) return "";
+            string branch = kind.Branch == SkillTag.None ? "클래스 무기 아님" : StatText.TagName(kind.Branch);
+            string pace = Math.Abs(kind.Speed - 1) < 0.01f ? "" : $" · 공격 속도 ×{kind.Speed:0.##}";
+            return $"{kind.Name} · {branch}{pace}" + (kind.Description.Length > 0 ? $" — {kind.Description}" : "");
         }
 
         public static string SlotName(ItemSlot slot) => slot switch
@@ -66,6 +80,7 @@ namespace Game.Core
         public static List<string> Describe(Item item, bool showTiers = false, Equipment worn = null, IReadOnlyCollection<string> classes = null)
         {
             var lines = new List<string> { $"[{GradeName(item)}] {Name(item)} (레벨 {item.Level})", $"  착용 레벨 {item.Base.RequiredLevel}" };
+            if (item.Base.Slot == ItemSlot.Weapon) lines.Add("  " + KindLine(item.Base));
             lines.AddRange(item.Implicits.Select(m => "  " + StatText.Describe(m)));
 
             foreach (var affix in item.Affixes.OrderBy(a => a.Affix.Kind))

@@ -79,6 +79,17 @@ namespace Game.Core
 
     public static class SkillText
     {
+        // What a class skill draws on (Docs/Weapons.md): "\n근접 무기의 힘을 받는다", or, with none worn, the cut.
+        public static string WeaponNote(SkillDefinition skill, PlayerStats stats)
+        {
+            var branch = skill?.Class?.Weapon ?? SkillTag.None;
+            if (branch == SkillTag.None || stats == null) return "";
+            string name = StatText.TagName(branch);
+            return stats.Wields(branch)
+                ? $"\n{name} 무기의 힘을 받는다(손에 들지 않아도)"
+                : $"\n{name} 무기 없음: 더 센 무기의 {Math.Round(PlayerStats.OffBranchShare * 100)}%로 친다";
+        }
+
         // The skill's numbers in one line, e.g. "피해 150% · 둘레 1.8칸 · 재사용 4초".
         // At a rank (Docs/Classes.md, 스킬 포인트와 단계): its damage, cooldown and time as that rank has them. With the
         // player's stats, the damage also in points ("피해 31 (150%)"), a heal in health, and the cooldown and time
@@ -88,7 +99,7 @@ namespace Game.Core
         {
             var parts = new List<string>();
             int damage = (int)Math.Round(skill.Damage * SkillRules.DamageScale(rank) * SkillSupports.DamageFactor(skill, supports));
-            string Hit(string percent) => stats == null ? percent : $"{Points(stats.DamageFor(stats.ContextFor(skill) | SkillSupports.Tags(supports)) * damage / 100f)} ({percent})";
+            string Hit(string percent) => stats == null ? percent : $"{Points(stats.ForSkill(skill).DamageFor(stats.ContextFor(skill) | SkillSupports.Tags(supports)) * damage / 100f)} ({percent})";
             string duration = Number(SkillRules.DurationTicks(skill, rank, stats?.SkillDurationFor(skill.Tags) ?? 0) * SkillSupports.DurationFactor(supports) / World.TicksPerSecond);
             float radius = SkillSupports.Radius(skill, supports);
             int count = SkillSupports.Count(skill, supports);

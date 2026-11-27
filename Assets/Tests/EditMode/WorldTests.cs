@@ -149,7 +149,8 @@ namespace Game.Core.Tests
             Assert.AreSame(BasicAttack.Arrow, BasicAttack.For(SkillTag.Ranged));
             Assert.AreSame(BasicAttack.Bolt, BasicAttack.For(SkillTag.Magic));
             Assert.AreSame(BasicAttack.Swing, BasicAttack.For(SkillTag.None));
-            Assert.AreSame(BasicAttack.Arrow, PlayerStats.From(Gear.Wearing("copper_bow")).Attack);
+            Assert.AreEqual(BasicAttackKind.Arrow, PlayerStats.From(Gear.Wearing("copper_bow")).Attack.Kind);
+            Assert.AreEqual("bow", PlayerStats.From(Gear.Wearing("copper_bow")).Kind.Id);
             Assert.AreSame(BasicAttack.Swing, PlayerStats.From(new Equipment()).Attack, "bare hands swing");
         }
 

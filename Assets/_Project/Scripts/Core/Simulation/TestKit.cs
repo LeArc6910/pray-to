@@ -29,7 +29,8 @@ namespace Game.Core
             Defense,
         }
 
-        public static readonly string[] Weapons = { "sword", "bow", "staff" };
+        // The ore weapons of a band, by their ids' ends (Docs/Weapons.md: eleven kinds).
+        public static readonly string[] Weapons = { "sword", "dagger", "greatsword", "spear", "hammer", "bow", "crossbow", "boomerang", "staff", "wand", "orb" };
         static readonly string[] Pieces = { "helmet", "armor", "boots", "ring", "amulet" };
 
         static int At(ModifierRange range, Roll roll) => roll switch

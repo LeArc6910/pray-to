@@ -229,6 +229,14 @@ namespace Game.Core
             player.Equip(item);
         }
 
+        // A weapon into the spare slot (Docs/Weapons.md, 무기 두 벌), the one there before let go.
+        public void WearSpareForTest(Player player, Item item)
+        {
+            if (player == null || item == null || item.Base.Slot != ItemSlot.Weapon) return;
+            Register(item);
+            player.EquipSpare(item);
+        }
+
         // Whole again, mana full, a burn or poison washed off, potions back up to the count.
         public void RefillForTest(Player player, ConsumableDefinition potion, int potions)
         {

@@ -269,6 +269,47 @@ namespace Game.Core
             return true;
         }
 
+        // A weapon from the bag into the spare slot (Docs/Weapons.md, 무기 두 벌); the spare there before goes to the bag.
+        public bool EquipSpare(int playerId, int itemId)
+        {
+            var player = FindPlayer(playerId);
+            var item = player?.Inventory.Find(itemId);
+            if (item == null || player.IsDead || item.Base.Slot != ItemSlot.Weapon || item.Base.RequiredLevel > player.Level) return false;
+            player.Inventory.Replace(item, player.Equipment.Spare);
+            player.EquipSpare(item);
+            return true;
+        }
+
+        public bool UnequipSpare(int playerId)
+        {
+            var player = FindPlayer(playerId);
+            var item = player?.Equipment.Spare;
+            if (item == null || player.IsDead || player.Inventory.IsFull) return false;
+            player.UnequipSpare();
+            player.Inventory.TryAdd(item);
+            return true;
+        }
+
+        // Seconds a weapon swap holds back the next basic attack.
+        public const float SwapSeconds = 0.25f;
+
+        // The weapon in hand and the spare change places: the combo starts again, and the next basic attack waits
+        // SwapSeconds (or the recovery of the last, if longer). A swap is free and can be made while rolling.
+        public bool SwapWeapons(int playerId)
+        {
+            var player = FindPlayer(playerId);
+            if (player == null || player.IsDead) return false;
+            if (player.Equipment[ItemSlot.Weapon] == null && player.Equipment.Spare == null) return false;
+            player.Equipment.SwapWeapons();
+            player.RefreshStats();
+            player.InventoryVersion++;
+            player.LastAttackTick = -1;
+            player.ComboStep = 0;
+            player.AttackCooldown = Math.Max(player.AttackCooldown, Ticks(SwapSeconds));
+            _events.Add(new SimEvent(SimEventType.Swapped, player.Id));
+            return true;
+        }
+
         // Fills the item's first empty socket with one of the player's runes. Works on worn items too.
         public bool InsertRune(int playerId, int itemId, RuneDefinition rune)
         {

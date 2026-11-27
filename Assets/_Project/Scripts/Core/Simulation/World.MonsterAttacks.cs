@@ -968,6 +968,23 @@ namespace Game.Core
         }
 
         // A mend that ran out or was broken by a hit, or a call stopped before it was made.
+        // Dazed by a player's blow (a hammer's finisher, Docs/Weapons.md): its attack is broken off and it stands dazed,
+        // taking StaggerMore, for so long. Only the monsters that fight from the attacks sheet; a boss is never dazed.
+        void Daze(Enemy enemy, float seconds)
+        {
+            if (enemy.IsDead || enemy.Away || enemy.Definition.Attacks.Count == 0 || enemy.State == EnemyState.Idle) return;
+            if (enemy.State == EnemyState.Stagger)
+            {
+                enemy.StateTicks = Math.Max(enemy.StateTicks, Ticks(seconds));
+                return;
+            }
+            EndAttack(enemy, broken: true);
+            enemy.RepeatsLeft = 0;
+            enemy.State = EnemyState.Stagger;
+            enemy.StateTicks = Ticks(seconds);
+            _events.Add(new SimEvent(SimEventType.MonsterFx, enemy.Id, amount: MonsterFxStagger, position: enemy.Position));
+        }
+
         void EndAttack(Enemy enemy, bool broken)
         {
             if (enemy.State == EnemyState.Channel || enemy.Attack?.Shape == MonsterAttackShape.Mend)
@@ -1193,12 +1210,13 @@ namespace Game.Core
             {
                 if (--shot.TurnTicks > 0) return false;
                 shot.TurnTicks = -1;
-                shot.PauseTicks = Ticks(TurnPause);
+                // A player's thrown weapon turns at once (Docs/Weapons.md, 투척); a monster's hangs there a moment.
+                shot.PauseTicks = shot.Friendly ? 0 : Ticks(TurnPause);
                 shot.Pace = shot.Velocity.Length;
                 shot.Velocity = Vec2.Zero;
                 // It can strike on the way back whoever it struck on the way out.
                 shot.Pierced.Clear();
-                _events.Add(new SimEvent(SimEventType.MonsterFx, shot.Source, amount: MonsterFxTurn, position: shot.Position));
+                if (!shot.Friendly) _events.Add(new SimEvent(SimEventType.MonsterFx, shot.Source, amount: MonsterFxTurn, position: shot.Position));
                 return false;
             }
             if (shot.PauseTicks > 0)
@@ -1206,10 +1224,24 @@ namespace Game.Core
                 shot.PauseTicks--;
                 return false;
             }
-            var home = FindEnemy(shot.Source);
-            if (home == null || home.IsDead) return shot.Velocity.LengthSquared < 1e-6f;
-            var toward = home.Position - shot.Position;
-            if (toward.Length <= home.Definition.Radius + shot.Radius + shot.Pace * TickSeconds) return true;
+            Vec2 homeAt;
+            float homeRadius;
+            if (shot.Friendly)
+            {
+                var thrower = FindPlayer(shot.Source);
+                if (thrower == null || thrower.IsDead) return true;
+                homeAt = thrower.Position;
+                homeRadius = PlayerRadius;
+            }
+            else
+            {
+                var home = FindEnemy(shot.Source);
+                if (home == null || home.IsDead) return shot.Velocity.LengthSquared < 1e-6f;
+                homeAt = home.Position;
+                homeRadius = home.Definition.Radius;
+            }
+            var toward = homeAt - shot.Position;
+            if (toward.Length <= homeRadius + shot.Radius + shot.Pace * TickSeconds) return true;
             shot.Velocity = toward.Normalized * shot.Pace;
             return false;
         }

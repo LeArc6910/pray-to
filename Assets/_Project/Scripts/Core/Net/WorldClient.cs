@@ -1641,6 +1641,10 @@ namespace Game.Core
         public int InventoryVersion { get; private set; }
 
         public byte[] EquipCommand(int itemId) => new InventoryCommandMessage(InventoryCommand.Equip, itemId).Encode();
+        // The second weapon (Docs/Weapons.md, 무기 두 벌).
+        public byte[] EquipSpareCommand(int itemId) => new InventoryCommandMessage(InventoryCommand.EquipSpare, itemId).Encode();
+        public byte[] UnequipSpareCommand() => new InventoryCommandMessage(InventoryCommand.UnequipSpare, 0).Encode();
+        public byte[] SwapWeaponsCommand() => new InventoryCommandMessage(InventoryCommand.SwapWeapons, 0).Encode();
 
         public byte[] UnequipCommand(ItemSlot slot) => new InventoryCommandMessage(InventoryCommand.Unequip, 0, slot).Encode();
 

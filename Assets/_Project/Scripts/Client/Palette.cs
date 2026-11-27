@@ -9,6 +9,8 @@ namespace Game.Client
         public static readonly Color Potion = new Color(0.95f, 0.35f, 0.45f);
         // The dodge roll's slot (SkillBar) and its dust.
         public static readonly Color Roll = new Color(0.85f, 0.78f, 0.63f);
+        // The weapons' slot on the skill bar (SkillBar.DrawWeapons, Docs/Weapons.md).
+        public static readonly Color Weapons = new Color(0.7f, 0.78f, 0.9f);
         public static readonly Color Heal = new Color(0.45f, 1f, 0.5f);
         public static readonly Color Water = new Color(0.45f, 0.7f, 1f);
         // The edge of a quick slot holding the gear worn now.

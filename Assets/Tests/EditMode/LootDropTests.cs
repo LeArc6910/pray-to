@@ -66,7 +66,6 @@ namespace Game.Core.Tests
             var world = Room(monsters: Pinata);
             var player = world.AddPlayer("a", Gear.Wearing("copper_sword"));
             Kill(world, player, Pinata.Find("pinata"));
-
             // Close enough already: the scatter keeps drops within a tile of where the monster stood.
             var events = new List<SimEvent>();
             for (int i = 0; i < 30 && world.GroundLoot.Count > 0; i++)
@@ -81,7 +80,8 @@ namespace Game.Core.Tests
             Assert.AreEqual(1, player.Inventory.Items.Count);
             Assert.AreEqual(1, player.Inventory.Runes.Values.Sum());
             Assert.AreNotEqual(0, player.Inventory.Items[0].Id, "items get an id when they appear");
-            Assert.AreEqual(2, events.Count(e => e.Type == SimEventType.Pickup && e.Source == player.Id));
+            // The item and the rune, and coins or essence besides when the roll gives them.
+            Assert.GreaterOrEqual(events.Count(e => e.Type == SimEventType.Pickup && e.Source == player.Id), 2);
         }
 
         [Test]

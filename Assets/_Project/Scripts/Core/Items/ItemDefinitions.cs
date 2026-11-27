@@ -94,6 +94,15 @@ namespace Game.Core
         // What else the item is for besides fighting: "pickaxe", or empty. Only a pickaxe in hand digs rock.
         public string Tool { get; }
         public bool IsPickaxe => Tool == Pickaxe;
+        // A weapon's kind (item_bases.csv kind, weapon_kinds.csv): its branch, basic attack and pace. A weapon base that
+        // names none is a sword, bow, staff or pickaxe by its tags and tool (WeaponKind.DefaultFor); anything else has none.
+        public string KindId { get; internal set; } = "";
+        WeaponKind _kind;
+        public WeaponKind Kind
+        {
+            get => Slot != ItemSlot.Weapon ? null : _kind ?? WeaponKind.DefaultFor(this);
+            internal set => _kind = value;
+        }
         // The boss that drops this as a legendary, or empty for an ordinary base; and the chance (%) each fighter
         // gets one when it falls.
         public string Legendary { get; }

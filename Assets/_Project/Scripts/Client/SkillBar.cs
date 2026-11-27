@@ -57,12 +57,27 @@ namespace Game.Client
                 : new Rect(potion.xMax + Gap, potion.yMax - RollSize, RollSize, RollSize);
         }
 
+        // The weapons' slot (Docs/Weapons.md, 무기 두 벌): on the PC bar left of the first skill, on touch left of the
+        // roll button.
+        public static Rect WeaponArea(int skills)
+        {
+            if (Controls.UsingTouch)
+            {
+                var roll = RollArea(skills);
+                return new Rect(roll.x - Gap - RollSize, roll.y, RollSize, RollSize);
+            }
+            var first = Area(0, skills);
+            return new Rect(first.x - Gap - KeySize, first.y, KeySize, KeySize);
+        }
+
         // Everything the slots cover, for keeping other text clear of them.
         public static Rect Bounds(int skills)
         {
             var bounds = Area(skills, skills);
             var roll = RollArea(skills);
             bounds = Rect.MinMaxRect(Mathf.Min(bounds.xMin, roll.xMin), Mathf.Min(bounds.yMin, roll.yMin), Mathf.Max(bounds.xMax, roll.xMax), Mathf.Max(bounds.yMax, roll.yMax));
+            var weapons = WeaponArea(skills);
+            bounds = Rect.MinMaxRect(Mathf.Min(bounds.xMin, weapons.xMin), Mathf.Min(bounds.yMin, weapons.yMin), Mathf.Max(bounds.xMax, weapons.xMax), Mathf.Max(bounds.yMax, weapons.yMax));
             for (int slot = 0; slot < skills; slot++)
             {
                 var area = Area(slot, skills);
@@ -128,11 +143,42 @@ namespace Game.Client
                     string tags = skill.Tags == SkillTag.None ? "" : " · " + StatText.TagNames(skill.Tags);
                     var gems = client.GemsIn(skill);
                     DrawTooltip($"{skill.Name} {rank}단계 ({skill.Class.Name}){tags}\n{skill.Description}\n{SkillText.Numbers(skill, rank, client.Stats, client.SupportsOf(skill))}"
-                        + (gems.Count > 0 ? $"\n변형: {string.Join(", ", gems.Select(g => g.Name))}" : ""), area);
+                        + (gems.Count > 0 ? $"\n변형: {string.Join(", ", gems.Select(g => g.Name))}" : "")
+                        + SkillText.WeaponNote(skill, client.Stats), area);
                 }
             }
             DrawPotion(client, Area(count, count));
             DrawRoll(client, RollArea(count));
+            DrawWeapons(client, WeaponArea(count));
+        }
+
+        // The weapon in hand, big, and the spare, small in the corner; tapped, clicked or its key (X) swaps them
+        // (Docs/Weapons.md, 무기 두 벌). Dim without a spare.
+        static void DrawWeapons(WorldClient client, Rect area)
+        {
+            var held = client.Equipment[ItemSlot.Weapon];
+            var spare = client.Equipment.Spare;
+            Controls.Block(area);
+            Controls.SwapButton(area);
+            Panel(area, Palette.Weapons);
+
+            var previous = GUI.color;
+            GUI.color = spare != null || held == null ? Color.white : new Color(1, 1, 1, 0.6f);
+            float big = area.width - Inner * 2 - 10;
+            if (held != null) Sprites.DrawInGui(new Rect(area.x + Inner + 1, area.y + Inner + 1, big, big), Sprites.Icon(held.Base));
+            float small = area.width * 0.42f;
+            var corner = new Rect(area.xMax - Inner - small, area.yMax - Inner - small, small, small);
+            Fill(corner, new Color(0, 0, 0, 0.45f));
+            if (spare != null) Sprites.DrawInGui(corner, Sprites.Icon(spare.Base));
+            GUI.color = previous;
+            if (!Controls.UsingTouch) GUI.Label(KeyArea(area), Controls.SwapKeyName, _keyStyle);
+
+            if (!Controls.UsingTouch && area.Contains(Event.current.mousePosition))
+            {
+                string Line(string label, Item item) => item == null ? $"{label}: 없음" : $"{label}: {ItemText.Name(item)} ({item.Base.Kind.Name})";
+                DrawTooltip($"무기 바꾸기 ({Controls.SwapKeyName})\n{Line("손", held)}\n{Line("보조", spare)}\n"
+                    + "클래스 스킬은 손에 든 것과 상관없이 그 클래스 무기의 힘을 받는다. 보조 무기는 가방에서 [보조로]", area);
+            }
         }
 
         // The dodge roll: its picture, dim and shaded while it cannot be used again yet. Tapped or clicked through

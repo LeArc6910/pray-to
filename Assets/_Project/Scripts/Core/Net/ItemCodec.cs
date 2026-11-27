@@ -230,6 +230,11 @@ namespace Game.Core
         LeaveDungeon,
         // Opens the chest or uses the shrine of index Item in the dungeon the player is in (World.UseDungeonThing, 묶음 5b).
         UseDungeonThing,
+        // The second weapon (Docs/Weapons.md): Item from the bag into the spare slot, the spare back to the bag, and the
+        // weapon in hand swapped for the spare.
+        EquipSpare,
+        UnequipSpare,
+        SwapWeapons,
     }
 
     // A player asking the host to change their gear, use a consumable, craft or build. Item is an item id; Slot is
@@ -299,6 +304,8 @@ namespace Game.Core
                 w.Write(item != null);
                 if (item != null) ItemCodec.Write(w, item, data);
             }
+            w.Write(Equipment.Spare != null);
+            if (Equipment.Spare != null) ItemCodec.Write(w, Equipment.Spare, data);
             ItemCodec.WriteBag(w, Bag, data);
             w.Write((ushort)Passives.Count);
             foreach (int point in Passives) w.Write((ushort)point);
@@ -331,6 +338,12 @@ namespace Game.Core
                 var item = ItemCodec.Read(r, loot);
                 if (item.Base.Slot != slot) throw new InvalidDataException("Item in the wrong slot.");
                 equipment.Equip(item);
+            }
+            if (r.ReadBoolean())
+            {
+                var spare = ItemCodec.Read(r, loot);
+                if (spare.Base.Slot != ItemSlot.Weapon) throw new InvalidDataException("A spare that is no weapon.");
+                equipment.EquipSpare(spare);
             }
             var bag = ItemCodec.ReadBag(r, loot);
             var passives = new List<int>();

@@ -394,7 +394,8 @@ namespace CoreSandbox
                 Read(LootSheets.ConsumablesFile),
                 Read(LootSheets.MaterialsFile),
                 Read(LootSheets.RecipesFile),
-                Read(LootSheets.SetsFile));
+                Read(LootSheets.SetsFile),
+                Read(WeaponKind.File));
             if (data.Success) return data;
 
             foreach (string error in data.Errors) Console.Error.WriteLine(error);

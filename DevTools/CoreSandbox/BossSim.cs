@@ -40,7 +40,10 @@ namespace CoreSandbox
                 foreach (string id in gear)
                 {
                     var itemBase = loot.FindBase(id);
-                    equipment.Equip(generator.RollItem(itemBase, itemBase.Level, Rarity.Common, random));
+                    var item = generator.RollItem(itemBase, itemBase.Level, Rarity.Common, random);
+                    // A second weapon goes to the spare slot (Docs/Weapons.md): "--gear iron_bow,iron_sword" holds the bow.
+                    if (itemBase.Slot == ItemSlot.Weapon && equipment[ItemSlot.Weapon] != null) equipment.EquipSpare(item);
+                    else equipment.Equip(item);
                 }
                 var player = world.AddPlayer("bot" + (i + 1), equipment, classes);
                 bots.Add(new Bot { Player = player, Skills = new SkillBot(player, loot) });

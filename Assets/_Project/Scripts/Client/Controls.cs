@@ -64,6 +64,9 @@ namespace Game.Client
         static bool _potionTapped;
         static readonly List<Rect> _rollButtons = new List<Rect>();
         static bool _rollTapped;
+        // The weapon swap's button (SkillBar.DrawWeapons, Docs/Weapons.md).
+        static readonly List<Rect> _swapButtons = new List<Rect>();
+        static bool _swapTapped;
         static readonly Predicate<int> Released = id => !Held(id);
         static readonly Stick _move = new Stick();
         static readonly Stick _aim = new Stick();
@@ -108,6 +111,7 @@ namespace Game.Client
             _hotbarTaps.Clear();
             _potionTapped = false;
             _rollTapped = false;
+            _swapTapped = false;
             _touches.Clear();
             var screen = Touchscreen.current;
             if (screen != null)
@@ -144,6 +148,7 @@ namespace Game.Client
                 {
                     // The roll's slot on the PC bar can be clicked too.
                     foreach (var area in _rollButtons) _rollTapped |= area.Contains(point);
+                    foreach (var area in _swapButtons) _swapTapped |= area.Contains(point);
                     foreach (var (area, slot) in _hotbarButtons)
                     {
                         if (area.Contains(point)) _hotbarTaps.Add(slot);
@@ -154,6 +159,7 @@ namespace Game.Client
             _skillButtons.Clear();
             _potionButtons.Clear();
             _rollButtons.Clear();
+            _swapButtons.Clear();
             _hotbarButtons.Clear();
         }
 
@@ -202,6 +208,22 @@ namespace Game.Client
         }
 
         public static string RollKeyName => KeyBindings.Name(KeyAction.Roll);
+
+        // Marks the weapon swap's button, in points: a tap or a click swaps. Call from OnGUI.
+        public static void SwapButton(Rect area)
+        {
+            if (Event.current.type == EventType.Repaint) _swapButtons.Add(area);
+        }
+
+        public static string SwapKeyName => KeyBindings.Name(KeyAction.SwapWeapon);
+
+        // Whether the swap key was pressed or its button tapped this frame.
+        public static bool TakeSwapPress()
+        {
+            bool pressed = _swapTapped || KeyBindings.Pressed(KeyAction.SwapWeapon);
+            _swapTapped = false;
+            return pressed;
+        }
 
         // Whether the roll key was pressed or the roll button tapped this frame.
         public static bool TakeRollPress()
@@ -365,6 +387,13 @@ namespace Game.Client
             {
                 if (!area.Contains(point)) continue;
                 _rollTapped = true;
+                _ignored.Add(id);
+                return;
+            }
+            foreach (var area in _swapButtons)
+            {
+                if (!area.Contains(point)) continue;
+                _swapTapped = true;
                 _ignored.Add(id);
                 return;
             }
