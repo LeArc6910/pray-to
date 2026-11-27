@@ -7850,6 +7850,17 @@ async function testground(browser) {
     check(worn.length === 6, `${name}: 철 세트 여섯 벌(희귀)을 입었다 (${(tg.worn || []).join(', ')})`);
     check(/^철 세트/.test(tg.status || ''), `${name}: 답이 시험판에 ("${tg.status}")`);
     const armor = tg.armor;
+    // A hunting set and a boss set of the band, all their pieces at once (Docs/Gear.md).
+    await game.press('서리 늑대', '세트 (사냥·보스, 한 번에 모두)');
+    tg = await game.ask('test');
+    const wolf = (tg.worn || []).filter(w => w.startsWith('frostwolf_'));
+    check(wolf.length === 6 && /^서리 늑대 세트 6부위/.test(tg.status || ''), `${name}: [서리 늑대]로 사냥 세트 여섯 부위 (${wolf.length}, "${tg.status}")`);
+    await game.shot('testground-gearsets', '시험판: 세트·정예 고유 단추');
+    await game.press('동굴 수호자', '세트 (사냥·보스, 한 번에 모두)');
+    tg = await game.ask('test');
+    check((tg.worn || []).filter(w => /^warden_/.test(w)).length === 3, `${name}: [동굴 수호자]로 보스 세트 세 부위 (${(tg.worn || []).join(', ')})`);
+    await game.press('철 세트 입기', '장비 입기');
+    tg = await game.ask('test');
     // Never felled while watching the hits.
     await game.press('생존', '시험판 쪽');
     await game.press('죽지 않기: 끔', '생존');

@@ -277,8 +277,16 @@ namespace Game.Client
             Heading("한 벌씩");
             var pieces = loot.Bases.Where(b => !b.IsLegendary && b.Weight > 0 && b.Level == BandBaseLevel(_band) && !b.Id.EndsWith("_pickaxe", StringComparison.Ordinal)).ToList();
             Grid("한 벌씩", width, 104, pieces.Select(b => Cell(b.Name, player.Equipment[b.Slot]?.Base == b, () => Run(root, $"test piece {b.Id} {options}"))));
+            // The band's hunting sets and the boss sets worn in it, all their pieces at once (Docs/Gear.md).
+            Heading("세트 (사냥·보스, 한 번에 모두)");
+            var sets = loot.Sets.Where(set => loot.Bases.Any(b => b.Set == set && GearBand(b) == _band)).ToList();
+            Grid("세트", width, 150, sets.Select(set => Cell(set.Name, loot.Bases.Where(b => b.Set == set).All(b => player.Equipment[b.Slot]?.Base == b),
+                () => Run(root, $"test set {set.Id} {_roll} {_upgrade}"))));
+            Heading("정예 고유");
+            Grid("정예 고유", width, 150, loot.Bases.Where(b => b.IsEliteUnique && GearBand(b) == _band).Select(b => Cell(b.Name, player.Equipment[b.Slot]?.Base == b,
+                () => Run(root, $"test piece {b.Id} Legendary {_roll} {_upgrade}"))));
             Heading("전설 (보스·균열)");
-            Grid("전설", width, 150, loot.Bases.Where(b => b.IsLegendary).OrderBy(b => b.Level).Select(b => Cell(b.Name, player.Equipment[b.Slot]?.Base == b, () => Run(root, $"test piece {b.Id} Legendary {_roll} {_upgrade}"))));
+            Grid("전설", width, 150, loot.Bases.Where(b => b.IsLegendary && !b.IsEliteUnique).OrderBy(b => b.Level).Select(b => Cell(b.Name, player.Equipment[b.Slot]?.Base == b, () => Run(root, $"test piece {b.Id} Legendary {_roll} {_upgrade}"))));
 
             Heading("룬 (입은 것의 빈 홈에)");
             Grid("룬", width, 76, loot.Runes.OrderBy(r => r.Level).Select(r => Cell(r.Name, false, () => Run(root, $"test rune {r.Id}"))));
@@ -286,6 +294,9 @@ namespace Game.Client
             Heading("음식 (먹으면 버프)");
             Grid("음식", width, 104, loot.Consumables.Where(c => c.IsFood).Select(c => Cell(c.Name, false, () => Run(root, $"test eat {c.Id}"))));
         }
+
+        // The band a piece is worn in: its level's (the last band's 45 too).
+        static int GearBand(ItemBase b) => DamageBands.BandOfLevel(Math.Min(b.Level, 40));
 
         // The level a band's ordinary bases are made at (item_bases.csv: 1, 10, 20, 30, 40).
         static int BandBaseLevel(int band) => band <= 1 ? 1 : (band - 1) * 10;

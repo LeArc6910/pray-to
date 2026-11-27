@@ -92,6 +92,15 @@ namespace Game.Client
                     world.WearForTest(player, item);
                     return Done("piece", $"{ItemText.Name(item)}({ItemText.RarityName(item.Rarity)}) · {Stats(player)}");
                 }
+                case "set":
+                {
+                    // Every piece of a set (sets.csv), at the roll and upgrade (Docs/Gear.md).
+                    var set = loot.Sets.FirstOrDefault(x => x.Id == words[2]) ?? throw new ArgumentException($"no set '{words[2]}'");
+                    var roll = words.Length > 3 ? (TestKit.Roll)Enum.Parse(typeof(TestKit.Roll), words[3], ignoreCase: true) : TestKit.Roll.Middle;
+                    int upgrade = words.Length > 4 ? Int(words[4]) : 0;
+                    foreach (var piece in loot.Bases.Where(b => b.Set == set)) world.WearForTest(player, TestKit.Make(loot, piece, Rarity.Common, roll, upgrade));
+                    return Done("set", $"{set.Name} 세트 {loot.Bases.Count(b => b.Set == set)}부위 · {Stats(player)}");
+                }
                 case "bare":
                     foreach (ItemSlot slot in Enum.GetValues(typeof(ItemSlot)))
                         if (player.Equipment[slot] != null) player.Unequip(slot);

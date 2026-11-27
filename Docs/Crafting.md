@@ -248,6 +248,8 @@ M4c에서 만든 규칙과 시트 작성법이다. 놓는 물건(작업대, 화�
 
 ## materials.csv
 
+- (2026-11-27) `drops`: 몬스터가 제 재료와 따로 떨구는 사냥 재료(`cave_beetle:25|big_beetle:70`, `rift`는 균열 몬스터 아무나). 사냥 재료 세트의 제작법은 작업대에서 같은 부위 광석 장비의 재료 + 사냥 재료다(`Docs/Gear.md`)
+
 `Assets/_Project/Data/Loot/materials.csv`. `id, name, places, description`, 그리고 선택 열 `fish`, `fuel`. `places`는 [놓기]로 세우는 칸 종류이고, 비우면 세울 수 없는 재료다. `fish`는 그 생물군계(`cave`, `mushroom`, `ice`, `crystal`, `abyss`)의 물에서 낚이는 물고기라는 뜻이다(`Docs/Fishing.md`). `fuel`은 발전기가 그 재료 하나로 도는 초다(`Docs/Automation.md`).
 
 ## recipes.csv

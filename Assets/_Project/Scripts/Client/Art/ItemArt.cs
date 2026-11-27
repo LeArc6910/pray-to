@@ -611,6 +611,66 @@ namespace Game.Client
                 ".....oo.........");
         }
 
+        // A stretched hide: four legs pinned out (rat and wolf pelts).
+        static readonly string[] Pelt =
+        {
+            "L........L",
+            ".LMMMMMMm.",
+            "..LwMMMm..",
+            "..MMMMMm..",
+            "..MMMMmm..",
+            ".MMMmmmmd.",
+            "m........d",
+        };
+
+        // A beetle's or crab's back plate, ridged down the middle.
+        static readonly string[] Carapace =
+        {
+            "...LLMM...",
+            "..LwMmMm..",
+            ".LwMMmMMm.",
+            ".LMMMmMMm.",
+            ".MMMMmMmm.",
+            "..MMmmmd..",
+            "...mmdd...",
+        };
+
+        // A scorpion's curled sting.
+        static readonly string[] Stinger =
+        {
+            "......LM..",
+            ".....LwMm.",
+            "......MMm.",
+            "..LM..Mm..",
+            ".LwMMMm...",
+            "..MMmm....",
+            "...md.....",
+        };
+
+        // Overlapping scales, three rows.
+        static readonly string[] ScaleRows =
+        {
+            "..LM..LM..",
+            ".LwMmLwMm.",
+            "..LMmLMm..",
+            ".LwMmLwMm.",
+            "..MmmMmm..",
+            ".LMmdMmd..",
+            "..md..md..",
+        };
+
+        // A hank of silk thread, wound round.
+        static readonly string[] Silk =
+        {
+            "...LLMM...",
+            "..LwwMMm..",
+            ".LMmmmmMm.",
+            ".LwwMMMMm.",
+            ".MmmmmmMm.",
+            "..MMMMmm..",
+            "...mmdd...",
+        };
+
         static readonly string[] Goo =
         {
             "....L.....",
@@ -1038,6 +1098,17 @@ namespace Game.Client
                 case "void_bar": return Bar(Ramp.Of("#9A74F0"));
                 case "void_essence": return RampedOwn(Gem15, Ramp.Of("#C8A8FF"));
                 case "slime_gel": return Ramped(Goo, Ramp.Of("#8CD94D"));
+                // Hunting trophies (2026-11-27, Docs/Gear.md): a hide, a shell, a stinger, a hank of silk, a scale.
+                case "rat_pelt": return Ramped(Pelt, Ramp.Of("#9A7A5A"));
+                case "frost_pelt": return Ramped(Pelt, Ramp.Of("#D8ECF4"));
+                case "beetle_shell": return Ramped(Carapace, Ramp.Of("#6E8A4A"));
+                case "crab_shell": return Ramped(Carapace, Ramp.Of("#D2603C"));
+                case "scorpion_stinger": return Ramped(Stinger, Ramp.Of("#C8962E"));
+                case "salamander_scale": return Ramped(ScaleRows, Ramp.Of("#E8502A"));
+                case "void_lens": return RampedOwn(Gem15, Ramp.Of("#8C5AE8"));
+                case "shadow_silk": return Ramped(Silk, Ramp.Of("#5A4A8A"));
+                case "spider_silk": return Ramped(Silk, Ramp.Of("#E8E0D0"));
+                case "rift_ichor": return Ramped(Goo, Ramp.Of("#5AE8D2"));
                 case "warden_core": return RampedOwn(Gem15, Ramp.Of("#FFA83A"));
                 case "mushroom_spore": return Ramped(Spores, Ramp.Of("#B07CE0"));
                 case "mushroom": return Ramped(CapMushroom, Ramp.Of("#E8A866"));
