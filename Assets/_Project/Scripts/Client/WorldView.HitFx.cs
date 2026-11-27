@@ -163,8 +163,9 @@ namespace Game.Client
             Vector2 point = Ui.FromScreen(screen);
             // Its place among the numbers off the same body: 0, +1, -1, +2, -2, the outer ones a little higher.
             int step = (text.Slot + 1) / 2;
-            point.x += (text.Slot % 2 == 1 ? step : -step) * NumberApart * (text.Big ? 1.35f : 1);
-            point.y -= step * 7;
+            // A big one is wider than its place, so beside others it stands a row above them.
+            point.x += (text.Slot % 2 == 1 ? step : -step) * NumberApart;
+            point.y -= step * 10 + (text.Big && text.Slot > 0 ? 18 : 0);
             _bigLabelStyle ??= new GUIStyle(_labelStyle);
             Ui.Text(_bigLabelStyle, Mathf.RoundToInt(15 * size), bold: true);
             var rect = new Rect(point.x - 100, point.y - 18, 200, 36);
