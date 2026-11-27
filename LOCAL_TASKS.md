@@ -1819,6 +1819,12 @@ DevTools/Local/setup.sh --commit
 
 - 사람 요청 "로컬 ai로 만들어줘": 4차에서 "새로 찾기"를 고른 세트의 후보를 이 컴퓨터의 ComfyUI로 만들었다. 효과음·발소리는 Stable Audio Open 1.0(사람이 Hugging Face 약관에 동의하고 받음), 징글·곡은 ACE-Step 1.5 turbo. 모델은 `F:\Comfy-Desktop\ComfyUI-Shared\models`에 두고 저장소에는 넣지 않았다. 자세한 것은 `Docs/SoundCredits.md` "4차 2부"
 - 같은 장면 듣기 페이지로 사람이 골라 16세트를 바꿨다(같은 파일 이름): 취소, 내려찍기, 몬스터 부르기(낮게), 불(작게), 김(작게), 얼음, 승리 징글, 발소리 눈·낙엽·젖은 발·거친 바위, 곡 용암 지대·모래 동굴·왕국(반복 이음매를 겹쳐 다듬음). 새로 생긴 4개(낙엽 3·4, 젖은 발 4, 취소 3)의 .meta를 커밋했다. 위 setup.ps1(-SkipTests)로 가져오기를 확인했다
-- **다시 만들 것(다음 차례)**: 번개(번개·천둥 쪽으로), 레벨업 징글(2초), 쓰러짐 징글(낮은 피아노·현악), 보스전 곡(일렉 기타·드럼의 빠른 비트), 오두막 곡(잔잔한 통기타·현악). GPU를 지금 보스 도트 세션이 쓰고 있어(`F:\Comfy-Desktop\gpu-lock.json`) 잠금이 풀린 뒤 만든다
+- **다시 만든 것(같은 날, 보스 도트 세션과 GPU를 번갈아 씀)**: 번개(두 번 더 만들어 "파지직" 전기 소리), 레벨업 징글(2.2초), 기술 배움(짧고 신나는 신디, 작게. 사람: "벨이나 징글에 집착할 필요 없어"), 쓰러짐 징글(낮은 피아노·첼로), 보스전 곡(일렉 기타·더블 킥, 170 bpm), 오두막 곡(통기타·현악, 80 bpm). 기술 배움이 하나에서 셋이 되어 새 .meta 둘을 커밋했다. 위 01:42 setup.ps1(-SkipTests)로 가져오기를 확인했다. 4차의 "새로 찾기"는 모래 발소리(지금 소리 유지)를 빼고 모두 끝났다
 - **사람이 할 일**: 이 게임을 팔거나 상업적으로 쓰게 되면 Stability AI Community License에 따라 Stability AI에 무료 등록을 한다(https://stability.ai/community-license-agreement). 연 매출 100만 달러를 넘으면 따로 라이선스가 필요하다
 - 사람이 다시 들어 볼 것: `Docs/HumanChecklist.md` "녹음 소리 4차 2부"
+
+### 2026-11-28 01:42 setup.ps1 (Unity 6000.6.3f1)
+
+- 프로젝트 설정: 성공
+- 패키지: com.unity.netcode.gameobjects 2.13.3, com.unity.transport 6.6.0, com.unity.render-pipelines.universal 17.6.0, com.unity.inputsystem 1.20.0, com.unity.multiplayer.playmode 3.0.0, com.unity.test-framework 1.8.0
+- 테스트: 건너뜀

@@ -211,7 +211,7 @@ OpenGameArt 페이지에 CC0 외의 라이선스가 함께 붙은 팩(예: OGA-B
 | music_lake.ogg | Cleyton RX - Underwater_0.mp3 | Underwater theme | Cleyton Kauffman | https://opengameart.org/content/underwater-theme | 호수 | 0–75초, 3초 겹침 | CC0 1.0 |
 | music_sand.ogg (4차에서 바꿈) | headinthesand_0.ogg | Head in the Sand (seamless loop) | congusbongus | https://opengameart.org/content/head-in-the-sand-seamless-loop | 모래 동굴 | 전체(원래 이음매 없는 반복) | CC0 1.0 |
 | music_dungeon.ogg | dungeon002_0.ogg | Dungeon Ambience | yd | https://opengameart.org/content/dungeon-ambience | 던전 안 | 10–85초, 4초 겹침 | CC0 1.0 |
-| music_boss.ogg | 3. Boss Fight.ogg | 4 Chiptunes (Adventure) | Juhani Junkala (SubspaceAudio) | https://opengameart.org/content/4-chiptunes-adventure | 보스전(모든 페이즈) | 0–70초, 1.5초 겹침 | CC0 1.0 |
+| music_boss.ogg (4차에서 바꿈) | 3. Boss Fight.ogg | 4 Chiptunes (Adventure) | Juhani Junkala (SubspaceAudio) | https://opengameart.org/content/4-chiptunes-adventure | 보스전(모든 페이즈) | 0–70초, 1.5초 겹침 | CC0 1.0 |
 
 ### 효과음·환경음 파일
 
@@ -260,9 +260,9 @@ OpenGameArt 페이지에 CC0 외의 라이선스가 함께 붙은 팩(예: OGA-B
 | sfx_shatter_1.wav | bfh1_glass_breaking_01.ogg | 75 CC0 breaking / falling / hit sfx | rubberduck | https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx | CC0 1.0 |
 | sfx_shatter_2.wav | bfh1_glass_breaking_02.ogg | 75 CC0 breaking / falling / hit sfx | rubberduck | https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx | CC0 1.0 |
 | sfx_shatter_3.wav | bfh1_glass_breaking_03.ogg | 75 CC0 breaking / falling / hit sfx | rubberduck | https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx | CC0 1.0 |
-| sfx_zap_1.wav | zap1.mp3 | 63 Digital sound effects | Kenney | https://opengameart.org/content/63-digital-sound-effects-lasers-phasers-space-etc | CC0 1.0 |
-| sfx_zap_2.wav | zap2.mp3 | 63 Digital sound effects | Kenney | https://opengameart.org/content/63-digital-sound-effects-lasers-phasers-space-etc | CC0 1.0 |
-| sfx_zap_3.wav | zapTwoTone.mp3 | 63 Digital sound effects | Kenney | https://opengameart.org/content/63-digital-sound-effects-lasers-phasers-space-etc | CC0 1.0 |
+| sfx_zap_1.wav (4차에서 바꿈) | zap1.mp3 | 63 Digital sound effects | Kenney | https://opengameart.org/content/63-digital-sound-effects-lasers-phasers-space-etc | CC0 1.0 |
+| sfx_zap_2.wav (4차에서 바꿈) | zap2.mp3 | 63 Digital sound effects | Kenney | https://opengameart.org/content/63-digital-sound-effects-lasers-phasers-space-etc | CC0 1.0 |
+| sfx_zap_3.wav (4차에서 바꿈) | zapTwoTone.mp3 | 63 Digital sound effects | Kenney | https://opengameart.org/content/63-digital-sound-effects-lasers-phasers-space-etc | CC0 1.0 |
 | sfx_spell_1.wav | spell_01.ogg | 80 CC0 RPG SFX | rubberduck | https://opengameart.org/content/80-cc0-rpg-sfx | CC0 1.0 |
 | sfx_spell_2.wav | spell_02.ogg | 80 CC0 RPG SFX | rubberduck | https://opengameart.org/content/80-cc0-rpg-sfx | CC0 1.0 |
 | sfx_plop_1.wav | plop_01.ogg | 100 CC0 SFX | rubberduck | https://opengameart.org/content/100-cc0-sfx | CC0 1.0 |
@@ -288,10 +288,10 @@ OpenGameArt 페이지에 CC0 외의 라이선스가 함께 붙은 팩(예: OGA-B
 | sfx_coin_buy_1.wav (4차에서 바꿈) | chips-stack-1.ogg | 54 casino sound effects | Kenney | https://opengameart.org/content/54-casino-sound-effects-cards-dice-chips | CC0 1.0 |
 | sfx_coin_buy_2.wav (4차에서 바꿈) | handleCoins.ogg | 50 RPG sound effects | Kenney | https://opengameart.org/content/50-rpg-sound-effects | CC0 1.0 |
 | jingle_victory_1.wav (4차에서 바꿈) | jingles_NES12.ogg | 85 short music jingles | Kenney | https://opengameart.org/content/85-short-music-jingles | CC0 1.0 |
-| jingle_levelup_1.wav | jingles_NES03.ogg | 85 short music jingles | Kenney | https://opengameart.org/content/85-short-music-jingles | CC0 1.0 |
-| jingle_learn_1.wav | jingles_NES14.ogg | 85 short music jingles | Kenney | https://opengameart.org/content/85-short-music-jingles | CC0 1.0 |
+| jingle_levelup_1.wav (4차에서 바꿈) | jingles_NES03.ogg | 85 short music jingles | Kenney | https://opengameart.org/content/85-short-music-jingles | CC0 1.0 |
+| jingle_learn_1.wav (4차에서 바꿈) | jingles_NES14.ogg | 85 short music jingles | Kenney | https://opengameart.org/content/85-short-music-jingles | CC0 1.0 |
 | jingle_story_1.wav | jingles_NES08.ogg | 85 short music jingles | Kenney | https://opengameart.org/content/85-short-music-jingles | CC0 1.0 |
-| jingle_down_1.wav | jingles_NES11.ogg | 85 short music jingles | Kenney | https://opengameart.org/content/85-short-music-jingles | CC0 1.0 |
+| jingle_down_1.wav (4차에서 바꿈) | jingles_NES11.ogg | 85 short music jingles | Kenney | https://opengameart.org/content/85-short-music-jingles | CC0 1.0 |
 | voice_slime_cry_1.wav | slime_01.ogg | 40 CC0 water / splash / slime SFX | rubberduck | https://opengameart.org/content/40-cc0-water-splash-slime-sfx | CC0 1.0 |
 | voice_slime_cry_3.wav | slime_03.ogg | 40 CC0 water / splash / slime SFX | rubberduck | https://opengameart.org/content/40-cc0-water-splash-slime-sfx | CC0 1.0 |
 | voice_slime_cry_5.wav | slime_05.ogg | 40 CC0 water / splash / slime SFX | rubberduck | https://opengameart.org/content/40-cc0-water-splash-slime-sfx | CC0 1.0 |
@@ -347,7 +347,7 @@ OpenGameArt 페이지에 CC0 외의 라이선스가 함께 붙은 팩(예: OGA-B
 | 파일 | 원본 파일 | 곡·팩 | 작가 | 출처 페이지 | 쓰는 곳 | 반복 | 라이선스 |
 |---|---|---|---|---|---|---|---|
 | music_kingdom.ogg (4차에서 바꿈) | CHIPTUNE_Loop_The_Bards_Tale.wav | Chiptune Medieval: The Bard's Tale (loop) | RandomMind | https://opengameart.org/content/chiptune-medieval-the-bards-tale | 왕국 | 전체(반복판) | CC0 1.0 |
-| music_hut.ogg | CHIPTUNE_Loop_The_Old_Tower_Inn.wav | Chiptune Medieval: The Old Tower Inn (loop) | RandomMind | https://opengameart.org/content/chiptune-medieval-the-old-tower-inn | 오두막 | 전체(반복판) | CC0 1.0 |
+| music_hut.ogg (4차에서 바꿈) | CHIPTUNE_Loop_The_Old_Tower_Inn.wav | Chiptune Medieval: The Old Tower Inn (loop) | RandomMind | https://opengameart.org/content/chiptune-medieval-the-old-tower-inn | 오두막 | 전체(반복판) | CC0 1.0 |
 | music_harbor.ogg | port_town_in_game.ogg | Port Town Loop | beardalaxy | https://opengameart.org/content/port-town-loop | 항구 | 전체(반복판) | CC0 1.0 |
 | music_ruins.ogg | Ruined City Theme.wav | Ruined City Theme | Cleyton Kauffman | https://opengameart.org/content/ruined-city-theme | 유적 | 0–60초, 3초 겹침 | CC0 1.0 |
 | music_nest.ogg | Evil4 - Witch's Lair.ogg | JRPG Music Pack #3 [Evil] | Juhani Junkala (SubspaceAudio) | https://opengameart.org/content/jrpg-pack-3-evil | 마족 둥지 | 0–60초, 2초 겹침 | CC0 1.0 |
@@ -486,4 +486,13 @@ OpenGameArt 페이지에 CC0 외의 라이선스가 함께 붙은 팩(예: OGA-B
 | Music/music_sand.ogg | ACE-Step 1.5 turbo | ancient egyptian desert tomb, oud, ney flute, darbuka and frame drum, mysterious (96 bpm, E minor, 87초 반복) | B | 모래 동굴 | 2026-11-28 |
 | Music/music_kingdom.ogg | ACE-Step 1.5 turbo | medieval fantasy kingdom theme, lute, recorder, harp, strings, warm and noble (지금 곡을 바탕으로 0.6, 53.7초 반복) | A | 왕국 | 2026-11-28 |
 
-다시 만드는 것(사람 메모): 번개 "지지직보다 번개나 천둥", 레벨업 "2초 정도로 짧게", 쓰러짐 "슬프면서 낮은 음 위주의 피아노와 현악", 보스전 "일렉 기타나 드럼 위주의 빠른 비트", 오두막 "잔잔하게 통기타나 현악기 위주". 모래 발소리와 기술 배움 징글은 지금 소리 그대로.
+사람 메모로 다시 만든 것(같은 날, 같은 모델·설정, 다시 장면 듣기로 고름). 모래 발소리는 지금 소리 그대로.
+
+| 파일 | 모델 | 프롬프트(요지) | 후보 | 쓰는 곳 | 만든 날 |
+|---|---|---|---|---|---|
+| sfx_zap_1~3.wav | Stable Audio Open 1.0 | electric arc crackle, sharp crackling electricity snapping and sparking, lightning bolt zap, no thunder (시드 7). 사람: "지지직"도 "천둥"도 아니고 "번개가 파지직" | C | 번개 기술 | 2026-11-28 |
+| jingle_levelup_1.wav | ACE-Step 1.5 turbo | 8-bit chiptune, NES, very short level up jingle, quick bright ascending arpeggio ending on a high note (180 bpm, D major), 2.2초 | C | 레벨업 | 2026-11-28 |
+| jingle_learn_1~3.wav | Stable Audio Open 1.0 | short upbeat synth stinger, bright energetic synthesizer chord stab rising quickly, positive reward notification, no bells. 사람: "짧은 신나는 느낌의 신디 사운드, 벨·징글에 집착하지 말 것", 크기 -6 dB(피크 -12) | C | 기술 배움과 좋은 일 알림(의뢰 받기, 웨이포인트, 부화·펫 성장, 일으키기, 이사, 쉬기, 광차·이정석) | 2026-11-28 |
+| jingle_down_1.wav | ACE-Step 1.5 turbo | sad game over music, slow low piano and cello and string ensemble, melancholic, minor key, low register (60 bpm, A minor), 5초 | A | 쓰러짐 | 2026-11-28 |
+| Music/music_boss.ogg | ACE-Step 1.5 turbo | fast hard rock boss battle music, heavy distorted electric guitar riffs, pounding double kick drums, driving bass (170 bpm, E minor, 67초 반복) | B | 보스전 | 2026-11-28 |
+| Music/music_hut.ogg | ACE-Step 1.5 turbo | calm cozy cottage music, gentle acoustic guitar fingerpicking, soft violin and cello (80 bpm, D major, 57초 반복) | A | 오두막 | 2026-11-28 |
