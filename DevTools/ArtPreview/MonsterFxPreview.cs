@@ -371,7 +371,9 @@ namespace Game.Client
                     if (_attack.Shape == MonsterAttackShape.Swoop && ran < _attack.Length) Take(MobFx.Wake, context, t, bx, by + Feet);
                     if (_attack.Shape == MonsterAttackShape.Charge && ran < _attack.Length)
                     {
-                        int pieces = Take(MobFx.Rush, context, t, bx, by + Feet);
+                        var rush = context;
+                        rush.Size = _monster.Radius * Tile;
+                        int pieces = Take(MobFx.Rush, rush, t, bx, by + Feet);
                         if (count) MostLand = Math.Max(MostLand, pieces);
                     }
                     if (_attack.Pool != MonsterPool.None)

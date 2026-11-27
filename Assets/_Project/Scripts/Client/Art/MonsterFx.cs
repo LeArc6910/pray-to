@@ -72,7 +72,7 @@ namespace Game.Client
         Fall,
         Crack,
         // The effects rework (E5, 2026-11-27). A loop on a body that runs at someone (a charge): dust kicked up behind
-        // its feet and lines of speed off its back (Dir the way it runs).
+        // its feet and lines of speed off its back (Dir the way it runs, Size its body's radius in pixels).
         Rush,
     }
 
@@ -1155,16 +1155,18 @@ namespace Game.Client
         static void Rush(in MobContext c, float t, List<FxStamp> o)
         {
             float dir = c.Dir * Deg, bx = -SkillFx.Cos(dir), by = -SkillFx.Sin(dir);
+            // Behind its body, however large that is (Size: its radius in pixels).
+            float behind = Math.Max(8, c.Size);
             // Lines of speed off its back.
             for (int i = 0; i < 4; i++)
             {
-                float lag = 12 + 8 * SkillFx.Rnd(c.Seed + (int)(t * 25), i, 61), side = (i - 1.5f) * 4;
-                Put(o, FxShape.Streak, c.Ramp, SkillFxArt.Step4(lag), 1, bx * (10 + lag / 2) - by * side, Body + by * (10 + lag / 2) + bx * side, 0.6f, dir);
+                float lag = 12 + 8 * SkillFx.Rnd(c.Seed + (int)(t * 25), i, 61) + behind * 0.4f, side = (i - 1.5f) * Math.Max(4, behind * 0.4f);
+                Put(o, FxShape.Streak, c.Ramp, SkillFxArt.Step4(lag), 1, bx * (behind + 2 + lag / 2) - by * side, Body + by * (behind + 2 + lag / 2) + bx * side, 0.6f, dir);
             }
             // Dust kicked up behind its feet, on the floor; and what its kind is made of thrown up with it.
             for (int i = 0; i < 5; i++)
             {
-                float u = SkillFx.Frac(t * 3 + i / 5f), far = 8 + 22 * u, off = (SkillFx.Rnd(c.Seed, i, 62) - 0.5f) * 8;
+                float u = SkillFx.Frac(t * 3 + i / 5f), far = behind + 22 * u, off = (SkillFx.Rnd(c.Seed, i, 62) - 0.5f) * Math.Max(8, behind);
                 float x = bx * far - by * off, y = 1 + by * far + bx * off;
                 Put(o, FxShape.Smoke, FxRamp.Dust, SkillFxArt.Even(6 + 5 * u), Math.Min(3, (int)(u * 4)), x, y, 0.75f * (1 - u), 0, true);
                 if ((i & 1) != 0) continue;

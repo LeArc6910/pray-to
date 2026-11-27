@@ -3036,18 +3036,18 @@ const MobWarnRows = [
 ];
 
 async function mobWarnScene(game, tag, hold) {
-  await game.send('fxhold off; speed 1; clear; monsters hold; heal; face 1 0');
+  // (heal 5000: the player outlives the four blows, so the pictures after them are not of a fallen one.)
+  await game.send('fxhold off; speed 1; clear; monsters hold; heal 5000; face 1 0');
   await game.wait(600);
   for (const [id, , dx, dy] of MobWarnRows) await game.send(`mob ${id} spawn ${dx} ${dy}`);
   await game.wait(300);
   await game.send(MobWarnRows.map(([id]) => `mob ${id} face`).join('; '));
   await game.send(MobWarnRows.map(([id, attack]) => `mob ${id} use ${attack}`).join('; '));
-  // All four winding up: looked at for a while, then held still for the picture.
-  let st = await pollState(game, t => t.mobWarnsShown >= 3 && t.aimDots > 0, 2500);
+  // The shortest wind-up (the fan's) is 0.6 s: the world is held a moment in, and the screen given time to catch up.
   await game.wait(hold);
   await game.send('speed 0');
   await game.wait(250);
-  st = await pollState(game, t => t.mobWarnsShown >= 3 && t.aimDots > 0, 1500);
+  const st = await pollState(game, t => t.mobWarnsShown >= 3 && t.aimDots > 0, 3000);
   check(st.mobWarnsShown >= 3, `${tag}: 예고 셋(던지기 원, 돌진 길, 불 벽 선)이 도형 그림으로 그려진다 (${st.mobWarnsShown}개, ${st.mobs})`);
   check(st.aimDots > 0 && st.aimDots <= 72, `${tag}: 부채 사격의 조준선이 깔린다 (${st.aimDots}점, 한도 72)`);
   check(st.mobFxPieces <= 420, `${tag}: 넷이 함께 예고해도 화면 조각 한도 안 (${st.mobFxPieces}/420)`);
@@ -3061,11 +3061,11 @@ async function mobwarn(browser) {
   await game.wait(1200);
   await game.send('goto wild');
   await clearRoom(game, 12, 7);
-  await mobWarnScene(game, 'PC', 350);
+  await mobWarnScene(game, 'PC', 200);
   await game.shot('mobwarn-together', '넷이 함께 예고: 왼쪽 위 결정 부채(조준선), 왼쪽 아래 포자 주머니(원), 오른쪽 위 짓밟기 돌진(노란 길과 화살표), 오른쪽 아래 불 벽(붉은 선)');
   // The shots leave, the charge runs, the sac and the wall land.
   await game.send('speed 1');
-  let st = await pollState(game, t => t.mobShots > 0 || t.enemyShots > 0, 3000);
+  let st = await pollState(game, t => t.mobShots > 0 && t.enemyShots > 0, 3000);
   check(st.enemyShots > 0 && st.mobShots > 0, `결정 가시가 원소 그림(적의 탄)으로 난다 (${st.enemyShots}발, 몬스터 탄 ${st.mobShots})`);
   await game.send('speed 0');
   await game.wait(250);
@@ -3080,14 +3080,14 @@ async function mobwarn(browser) {
   st = await pollState(game, t => t.mobPoolsShown >= 2, 4000);
   check(st.mobPoolsShown >= 2, `포자 웅덩이와 불 벽이 바닥에 남는다 (${st.mobPoolsShown}개)`);
   check(st.skillFxLights <= 12, `바닥 빛은 화면 12개까지 (${st.skillFxLights})`);
-  await game.wait(500);
+  await game.wait(300);
   await game.send('speed 0');
   await game.wait(250);
   st = await game.state();
   check(st.mobFxPieces > 0 && st.mobFxPieces <= 420, `장판의 조각이 한도 안 (${st.mobFxPieces}/420)`);
   await game.shot('mobwarn-pools', '남은 것: 포자 웅덩이와 불 벽(붉은 점선 테, 바닥 빛)');
   await game.send('speed 1; clear');
-  await game.close();
+  await game.context.close();
 
   note('\n## 일반 몬스터의 예고 (E5, 휴대폰 세로)\n');
   const phone = await open(browser, run, Profiles.phonePortrait, url);
@@ -3095,10 +3095,10 @@ async function mobwarn(browser) {
   await phone.wait(1200);
   await phone.send('goto wild');
   await clearRoom(phone, 12, 7);
-  await mobWarnScene(phone, '휴대폰', 350);
+  await mobWarnScene(phone, '휴대폰', 200);
   await phone.shot('mobwarn-phone', '휴대폰 세로: 넷이 함께 예고');
   await phone.send('speed 1; clear');
-  await phone.close();
+  await phone.context.close();
 }
 
 // ---------------------------------------------------------------- 적의 탄 (E2, Docs/EffectsRework.md 7절)
@@ -4589,16 +4589,14 @@ async function hero(browser) {
       // gets up again in the village (2026-11-19).
       for (let i = 0; i < 6; i++) {
         await game.wait(170);
-        await game.send('heal');
-        await game.shot(`hero-${profile}-${weapon}-${i}`, `${name} 연타 ${i + 1}`);
+              await game.shot(`hero-${profile}-${weapon}-${i}`, `${name} 연타 ${i + 1}`);
       }
       // The same weapon the other three ways (only on the PC: the phone's pictures are for size and fit).
       if (profile === 'pc') {
         for (const [dx, dy, way] of [[0, 1, '위'], [-1, 0, '왼쪽'], [0, -1, '아래']]) {
           await game.send(`heal; hero ${weapon} ${dx} ${dy}`);
           await game.wait(450);
-          await game.send('heal');
-          await game.shot(`hero-${profile}-${weapon}-${way}`, `${name} ${way}로`);
+                  await game.shot(`hero-${profile}-${weapon}-${way}`, `${name} ${way}로`);
           await game.wait(230);
           await game.shot(`hero-${profile}-${weapon}-${way}-2`, `${name} ${way}로 (다음 장)`);
         }
@@ -6617,8 +6615,7 @@ async function hud(browser) {
     s = await game.state();
     check(s.ui.lowHealth > 0, `생명력이 낮으면 화면 가장자리가 붉다 (${s.ui.lowHealth.toFixed(2)}, 생명력 ${Math.round(s.health)}/${s.maxHealth})`);
     await shot('low-health', '생명력이 낮을 때 붉은 가장자리');
-    await game.send('heal');
-    await game.wait(600);
+      await game.wait(600);
     check((await game.state()).ui.lowHealth === 0, '회복하면 붉은 가장자리가 사라진다');
 
     // ---- 배너와 메뉴 ----

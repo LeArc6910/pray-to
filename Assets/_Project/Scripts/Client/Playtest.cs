@@ -358,7 +358,9 @@ namespace Game.Client
                     player.Mana = Float(words[1]);
                     return null;
                 case "heal":
-                    player.Health = player.Stats.MaxHealth;
+                    // heal <amount>: that much health, past the most there is (a picture's player who outlives every
+                    // blow shown).
+                    player.Health = words.Length > 1 ? Float(words[1]) : player.Stats.MaxHealth;
                     player.Mana = player.Stats.MaxMana;
                     return null;
                 case "hurt":

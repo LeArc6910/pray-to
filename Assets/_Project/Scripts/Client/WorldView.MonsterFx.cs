@@ -213,7 +213,8 @@ namespace Game.Client
             // A charge throws up dust behind its feet and draws lines of speed off its back (E5).
             if (state == EnemyState.Charge && body.MobAttack != null && body.MobAttack.Shape == MonsterAttackShape.Charge && !buried)
             {
-                QueueMob(MobFx.Rush, feet, new MobContext { Ramp = body.MobRamp, Tint = body.MobTint, Dir = view.Facing.Angle, Look = body.MobKind, Seed = view.Id & 0xFFFF }, Time.time);
+                QueueMob(MobFx.Rush, feet, new MobContext { Ramp = body.MobRamp, Tint = body.MobTint, Dir = view.Facing.Angle, Look = body.MobKind, Seed = view.Id & 0xFFFF,
+                    Size = view.Monster.Radius * Ppu }, Time.time);
                 _rushes++;
             }
             if (winding && (!body.MobWinding || body.MobAttack != attack))
@@ -545,12 +546,21 @@ namespace Game.Client
             if (!_mobShots.TryGetValue(projectile.Id, out var shot))
             {
                 if (!isNew) return;
+                // The one that fired stands back along the way the shot flies: the screen may first see a shot some
+                // way out from its monster (2026-11-27: a web client saw a fan's shots two tiles out and drew them plain).
                 Body from = null;
-                float best = 1.8f;
+                float best = 5;
+                var here = new Vector2(projectile.Position.X, projectile.Position.Y);
+                var way = new Vector2(projectile.Velocity.X, projectile.Velocity.Y);
+                way = way.sqrMagnitude > 1e-6f ? way.normalized : Vector2.zero;
                 foreach (var body in _others.Values)
                 {
                     if (body.Kind != BodyKind.Monster || body.MobAttack == null || body.MobAttack.Tell != Tell.Barrage) continue;
-                    float distance = Vector2.Distance(body.Position, new Vector2(projectile.Position.X, projectile.Position.Y));
+                    var back = (Vector2)body.Position - here;
+                    float along = -Vector2.Dot(back, way), aside = (back + way * along).magnitude;
+                    float distance = back.magnitude;
+                    // Beside it (1.8 tiles, as before), or behind the shot within a body's width of its line.
+                    if (distance >= 1.8f && (along < 0 || aside > 0.9f)) continue;
                     if (distance >= best) continue;
                     best = distance;
                     from = body;
