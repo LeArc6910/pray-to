@@ -67,6 +67,12 @@ namespace Game.Client
         static readonly Dictionary<long, Sprite> FxSprites = new Dictionary<long, Sprite>();
         int _fxUsed;
         int _fxSeed;
+        // The lights the effects' pieces ask for (FxShape.Light): gathered while a frame's pieces are laid out, and
+        // put on the light map the frame after. Three an effect, twelve in all (Docs/EffectsRework.md 8).
+        List<LightSource> _fxLights = new List<LightSource>(), _fxLightsShown = new List<LightSource>();
+        const int FxMostLights = 12;
+        // Lights the effects' pieces put on the light map last frame, for the playtests.
+        public int SkillFxLights => _fxLightsShown.Count;
 
         // The most pieces on screen at once, and the most effects alive: past these the newest lesser ones are dropped
         // (a web build draws each piece as a sprite).
@@ -182,6 +188,11 @@ namespace Game.Client
             AddFx(FxProgram.Hit, skill.Id, at, new FxContext { Radius = skill.Radius * Sprites.PixelsPerUnit, Main = MainRamp(skill, SkillTag.None) }, mine, light: skill.Radius + 2.5f);
         }
 
+        // A skill's blast put on the floor by hand, for the playtests' pictures (the command blast, E3 of
+        // Docs/EffectsRework.md): the same effect a landed projectile of that skill gets, at this radius in tiles.
+        public void StageBlast(string skill, Vec2 at, float radius) =>
+            AddFx(FxProgram.Hit, skill, new Vector3(at.X, at.Y, 0), new FxContext { Radius = radius * Sprites.PixelsPerUnit, Main = FxRamp.Fire }, mine: true, light: radius + 2.5f);
+
         // Lightning's jump between two bodies.
         void ShowChainFx(Vector3 from, Vector3 to)
         {
@@ -280,6 +291,8 @@ namespace Game.Client
         void BeginSkillFx()
         {
             _fxUsed = 0;
+            (_fxLights, _fxLightsShown) = (_fxLightsShown, _fxLights);
+            _fxLights.Clear();
             _skillShotsDrawn = 0;
             for (int i = _launches.Count - 1; i >= 0; i--)
             {
@@ -305,7 +318,8 @@ namespace Game.Client
                     _fx.RemoveAt(i);
                     continue;
                 }
-                EmitFx(fx.At, fx.Mine ? 1 : OthersFxAlpha, fx.Ghost);
+                // An effect that lights the floor with its own pieces needs no flash of the old kind.
+                if (EmitFx(fx.At, fx.Mine ? 1 : OthersFxAlpha, fx.Ghost)) fx.Light = 0;
             }
             if (Feel.SkillFx)
             {
@@ -346,13 +360,24 @@ namespace Game.Client
             }
         }
 
-        // Lays this frame's pieces of one effect on pooled sprites, each on the world's pixel grid.
-        void EmitFx(Vector3 origin, float alpha, Sprite ghost)
+        // Lays this frame's pieces of one effect on pooled sprites, each on the world's pixel grid. True if the
+        // effect asked for a light of its own.
+        bool EmitFx(Vector3 origin, float alpha, Sprite ghost)
         {
             const float pixel = 1f / Sprites.PixelsPerUnit;
+            int lights = 0;
             foreach (var stamp in _fxStamps)
             {
-                if (_fxUsed >= FxMostStamps) return;
+                if (stamp.Shape == FxShape.Light)
+                {
+                    if (lights++ < FxLayers.MostLights && _fxLights.Count < FxMostLights)
+                    {
+                        _fxLights.Add(new LightSource(new Vec2(origin.x + stamp.X * pixel, origin.y + stamp.Y * pixel), stamp.Size * pixel, stamp.Alpha * alpha,
+                            SkillFxArt.Ramp(stamp.Ramp)[stamp.Frame & 3], tints: true));
+                    }
+                    continue;
+                }
+                if (_fxUsed >= FxMostStamps) return lights > 0;
                 Sprite sprite;
                 var color = Color.white;
                 if (stamp.Shape == FxShape.Ghost)
@@ -393,11 +418,13 @@ namespace Game.Client
                 renderer.sortingOrder = stamp.Ground ? FxGroundOrder : FxOverOrder + (_fxUsed & 511);
                 _fxUsed++;
             }
+            return lights > 0;
         }
 
         // A blast lights the dark around it for a moment, in its element's colour.
         void AddFxLights()
         {
+            _lights.AddRange(_fxLightsShown);
             foreach (var fx in _fx)
             {
                 if (fx.Light <= 0 || fx.Age > 0.45f || fx.Age < (fx.Program == FxProgram.Cast ? SkillFx.Lead : 0)) continue;

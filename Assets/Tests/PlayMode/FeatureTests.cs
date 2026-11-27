@@ -770,6 +770,37 @@ namespace Game.Client.Tests
             Assert.IsTrue(_root.Playing);
         }
 
+        // The rework's blast (E3 of Docs/EffectsRework.md, FxLayers.Blast): a fireball's and a meteor's landings put
+        // beside the player and held at the swelling ball, then at the smoke. Each stays within an effect's pieces and
+        // lights the floor with no more than three lights of its own; both are over within 1.4 seconds.
+        [UnityTest, Category(Screens.Category)]
+        public IEnumerator BlastsSwellHollowAndLightTheFloor()
+        {
+            yield return Start();
+            World.MonstersHold = true;
+            var view = _root.View;
+            Feel.SkillFxHold = 0.12f;
+            view.StageBlast("fireball", Player.Position + new Vec2(-4, 1), 1.2f);
+            yield return new WaitForSecondsRealtime(0.3f);
+            Assert.That(_root.SkillFxPieces, Is.InRange(8, 72), "A fireball's blast: ball, ring, edge, sparks and soot.");
+            Assert.That(_root.SkillFxLights, Is.InRange(1, 3), "It lights the floor with its own lights.");
+            view.StageBlast("meteor", Player.Position + new Vec2(3.5f, 0.5f), 2.6f);
+            yield return new WaitForSecondsRealtime(0.3f);
+            Assert.That(_root.SkillFxPieces, Is.InRange(30, 144), "Two blasts, each within 72 pieces.");
+            Assert.That(_root.SkillFxLights, Is.InRange(2, 6));
+            yield return Screens.Take("blast-ball");
+            Feel.SkillFxHold = 0.5f;
+            yield return new WaitForSecondsRealtime(0.6f);
+            Assert.Greater(_root.SkillFxPieces, 0, "Smoke, soot and the split floor are still there.");
+            yield return Screens.Take("blast-smoke");
+            Feel.SkillFxHold = -1;
+            yield return new WaitForSecondsRealtime(1.2f);
+            Assert.AreEqual(0, _root.SkillFxAlive, "Both are over within 1.4 seconds.");
+            Assert.AreEqual(0, _root.SkillFxLights);
+            World.MonstersHold = false;
+            Assert.IsTrue(_root.Playing);
+        }
+
         // A boss's warnings and the blow that lands in their shape (E1 of Docs/EffectsRework.md, WorldView.Hazards.cs):
         // every shape laid beside the player and held part filled, then landed. The blow stays within its pieces, the
         // floor keeps a scar for each harmful one (a charge's path leaves none) and gives them up in time.

@@ -105,3 +105,15 @@
 - **조준선**: 대상 쪽으로 펼쳐 쏘는 부채 사격(`burst`에 `angle`이 있는 것: 그룸 바위 던지기, 시구레 월광참, 아라네 독액 뿜기)의 예고 동안 탄마다 붉은 점선(3px 점, 0.6칸 간격, 7칸까지, 예고가 찰수록 길고 진하게, 72점까지). 방향은 화면이 아는 보스의 방향과 시트의 각도·수로 정한다(`World.Burst`와 같은 식). **넣지 못한 것**: 사방으로 쏘는 `burst`와 `spiral`은 쏘는 순간 호스트가 시작 각도를 무작위로 정해 화면이 미리 알 수 없다(Core를 바꿔야 한다)
 - **그대로 둔 것**: 그룸의 바위는 제 그림 그대로 + 소멸만 돌 파편으로. 시구레의 월광참(꽃잎)·아라네의 독액(방울)은 제 연출이 있어 그대로. 일반 몬스터의 시트 탄(`WorldView.MonsterFx`)은 E5. 플레이어 탄은 E4
 - **확인**: `--only shot`(`out/shot/shots.png`와 흑백 `_gray`, `report.txt`), 명령 `shots`, `sweep.js --only shots`, PlayMode `EnemyShotsFlyInTheirElementAndEndInARing`(사진 `shots-elements`·`shots-ends`)
+
+## 8. E3 적용: 공용 층 조각과 폭발 (2026-11-27)
+
+- **5색 램프**: `SkillFxArt.Ramp5(ramp)`는 밝은 쪽부터 핵·밝음·중간(옛 램프의 위 세 색) + 색상이 도는 어두운 두 색(`Turns` 표: 불은 빨강 → 검붉음, 냉기는 파랑 → 남색, 번개는 보라). 옛 4색 `Ramp`는 그대로라 이미 있는 이펙트는 한 픽셀도 바뀌지 않았다(미리보기 표를 앞뒤로 견줘 확인)
+- **새 조각**(`FxShape`, 그림은 `Client/Art/SkillFxArt.Layers.cs`): `Burst`(폭발 불덩이 한 장: 흰 번쩍임 1프레임 + 일렁이는 가장자리의 덩어리 넷이 부풀고 속부터 연기로 비워지는 9프레임, 네 가지 모양), `Pall`(불덩이 자리에 남아 속부터 비워지는 연기), `Plume`(오르는 연기 뭉치 6프레임), `Ember`(꼬리 달린 불티, 식을수록 꼬리가 짧고 어둡다), `Shock`(충격파 고리 4프레임), `Glow`(바닥의 세 띠 빛 그림, 보통 혼합, 큰 폭발에만), `Light`(그림 없음: 빛 지도의 광원). 있던 조각을 넓힌 것: `Chunk` 4~7(위가 밝은 어두운 돌), `Scorch` 4~7(가장자리가 무늬로 옅어지는 그을음), `Crack` 4 이상(`SplitFrame`: 빛나다 식는 균열). 옅어짐은 알파가 아니라 4×4 무늬로 한다
+- **층 도우미**(`Client/Art/FxLayers.cs`, 스킬·몬스터·보스 공용): `Light`, `Ball`, `Pall`, `Plumes`, `Shock`, `Embers`, `Rubble`(돌 + 바닥 그림자, 돌 하나에 2조각), `Scorch`, `Splits`, 그리고 이들을 차례로 쌓는 `Blast`
+- **폭발 순서**(`FxLayers.Blast`): 흰 번쩍임 0.05초 → 덩어리가 0.2초에 부풂 → 0.15초부터 속이 연기로 → 충격파 고리 0.32초 + 판정 크기의 테 0.14초 → 감속하는 불티 → (큰 것만) 튀는 돌 → 오르는 연기 다섯 → 그을음(끝 0.4초에 걸쳐 사라짐)
+- **바닥 빛**: 조각 목록에 `Light`(반지름 px·세기·색)를 넣으면 `WorldView.EmitFx`가 모아 다음 프레임의 빛 지도에 넣는다(`_fxLights`). 이펙트당 3개(`FxLayers.MostLights`), 화면 12개. 몬스터 이펙트도 같은 `EmitFx`를 지나므로 그대로 쓸 수 있다. 제 빛을 내는 이펙트는 옛 한 덩이 번쩍임(`Fx.Light`)을 끈다. 폭발의 빛 셋: 번쩍임(0.08초, 핵 색) · 불빛(0.45초) · 남은 불티의 옅은 빛(0.2~0.8초)
+- **실제로 바꾼 것은 둘**: 화염구(19조각, 1.1초)와 유성(49조각, 1.38초: 작은 불덩이 넷 + 빛나다 식는 균열 아홉 + 바닥 빛 그림 + 돌 여섯). 시안의 유성 84조각은 불덩이를 한 장으로 구워 줄였다. 불꽃 세례·폭발 화살과 나머지 스킬, 몬스터, `EffectArt.Burst`는 그대로(E4·E5·E7). 유성이 위에서 떨어지는 모습과 날아가는 불덩이의 혜성 꼬리는 E4
+- **한도**: 이펙트 72조각(빛은 조각으로 세지 않는다), 시전 1.4초(바닥 흔적도 이 안에 끝낸다: 따로 세지 않았다), 빛 3개는 `SkillFxPreview`가 넘으면 실패. 방 어둡게·화면 번쩍임·가산 혼합 없음
+- **E4~E6에서 쓰는 법**: 폭발은 `FxLayers.Blast(o, t, 반지름px, 램프, seed, embers, rubble, smoke, linger)` 한 줄. 층을 따로 쓸 때는 `FxLayers.Embers`·`Plumes`·`Shock`·`Scorch`·`Splits`·`Light`를 골라 쌓는다. 원소는 램프만 바꾸면 된다(조각표의 냉기·보라 줄). 새 원소 모양(얼음 결정, 독 웅덩이 등)은 그 묶음에서 `SkillFxArt.Layers.cs`에 더한다
+- **확인**: `--only skillfx`(`pieces.png` 아래 세 줄이 새 조각, `fire_mage.png`·`_gray`), 명령 `blast <스킬> <dx> <dy> <반지름>`, 상태 `skillFxLights`, `sweep.js --only blast`, PlayMode `BlastsSwellHollowAndLightTheFloor`(사진 `blast-ball`·`blast-smoke`)

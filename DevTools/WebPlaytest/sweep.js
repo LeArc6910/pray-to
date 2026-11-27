@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu title testground hunt harvest zones towns time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight warden antlion queen general spider arenas world farm life npc factory defense gear skills skillfx monsterfx hazards shots map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
+// Sections: menu title testground hunt harvest zones towns time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight warden antlion queen general spider arenas world farm life npc factory defense gear skills skillfx monsterfx hazards shots blast map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -3095,6 +3095,68 @@ async function shots(browser) {
   check(st.enemyShots === 12 && st.aimDots > 0, `휴대폰 세로에서도 탄과 조준선이 그려진다 (탄 ${st.enemyShots}, 점 ${st.aimDots})`);
   await phone.shot('shots-phone', '휴대폰 세로: 결정·용암·공허·물 탄과 플레이어 구슬, 조준선');
   await phone.send('shots clear; warn clear; monsters go');
+  await phone.context.close();
+}
+
+// ---------------------------------------------------------------- 공용 폭발 (이펙트 개편 E3)
+// The rework's blast (FxLayers.Blast, Docs/EffectsRework.md 8): a fireball's and a meteor's landings put beside the
+// player and held at each phase: the flash, the swelling ball, the hollowing, the smoke, what is left on the floor.
+// Each within an effect's pieces, lighting the floor with at most three lights of its own; then a real fireball.
+async function blast(browser) {
+  note('\n## 공용 폭발: 화염구·유성 (PC)\n');
+  const game = await open(browser, run, Profiles.pc, url);
+  await game.startSolo();
+  await game.wait(1200);
+  await game.send('goto wild');
+  await clearRoom(game, 12, 7);
+  await game.send('monsters hold; heal; face 1 0');
+  const phases = [[0.03, '흰 번쩍임'], [0.12, '부푸는 불덩이'], [0.26, '속부터 연기로 비워짐'], [0.5, '오르는 연기와 그을음'], [1.0, '바닥 흔적']];
+  for (const [age, what] of phases) {
+    await game.send(`fxhold ${age}; blast fireball -4.5 1 1.2; blast meteor 3 0.5 2.6`);
+    const s = await pollState(game, st => st.skillFx >= 2 && st.skillFxPieces > 0);
+    check(s.skillFx >= 2 && s.skillFxPieces > 0 && s.skillFxPieces <= 144, `${age}초(${what}): 두 폭발이 한도 안에서 그려진다 (효과 ${s.skillFx}개, 조각 ${s.skillFxPieces}개, 한도 72×2)`);
+    if (age < 0.45) {
+      const lit = await pollState(game, st => st.skillFxLights > 0, 1500);
+      check(lit.skillFxLights >= 2 && lit.skillFxLights <= 6, `${age}초: 바닥 빛이 폭발마다 3개 이하로 켜진다 (${lit.skillFxLights}개)`);
+    }
+    await game.wait(250);
+    await game.shot(`blast-${String(age).replace('.', '_')}`, `왼쪽 화염구(1.2칸)·오른쪽 유성(2.6칸) ${age}초: ${what}`);
+    await game.send('fxhold off');
+    await pollState(game, st => st.skillFx === 0, 3000);
+  }
+  const over = await pollState(game, st => st.skillFx === 0 && st.skillFxLights === 0, 3000);
+  check(over.skillFx === 0 && over.skillFxLights === 0, `폭발이 1.4초 안에 끝나고 빛도 꺼진다 (효과 ${over.skillFx}개, 빛 ${over.skillFxLights}개)`);
+  // Twelve lights on screen at most, however many blasts.
+  await game.send('fxhold 0.12; ' + [0, 1, 2, 3, 4, 5].map(i => `blast fireball ${-6 + i * 2.4} ${i % 2 ? 2 : -2} 1.2`).join('; '));
+  const many = await pollState(game, st => st.skillFx >= 6 && st.skillFxLights > 0);
+  check(many.skillFxLights > 0 && many.skillFxLights <= 12, `폭발 여섯: 바닥 빛은 화면 12개까지 (${many.skillFxLights}개, 조각 ${many.skillFxPieces}개)`);
+  await game.send('fxhold off');
+  await pollState(game, st => st.skillFx === 0, 3000);
+  // A real fireball, thrown by the skill itself, lands with the same blast.
+  await game.send('monsters go; classes fire_mage; xp 21300; teach 2; heal; clear');
+  await game.wait(800);
+  const slot = Math.max(0, (await game.inventory()).skills.split(',').indexOf('fireball'));
+  await game.send('heal; mana 100; spawn slime 5 0 5000; face 1 0');
+  await game.wait(400);
+  await game.send(`skill ${slot}`);
+  await pollState(game, st => st.projectiles > 0, 2000);
+  await pollState(game, st => st.projectiles === 0, 4000);
+  const landed = await pollState(game, st => st.skillFxLights > 0, 1500);
+  check(landed.skillFxLights > 0, `진짜 화염구가 닿은 곳에서 새 폭발이 빛을 낸다 (빛 ${landed.skillFxLights}개, 조각 ${landed.skillFxPieces}개)`);
+  await game.context.close();
+
+  note('\n## 공용 폭발 (휴대폰 세로)\n');
+  const phone = await open(browser, run, Profiles.phone, url);
+  await phone.startSolo();
+  await phone.wait(1200);
+  await phone.send('goto wild');
+  await clearRoom(phone, 9, 6);
+  await phone.send('monsters hold; heal; face 1 0; fxhold 0.12; blast fireball -1.5 3 1.2; blast meteor 0.5 -2.5 2.6');
+  const small = await pollState(phone, st => st.skillFx >= 2 && st.skillFxPieces > 0);
+  check(small.skillFxPieces > 0 && small.skillFxPieces <= 144, `휴대폰 세로: 두 폭발이 그려진다 (조각 ${small.skillFxPieces}개)`);
+  await phone.wait(250);
+  await phone.shot('blast-phone', '휴대폰 세로: 위 화염구, 아래 유성 0.12초');
+  await phone.send('fxhold off; monsters go');
   await phone.context.close();
 }
 
@@ -8238,7 +8300,7 @@ async function towns(browser) {
   }
 }
 
-const Sections = { menu, title, testground, hunt, harvest, zones, towns, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, warden, antlion, queen, general, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, hazards, shots, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
+const Sections = { menu, title, testground, hunt, harvest, zones, towns, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, warden, antlion, queen, general, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, hazards, shots, blast, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

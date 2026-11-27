@@ -880,13 +880,23 @@ namespace Game.Client
             var m = c.Main;
             switch (skill)
             {
+                // The rework's blast (E3, FxLayers.Blast): the two that show it. The rest keep Explosion until E4.
                 case "fireball":
+                    return FxLayers.Blast(o, t, R, FxRamp.Fire, seed, embers: 12);
                 case "flame_burst":
                     return Explosion(o, t, R, 0, seed);
                 case "explosive_arrow":
                     return Explosion(o, t, R, 1, seed);
                 case "meteor":
-                    return Explosion(o, t, R, 2, seed);
+                {
+                    R = Math.Max(10, R);
+                    // The floor splits, glowing, and cools; a soft light lies on it while the fire burns.
+                    FxLayers.Splits(o, FxRamp.Fire, 9, t, 0, 1.38f, R, seed);
+                    if (t < 0.5f) Put(o, FxShape.Glow, FxRamp.Fire, SkillFxArt.Step4(R * 2.4f), 0, 0, 0, 0.55f * (1 - t / 0.5f), 0, true);
+                    // Four smaller balls of fire round the first, a moment after it.
+                    for (int i = 0; i < 4; i++) FxLayers.Ball(o, FxRamp.Fire, t, 0.03f + i * 0.02f, R * 0.5f, i + 1, Cos(i * 90 + 34) * R * 0.5f, Sin(i * 90 + 34) * R * 0.4f);
+                    return FxLayers.Blast(o, t, R, FxRamp.Fire, seed, embers: 16, rubble: 6, linger: 1.38f);
+                }
                 case "volley":
                     Puffs(o, FxRamp.Dust, 1, t, 0, 0.3f, 0, 2, seed, 5, 0.5f);
                     Fly(o, FxShape.Dot, m, 1, 2, 3, t, 0, 0.2f, 1, 7, seed);

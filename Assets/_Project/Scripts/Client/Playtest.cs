@@ -314,6 +314,12 @@ namespace Game.Client
                         root.View.StageShot(player.Position + new Vec2(Float(words[2]), Float(words[3])) + shotWay * (1.2f + 0.9f * (i % 3)), shotWay * 8, words.Length > 7 ? Float(words[7]) : 0.3f, Int(words[1]));
                     }
                     return null;
+                case "blast":
+                    // blast <skill> <dx> <dy> <radius in tiles>: that skill's landing put beside the player, as its
+                    // projectile would leave it (WorldView.StageBlast, E3 of Docs/EffectsRework.md). Hold its age with fxhold.
+                    if (root.View == null) return "no view";
+                    root.View.StageBlast(words[1], player.Position + new Vec2(Float(words[2]), Float(words[3])), Float(words[4]));
+                    return null;
                 case "fxhold":
                     // fxhold <seconds|off>: skill effects stop at that age, for a picture of one phase (Docs/SkillEffects.md).
                     Feel.SkillFxHold = words[1] == "off" ? -1 : Float(words[1]);
@@ -2890,6 +2896,8 @@ namespace Game.Client
                 // Skill effects running and the pieces they draw (WorldView.SkillFx).
                 json.Field("skillFx", root.SkillFxAlive);
                 json.Field("skillFxPieces", root.SkillFxPieces);
+                // Lights the effects' own pieces put on the light map (FxShape.Light: three an effect, twelve in all).
+                json.Field("skillFxLights", root.SkillFxLights);
                 // Projectiles drawn in their skill's own look (not the plain orb or arrow).
                 json.Field("skillShots", root.SkillShotsDrawn);
                 json.Field("warningSign", root.WarningShown);

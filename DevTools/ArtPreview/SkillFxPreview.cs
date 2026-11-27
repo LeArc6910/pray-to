@@ -77,6 +77,13 @@ namespace Game.Client
                         Console.Error.WriteLine($"skill {scene.Skill.Id}: {scene.MostAtOnce} pieces at once, more than {MostStamps}");
                         fine = false;
                     }
+                    for (float t = 0; t < scene.Duration; t += 0.02f)
+                    {
+                        if (Lights(scene, t) <= FxLayers.MostLights) continue;
+                        Console.Error.WriteLine($"skill {scene.Skill.Id}: {Lights(scene, t)} lights at once at {t:0.00} s, more than {FxLayers.MostLights}");
+                        fine = false;
+                        break;
+                    }
                     if (Count(scene, 0.04f) == 0 || Count(scene, scene.CastLife * 0.9f) == 0)
                     {
                         Console.Error.WriteLine($"skill {scene.Skill.Id}: nothing drawn at its start or its end (anticipation, dissipation)");
@@ -231,7 +238,22 @@ namespace Game.Client
             return scene;
         }
 
-        static int Count(Scene scene, float t) => Gather(scene, t).Count;
+        // Pieces drawn as sprites: a light (FxShape.Light) is none, it goes to the light map.
+        static int Count(Scene scene, float t) => Gather(scene, t).Count(piece => piece.Stamp.Shape != FxShape.Light);
+
+        // The most lights any one effect of the scene asks for at this moment (at most FxLayers.MostLights).
+        static int Lights(Scene scene, float t)
+        {
+            int most = 0, run = 0;
+            float lastX = float.NaN, lastY = float.NaN;
+            foreach (var (x, y, stamp) in Gather(scene, t))
+            {
+                if (x != lastX || y != lastY) run = 0;
+                (lastX, lastY) = (x, y);
+                if (stamp.Shape == FxShape.Light) most = Math.Max(most, ++run);
+            }
+            return most;
+        }
 
         // What the game would draw at this moment: the cast, each projectile in flight or landing, the buff's cue after.
         static List<(float X, float Y, FxStamp Stamp)> Gather(Scene scene, float t)
@@ -287,11 +309,15 @@ namespace Game.Client
             {
                 if (stamp.Ground) Blit(image, scene, x, y, stamp);
             }
+            foreach (var (x, y, stamp) in stamps)
+            {
+                if (stamp.Shape == FxShape.Light) Blit(image, scene, x, y, stamp);
+            }
             foreach (var (x, y) in scene.Slimes) image.Draw(scene.Slime, x - scene.Slime.Width / 2, y - scene.Slime.Height + 2);
             image.Draw(scene.Hero, scene.HeroX - HeroArt.FeetX, scene.HeroY - HeroArt.FeetY);
             foreach (var (x, y, stamp) in stamps)
             {
-                if (!stamp.Ground) Blit(image, scene, x, y, stamp);
+                if (!stamp.Ground && stamp.Shape != FxShape.Light) Blit(image, scene, x, y, stamp);
             }
             return image;
         }
@@ -301,6 +327,25 @@ namespace Game.Client
         {
             PixelImage piece;
             int anchorX, anchorY;
+            if (stamp.Shape == FxShape.Light)
+            {
+                // Roughly what the light map does: the floor and what stands on it brightened toward the light's colour.
+                var tint = SkillFxArt.Ramp(stamp.Ramp)[stamp.Frame & 3];
+                float lx = scene.HeroX + originX + stamp.X, ly = scene.HeroY - originY - stamp.Y;
+                for (int y = (int)(ly - stamp.Size); y <= ly + stamp.Size; y++)
+                {
+                    for (int x = (int)(lx - stamp.Size); x <= lx + stamp.Size; x++)
+                    {
+                        if (!image.Inside(x, y)) continue;
+                        float d = (float)Math.Sqrt((x + 0.5f - lx) * (x + 0.5f - lx) + (y + 0.5f - ly) * (y + 0.5f - ly)) / stamp.Size;
+                        if (d >= 1) continue;
+                        float k = 0.3f * stamp.Alpha * (1 - d) * (1 - d);
+                        var c = image[x, y];
+                        image[x, y] = new Rgba(Math.Min(255, (int)(c.R + tint.R * k)), Math.Min(255, (int)(c.G + tint.G * k)), Math.Min(255, (int)(c.B + tint.B * k)), c.A);
+                    }
+                }
+                return;
+            }
             if (stamp.Shape == FxShape.Ghost)
             {
                 // The caster's own picture in one pale colour, standing on the spot.
@@ -408,6 +453,23 @@ namespace Game.Client
                 list.Add(SkillFxArt.Draw(FxShape.Plus, ramp, 5, 0));
                 list.Add(SkillFxArt.Draw(FxShape.Leaf, ramp, 1, 0));
             }
+            // The rework's shared layers (E3): the ball's nine frames, its smoke, rising smoke, sparks, the shock wave,
+            // rocks, soot, splits glowing to cold, and the floor light.
+            var layers = new List<List<PixelImage>>();
+            foreach (FxRamp ramp in new[] { FxRamp.Fire, FxRamp.Cold, FxRamp.Violet })
+            {
+                var row = new List<PixelImage>();
+                for (int f = 0; f < 9; f++) row.Add(SkillFxArt.Draw(FxShape.Burst, ramp, 40, f));
+                for (int f = 0; f < 6; f += 2) row.Add(SkillFxArt.Draw(FxShape.Pall, ramp, 34, f));
+                for (int f = 0; f < 6; f++) row.Add(SkillFxArt.Draw(FxShape.Plume, ramp, 10 + f, f));
+                for (int f = 0; f < 3; f++) row.Add(SkillFxArt.Draw(FxShape.Ember, ramp, 6 - f, f));
+                for (int f = 0; f < 4; f++) row.Add(SkillFxArt.Draw(FxShape.Shock, ramp, 28 + 6 * f, f));
+                for (int f = 4; f < 8; f++) row.Add(SkillFxArt.Draw(FxShape.Chunk, FxRamp.Dust, 3 + (f & 1), f));
+                row.Add(SkillFxArt.Draw(FxShape.Scorch, ramp, 44, 4));
+                for (int c = 0; c < 3; c++) row.Add(SkillFxArt.Draw(FxShape.Crack, ramp, 24, SkillFxArt.SplitFrame(c, c)));
+                row.Add(SkillFxArt.Draw(FxShape.Glow, ramp, 48, 0));
+                layers.Add(row);
+            }
             var rows = new List<List<PixelImage>>();
             int per = list.Count / 5;
             for (int i = 0; i < 5; i++)
@@ -417,6 +479,16 @@ namespace Game.Client
                 {
                     var tile = new PixelImage(piece.Width + 4, 70);
                     tile.Fill(0, 0, tile.Width, tile.Height, Rgba.Hex("#24202A"));
+                    tile.Draw(piece, 2, (70 - Math.Min(66, piece.Height)) / 2);
+                    return tile;
+                }).ToList());
+            }
+            foreach (var row in layers)
+            {
+                rows.Add(row.Select(piece =>
+                {
+                    var tile = new PixelImage(piece.Width + 4, 70);
+                    tile.Fill(0, 0, tile.Width, tile.Height, Rgba.Hex("#5A5248"));
                     tile.Draw(piece, 2, (70 - Math.Min(66, piece.Height)) / 2);
                     return tile;
                 }).ToList());

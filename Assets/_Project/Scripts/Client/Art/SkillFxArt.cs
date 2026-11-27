@@ -26,9 +26,10 @@ namespace Game.Client
         Bolt,
         // An arc of steel round +x, size its radius, frame how many degrees wide.
         Crescent,
-        // A crack in the ground along +x, size its length, four kinds.
+        // A crack in the ground along +x, size its length, four kinds. Kinds 4 and up are a split that glows and
+        // cools (SkillFxArt.SplitFrame): thick at its root, bent once, in one colour.
         Crack,
-        // A bit of rubble, size 2 to 5.
+        // A bit of rubble, size 2 to 5. Kinds 4 to 7 are a dark rock thrown up, lit on top (size 3 to 6).
         Chunk,
         // A streak pointing +x with its bright head at the right, size its length, frame its thickness (1 to 3).
         Streak,
@@ -46,7 +47,7 @@ namespace Game.Client
         Reticle,
         // A ball of fire with its head at the right and a tail of flame, size the head's diameter, three frames.
         Fireball,
-        // A burn left on the ground, size its diameter.
+        // A burn left on the ground, size its diameter. Kinds 4 to 7 are soot with a ragged, thinning rim.
         Scorch,
         // A shadow on the ground, size its width.
         Shadow,
@@ -58,6 +59,26 @@ namespace Game.Client
         Leaf,
         // The caster's own picture, tinted (the view fills it in; nothing is drawn here).
         Ghost,
+
+        // ---- the shared layers of the effects rework (E3, Docs/EffectsRework.md 8; drawn in SkillFxArt.Layers) ----
+
+        // A blast's ball in one picture: a white flash, then lumps of red, orange, yellow and a pale core with edges
+        // that waver, swelling fast and hollowing into smoke from the middle. Size the blast's reach across (the
+        // picture is a little larger), frames 0 to 8 its life (BurstFrame), +16 for each of four different balls.
+        Burst,
+        // The smoke a ball leaves: a lump that empties from the middle, frames 0 to 5.
+        Pall,
+        // A puff of smoke on its way up, frames 0 to 5 from dark and solid to pale scraps.
+        Plume,
+        // A spark pointing +x with the streak it leaves, size its length (2 to 8), frame how far it has cooled (0 to 2).
+        Ember,
+        // A shock wave's ring, size its diameter, frames 0 to 3 from a bright band to scattered dots.
+        Shock,
+        // A soft light on the floor in three bands, size its diameter: only under the largest blasts.
+        Glow,
+        // No picture: a light for the light map, for this moment. Size its radius in pixels, Alpha how strong,
+        // Frame which of the ramp's colours (0 to 3). At most three an effect, twelve on screen (FxLayers.Light).
+        Light,
     }
 
     // An element's colours, dark to core.
@@ -82,7 +103,7 @@ namespace Game.Client
         Plain,
     }
 
-    static class SkillFxArt
+    static partial class SkillFxArt
     {
         // Dark, mid, light, core. The cores are pale, never pure white over a large area; the darks stay off black
         // (Docs/SkillEffects.md, rule 4). Fire leans to amber and yellow, away from the red of a boss's telegraph.
@@ -144,6 +165,12 @@ namespace Game.Client
                 case FxShape.Tether: return Tether(r, size, frame);
                 case FxShape.Blade: return Blade(r, size);
                 case FxShape.Leaf: return Leaf(r, frame);
+                case FxShape.Burst: return Burst(Ramp5(ramp), size, frame);
+                case FxShape.Pall: return Pall(size, frame);
+                case FxShape.Plume: return Plume(size, frame);
+                case FxShape.Ember: return Ember(Ramp5(ramp), size, frame);
+                case FxShape.Shock: return Shock(Ramp5(ramp), size, frame);
+                case FxShape.Glow: return Glow(r, size);
                 default: return null;
             }
         }
@@ -377,6 +404,7 @@ namespace Game.Client
         // A dark split wandering along +x, two pixels wide near its start, with a pale lip so it shows on dark floors.
         static PixelImage Crack(Rgba[] r, int length, int kind)
         {
+            if (kind >= 4) return Split(r, length, kind);
             const int half = 6;
             var image = new PixelImage(length, 2 * half + 1);
             var dark = new Rgba(34, 26, 24);
@@ -405,6 +433,7 @@ namespace Game.Client
 
         static PixelImage Chunk(Rgba[] r, int size, int kind)
         {
+            if (kind >= 4) return Rock(r, size, kind);
             size = Math.Clamp(size, 2, 5);
             var image = new PixelImage(size, size);
             for (int y = 0; y < size; y++)
@@ -615,6 +644,7 @@ namespace Game.Client
 
         static PixelImage Scorch(Rgba[] r, int diameter, int kind)
         {
+            if (kind >= 4) return Soot(diameter, kind);
             var image = new PixelImage(diameter, diameter);
             float centre = diameter / 2f, full = centre - 0.5f;
             var burnt = new Rgba(30, 22, 20);

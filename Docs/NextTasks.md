@@ -13,8 +13,8 @@
 
 - E1 보스 예고 도형과 공용 착지는 끝났다(2026-11-27, `Docs/EffectsRework.md` 6절). 본보기: `Client/Art/HazardArt.cs`, `WorldView.Hazards.cs`, `--only hazard`, `sweep.js --only hazards`
 - E2 적의 탄은 끝났다(2026-11-27, `Docs/EffectsRework.md` 7절). 본보기: `Client/Art/ShotArt.cs`, `WorldView.Shots.cs`, `--only shot`, `sweep.js --only shots`. 남은 것: 사방 사격·나선의 조준선(호스트가 쏠 때 각도를 정해 Core를 바꿔야 한다), 월광참·독액의 소멸(E6)
-- **E3 공용 층 조각과 폭발**(다음 차례): 바닥 빛(빛 지도의 짧은 광원), 그을음·균열, 연기, 꼬리 불티, 폭발(흰 핵 → 노랑 → 주황 → 빨강, 속부터 연기로 비워짐). E4~E6의 바탕
-- E5 일반 몬스터 → E4 플레이어 스킬(클래스마다) → E6 보스 고유 → E7 타격·숫자
+- E3 공용 층 조각과 폭발은 끝났다(2026-11-27, `Docs/EffectsRework.md` 8절). 본보기: `Client/Art/FxLayers.cs`(`Blast`와 층 도우미), `SkillFxArt.Layers.cs`(새 조각, `Ramp5`), `--only skillfx`, 명령 `blast`, `sweep.js --only blast`. 실제로 바꾼 것은 화염구·유성뿐
+- **E5 일반 몬스터**(다음 차례): 예고(굵은 테, 차오름)·탄·장판에 E1~E3의 조각을 쓴다. 그 뒤 E4 플레이어 스킬(클래스마다, 유성 낙하·혜성 꼬리 포함) → E6 보스 고유 → E7 타격·숫자
 - 묶음마다: 한도(이펙트 72조각, 바닥 빛 3장, 흔적 24개) 확인, 흑백 표, Playtest 장면과 `sweep.js` 구역, PlayMode 사진
 
 ## 정해진 것 (2026-11-27, 추천대로)

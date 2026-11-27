@@ -92,6 +92,7 @@ namespace Game.Client
         internal int RollsShown => _view?.RollsShown ?? 0;
         internal int DodgesShown => _view?.DodgesShown ?? 0;
         internal int SkillFxPieces => _view?.SkillFxPieces ?? 0;
+        internal int SkillFxLights => _view?.SkillFxLights ?? 0;
         internal int SkillShotsDrawn => _view?.SkillShotsDrawn ?? 0;
         internal bool WarningShown => _view != null && _view.WarningShown;
         internal int PoolsShown => _view?.PoolsShown ?? 0;
