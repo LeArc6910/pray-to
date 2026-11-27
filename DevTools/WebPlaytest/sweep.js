@@ -783,7 +783,9 @@ async function bosses(browser) {
   const game = await open(browser, run, Profiles.pc, url);
   await game.startSolo();
   await game.wait(1200);
-  await game.send('equip void_sword void_helmet void_armor void_boots; heal');
+  // Up to the level the void gear is worn at, so the fights last through all their checks (at level 9 the bosses of
+  // level 23 to 34 knocked the player down and every check after it failed, 2026-11-27).
+  await game.send('xp 2000000; equip void_sword void_helmet void_armor void_boots; heal');
   let s = await game.state();
   check(/cave_warden/.test(s.bosses) && /crystal_queen/.test(s.bosses) && /lava_titan/.test(s.bosses) && /void_lord/.test(s.bosses) && /tide_serpent/.test(s.bosses) && /antlion/.test(s.bosses)
     && /mad_general/.test(s.bosses) && /crown_wraith/.test(s.bosses), `보스 여덟이 월드에 있다 (${s.bosses})`);
@@ -802,8 +804,10 @@ async function bosses(browser) {
     // The two bosses of the places (2026-11-11, the content audit: they were not yet checked).
     ['mad_general', '미쳐 버린 장군 모르그'], ['crown_wraith', '왕관의 망령']]) {
     await game.send(`heal; goto boss ${id}`);
-    const woke = await game.until(t => has(t.banner, '등장') || has(t.entrance, '등장'), 6000, game.texts);
-    check(!!woke, `${name}: "${name} 등장!" 배너나 이름 카드`);
+    // The first time a boss comes in its name card shows (the report gives "id|name|title", Playtest "entrance"); seen
+    // before, the old banner.
+    const woke = await game.until(t => has(t.banner, '등장') || has(t.entrance, name), 6000, game.texts);
+    check(!!woke, `${name}: "${name} 등장!" 배너나 이름 카드 (${woke ? woke.banner || woke.entrance : '없음'})`);
     const theme = await game.until(t => t.music === `boss_${id}_1`, 4000);
     check(!!theme, `${name}: 보스 곡 1페이즈 (${(theme || await game.state()).music})`);
     await game.wait(2500);
@@ -865,7 +869,7 @@ async function patterns(browser) {
   for (const [id, attack, name, least = 1] of uses) {
     if (woken !== id) {
       await game.send(`heal; goto boss ${id}`);
-      await game.until(t => has(t.banner, '등장') || has(t.entrance, '등장'), 6000, game.texts);
+      await game.until(t => has(t.banner, '등장') || has(t.entrance, id), 6000, game.texts);
       woken = id;
     }
     await game.wait(1500);
