@@ -28,6 +28,20 @@ namespace Game.Client
                 // --only title: the title rework's art (out/title/, TitlePreview, Docs/TitleRework.md 묶음 T2).
                 return TitlePreview.Write(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out")) ? 0 : 1;
             }
+            if (args.Length > 2 && args[0] == "--only" && args[1] == "gapframes")
+            {
+                // --only gapframes <boss:View:Pose:frame>...: those frames side by side, the gaps in red
+                // (out/anim/gaps_frames.png), to look at a fix before and after.
+                var preview = FindFolder(Path.Combine("DevTools", "ArtPreview"));
+                return GapCheck.WriteFrames(Path.Combine(preview, "out", "anim"), Path.GetFullPath(Path.Combine(preview, "..", "..")), args.Skip(2).ToArray()) ? 0 : 1;
+            }
+            if (args.Length == 2 && args[0] == "--only" && args[1] == "gaps")
+            {
+                // --only gaps: see-through gaps inside every boss's and monster's body, frame by frame (out/anim/gaps.txt,
+                // gaps.png, GapCheck).
+                var preview = FindFolder(Path.Combine("DevTools", "ArtPreview"));
+                return GapCheck.Write(Path.Combine(preview, "out", "anim"), Path.GetFullPath(Path.Combine(preview, "..", ".."))) ? 0 : 1;
+            }
             if (args.Length == 2 && args[0] == "--only" && args[1] == "skillfx")
             {
                 // --only skillfx: just the skills' effects (out/skillfx/, SkillFxPreview).

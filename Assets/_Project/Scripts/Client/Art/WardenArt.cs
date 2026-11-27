@@ -489,6 +489,17 @@ namespace Game.Client
             _ => (new Box(8, 26, 22, 49), new Box(41, 26, 56, 49), new Box(18, 45, 29, 55), new Box(34, 45, 46, 55)),
         };
 
+        // The trunk behind the arms in each view: where an arm leaves from in front of it, the trunk is drawn in shade
+        // there (not the floor showing through the chest).
+        static Box TrunkOf(BossView view) => view switch
+        {
+            BossView.Front => new Box(17, 20, 47, 52),
+            BossView.FrontSide => new Box(16, 20, 45, 52),
+            BossView.Side => new Box(18, 20, 40, 52),
+            BossView.BackSide => new Box(17, 20, 47, 51),
+            _ => new Box(17, 22, 47, 51),
+        };
+
         static readonly Dictionary<BossView, Part[,]> PartMaps = new Dictionary<BossView, Part[,]>();
 
         static Part[,] PartsOf(BossView view)
@@ -1018,6 +1029,8 @@ namespace Game.Client
             fistB = armB.Empty ? (Margin + armA.Fist.X + bx - 4, Headroom + armA.Fist.Y + by - 1) : (Margin + armB.Fist.X + bx, Headroom + armB.Fist.Y + by);
 
             var canvas = new PixelImage(w + 2 * Margin, h + Headroom);
+            var trunk = TrunkOf(view);
+            var left = new bool[canvas.Width, canvas.Height];
             bool Far(int dx, int dy) => System.Math.Abs(dx) >= 5 || System.Math.Abs(dy) >= 5;
             // The far arm seen from the side, when it comes out from behind: drawn first, the body over it.
             if (armB.Empty && Far(bx, by)) Arm(Part.ArmA, armA, bx - 4, by - 1, 0.55f);
@@ -1035,12 +1048,13 @@ namespace Game.Client
                         continue;
                     }
                     // Where a part has moved away from inside the body, the body behind it in shade.
-                    int left = -1, right = -1;
-                    for (int k = x - 1; k >= 0 && left < 0; k--) if (Body(k)) left = k;
-                    for (int k = x + 1; k < w && right < 0; k++) if (Body(k)) right = k;
-                    if (left >= 0 && right >= 0)
+                    left[x + Margin, y + Headroom] = true;
+                    int before = -1, after = -1;
+                    for (int k = x - 1; k >= 0 && before < 0; k--) if (Body(k)) before = k;
+                    for (int k = x + 1; k < w && after < 0; k++) if (Body(k)) after = k;
+                    if (before >= 0 && after >= 0 || trunk.Holds(x, y) && (before >= 0 || after >= 0))
                     {
-                        var near = image[x - left <= right - x ? left : right, y];
+                        var near = image[before < 0 ? after : after < 0 ? before : x - before <= after - x ? before : after, y];
                         canvas[x + Margin, y + Headroom] = Luminance(near) < 20 ? Shade : near.Mix(Shade, 0.6f);
                     }
                 }
@@ -1094,6 +1108,12 @@ namespace Game.Client
             Lay(Part.LegA, la, lay, 1);
             if (!armB.Empty) Arm(Part.ArmB, armB, bx, by, 1);
             Arm(Part.ArmA, armA, ax, ay, 1);
+            // A narrow gap left between a part and the body (a fist moved a little off the trunk), or the notch between
+            // hip and leg the hanging fist hid at rest, closed in shade.
+            for (int y = trunk.Y0; y <= trunk.Y1; y++)
+                for (int x = trunk.X0; x <= trunk.X1; x++)
+                    left[x + Margin, y + Headroom] = true;
+            canvas.CloseGaps(left, Shade, 6);
             return canvas;
         }
 

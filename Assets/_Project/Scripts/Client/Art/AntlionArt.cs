@@ -665,6 +665,20 @@ namespace Game.Client
                         if (swells && p.Swell > 0.04f) Put(px + dx + 1, py + dy, c);
                     }
             }
+            // The abdomen pushed back or the head thrust ahead opens a narrow gap across the body where they met
+            // (2026-11-27, the sand showed through between the thorax and the abdomen, seen from behind): within where
+            // the body stood at rest, a see-through slit with body both sides is closed in shade.
+            var rest = new bool[canvas.Width, canvas.Height];
+            for (int y = 0; y < 64; y++)
+                for (int x = 0; x < 64; x++)
+                {
+                    var part = data.Parts[x, y];
+                    if (part != Part.Abdomen && part != Part.Thorax && part != Part.Head) continue;
+                    int cx = R(x) + Margin + shake, cy = R(ground - (ground - (y - lift + Headroom)) * stretch);
+                    for (int oy = -1; oy <= 1; oy++)
+                        if (canvas.Inside(cx, cy + oy)) rest[cx, cy + oy] = true;
+                }
+            canvas.CloseGaps(rest, new Rgba(40, 26, 16), 6);
             var headAt = Offset(Part.Head);
             joints.HeadX = (data.RootAX + data.RootBX) / 2 + headAt.X + Margin;
             joints.HeadY = (data.RootAY + data.RootBY) / 2 + headAt.Y + Headroom;

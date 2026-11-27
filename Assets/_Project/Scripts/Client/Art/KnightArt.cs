@@ -874,6 +874,7 @@ namespace Game.Client
             hands = (Margin + (fa.X + ax + fb.X + bx) / 2f, Headroom + (fa.Y + ay + fb.Y + by) / 2f);
 
             var canvas = new PixelImage(w + 2 * Margin, h + Headroom);
+            var vacated = new bool[canvas.Width, canvas.Height];
             bool moved(Part part) => part == Part.ArmA ? ax != 0 || ay != 0 : part == Part.ArmB ? bx != 0 || by != 0 : part == Part.LegA ? la != 0 || lay != 0 : part == Part.LegB ? lb != 0 || lby != 0 : false;
             for (int y = 0; y < h; y++)
             {
@@ -888,6 +889,7 @@ namespace Game.Client
                         continue;
                     }
                     // Where a part has moved away from inside the body, the body behind it in shade.
+                    vacated[x + Margin, y + Headroom] = true;
                     int left = -1, right = -1;
                     for (int k = x - 1; k >= 0 && left < 0; k--) if (Body(k)) left = k;
                     for (int k = x + 1; k < w && right < 0; k++) if (Body(k)) right = k;
@@ -940,6 +942,9 @@ namespace Game.Client
             Lay(Part.LegA, la, lay);
             Arm(Part.ArmB, armB, bx, by);
             Arm(Part.ArmA, armA, ax, ay);
+            // A narrow gap left between a part and the body (2026-11-27: the floor showed through the breastplate as an
+            // arm swung out from in front of it) closed in shade.
+            canvas.CloseGaps(vacated, Shade);
             return canvas;
         }
 

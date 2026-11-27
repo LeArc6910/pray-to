@@ -151,6 +151,43 @@ namespace Game.Client
             this[x, y] = under.Mix(color.WithAlpha(255), t).WithAlpha(Math.Max(under.A, color.A));
         }
 
+        // Where parts of a body posed in code have moved away (left), the floor must not show through a narrow gap
+        // between them and the rest (2026-11-27, Docs/Bosses.md 몸의 틈): a see-through pixel there with the body within
+        // reach on both sides (left and right, or above and below) is filled with the nearest body colour in shade. Three
+        // passes, so a gap a little wider than the reach closes from its edges.
+        public void CloseGaps(bool[,] left, Rgba shade, int reach = 3)
+        {
+            bool Solid(int x, int y) => Inside(x, y) && this[x, y].A == 255;
+            for (int pass = 0; pass < 3; pass++)
+            {
+                var fill = new List<(int X, int Y, Rgba C)>();
+                for (int y = 0; y < Height; y++)
+                {
+                    for (int x = 0; x < Width; x++)
+                    {
+                        if (!left[x, y] || this[x, y].A > 0) continue;
+                        Rgba? Find(int dx, int dy)
+                        {
+                            for (int k = 1; k <= reach; k++)
+                                if (Solid(x + dx * k, y + dy * k)) return this[x + dx * k, y + dy * k];
+                            return null;
+                        }
+                        var l = Find(-1, 0);
+                        var r = Find(1, 0);
+                        var u = Find(0, -1);
+                        var d = Find(0, 1);
+                        if (l != null && r != null || u != null && d != null)
+                        {
+                            var near = l ?? r ?? u ?? d ?? shade;
+                            fill.Add((x, y, near.Mix(shade, 0.6f)));
+                        }
+                    }
+                }
+                foreach (var (x, y, c) in fill) this[x, y] = c;
+                if (fill.Count == 0) break;
+            }
+        }
+
         // Darkens (factor below 1) or lightens one pixel, keeping its alpha.
         public void Shade(int x, int y, float factor)
         {

@@ -50,6 +50,10 @@ dotnet run --project DevTools/CoreSandbox -- --traps 1,2,3
 dotnet run --project DevTools/ArtPreview
 # 보스 하나의 움직임만 다시(anim/의 GIF, 프레임표, 연속성 보고서. general, warden, antlion, crystal_queen, spider, knight, samurai, vein_eater). hero는 주인공의 무기별 모션(hero_*), entrances는 여섯 보스의 입장만, arenas는 아레나 그림만(arenas.png, arenas_unlit.png, arenas_world.png, arenas/), skillfx는 스킬 이펙트만(skillfx/의 클래스별 프레임표·GIF, Docs/SkillEffects.md), monsterfx는 일반 몬스터의 예고와 이펙트만(monsterfx/의 종별 프레임표·GIF, Docs/Combat.md 몬스터의 공격 시트)
 dotnet run --project DevTools/ArtPreview -- --only spider
+# 몸의 틈 점검: 모든 보스·몬스터의 모든 프레임에서 몸 안에 생긴 투명한 틈(anim/gaps.txt, gaps_<이름>.png, Docs/Bosses.md 몸의 틈)
+dotnet run --project DevTools/ArtPreview -- --only gaps
+# 몇 프레임만 틈을 빨갛게 나란히(anim/gaps_frames.png, 고치기 전후 보기)
+dotnet run --project DevTools/ArtPreview -- --only gapframes cave_warden:Side:Raise:15 black_knight:FrontSide:Sweep:4
 # 생성된 지도 그림만(out/map/: 생성기 1판·2판, 시드 1~3의 온 지도와 시작 지점, 시드 1의 생물군계마다와 방 그래프, 역할마다의 방(v2_seed1_roles.png, rooms_art.png, rooms_art_lit.png), 새 칸(room_tiles.png), 길과 샛길(v2_seed1~3_roads.png))
 dotnet run --project DevTools/ArtPreview -- --only map
 # UI 개편 시안(out/uimock/: 양식 A·B·C와 추천 조합의 가방·대화·상점·성장 화면, 휴대폰 세로 가방·대화, compare_abc.png. Docs/UiRework.md 4-4)
