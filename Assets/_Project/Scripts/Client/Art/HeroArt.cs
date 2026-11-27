@@ -283,6 +283,8 @@ namespace Game.Client
             public float Shut;
             // The whole picture tipped over onto the floor (degrees).
             public float Tip;
+            // The whole body rolled over forwards, head first the way it faces (degrees; 360 is up on the feet again).
+            public float Roll;
         }
 
         static Pose Lerp(Pose a, Pose b, float t)
@@ -295,7 +297,7 @@ namespace Game.Client
                 HandR = V3.Lerp(a.HandR, b.HandR, t), HandL = V3.Lerp(a.HandL, b.HandL, t),
                 FootR = V3.Lerp(a.FootR, b.FootR, t), FootL = V3.Lerp(a.FootL, b.FootL, t),
                 Yaw = L(a.Yaw, b.Yaw), Pitch = L(a.Pitch, b.Pitch), Both = L(a.Both, b.Both),
-                Draw = L(a.Draw, b.Draw), Arrow = L(a.Arrow, b.Arrow), Glow = L(a.Glow, b.Glow), Shut = L(a.Shut, b.Shut), Tip = L(a.Tip, b.Tip),
+                Draw = L(a.Draw, b.Draw), Arrow = L(a.Arrow, b.Arrow), Glow = L(a.Glow, b.Glow), Shut = L(a.Shut, b.Shut), Tip = L(a.Tip, b.Tip), Roll = L(a.Roll, b.Roll),
             };
         }
 
@@ -1374,52 +1376,50 @@ namespace Game.Client
 
         // ---- The dodge roll: 0.3 s in all (World.RollSeconds), ahead being the way they roll ----
 
-        // A tumble: a dive onto the hands, the body tucked small and turned right over (seen from above, the views go
-        // by all the way round), and up onto the feet again. The weapon is held in against the body through it.
+        // A forward roll: a dive toward the hands, the body tucked into a ball and gone over head first the way it
+        // goes (Pose.Roll), and up onto the feet again. The weapon is held in against the back and goes over with it.
         static Clip Tumbling(Pose rest, HeroWeapon weapon)
         {
             bool armed = weapon != HeroWeapon.None;
             var dive = With(rest, (ref Pose p) =>
             {
-                p.Lean = 3.5f;
-                p.Drop = 3;
-                p.Nod = 1.5f;
-                p.HandR = armed ? V(4.5f, 2, 5) : V(4, 4.5f, 4.5f);
-                p.HandL = V(-4, 4.5f, 4.5f);
-                p.FootR = V(3, -3.5f, 0.5f);
-                p.FootL = V(-3, 1.5f, 0);
+                p.Roll = 50;
+                p.Lean = 2.5f;
+                p.Drop = 5.5f;
+                p.Nod = 2.5f;
+                p.HandR = armed ? V(4, 1.5f, 4.5f) : V(3.5f, 4, 4);
+                p.HandL = V(-3.5f, 4, 4);
+                p.FootR = V(2.5f, -1.5f, 0.5f);
+                p.FootL = V(-2.5f, 0.5f, 0);
                 if (armed)
                 {
-                    // Upright against the back, so it turns with the body without sweeping round.
+                    // Upright against the back, so it goes over with the body without sweeping round.
                     p.Yaw = -150;
                     p.Pitch = 78;
                 }
             });
             var tucked = With(dive, (ref Pose p) =>
             {
-                p.Pivot = 180;
-                p.Lean = 1;
-                p.Drop = 6;
-                p.Nod = 2.5f;
-                p.Hop = 1;
-                p.HandR = armed ? V(3.5f, 1.5f, 3.5f) : V(3, 2.5f, 3);
-                p.HandL = V(-3, 2.5f, 3);
-                p.FootR = V(2, 1, 1.5f);
-                p.FootL = V(-2, 1, 1.5f);
-                p.Shut = 1;
+                p.Roll = 180;
+                p.Lean = 0;
+                p.Drop = 9;
+                p.Nod = 4.5f;
+                p.Hop = 1.5f;
+                p.HandR = armed ? V(3, 1, 3.5f) : V(2.5f, 2.5f, 3);
+                p.HandL = V(-2.5f, 2.5f, 3);
+                p.FootR = V(1.5f, 1, 2);
+                p.FootL = V(-1.5f, 1, 2);
             });
             var over = With(tucked, (ref Pose p) =>
             {
-                p.Pivot = 360;
-                p.Drop = 4.5f;
+                p.Roll = 300;
+                p.Drop = 8;
                 p.Hop = 0;
-                p.Nod = 1.5f;
-                p.Lean = 2;
-                p.FootR = V(3, 2.5f, 0);
-                p.FootL = V(-3, -1.5f, 0);
-                p.Shut = 0;
+                p.Nod = 4;
+                p.FootR = V(2, 1.5f, 0.5f);
+                p.FootL = V(-2, 0, 0.5f);
             });
-            var up = With(rest, (ref Pose p) => p.Pivot = 360);
+            var up = With(rest, (ref Pose p) => p.Roll = 360);
             return Build(rest,
                 St(0.05f, dive, Ease.Out, Beat.Swing, least: 2),
                 St(0.09f, tucked, Ease.Even, Beat.Swing, least: 4),
@@ -1697,6 +1697,15 @@ namespace Game.Client
                 joints.Top = Round(MathF.Min(top, FeetY - 9));
                 joints.Bottom = FeetY - 1;
             }
+            if (Rolls(pose.Roll))
+            {
+                var m = RollOf(look, pose.Roll, false);
+                (joints.RightX, joints.RightY) = m.Put(joints.RightX, joints.RightY);
+                (joints.LeftX, joints.LeftY) = m.Put(joints.LeftX, joints.LeftY);
+                (joints.TipX, joints.TipY) = m.Put(joints.TipX, joints.TipY);
+                joints.Top = Round(RollY - 7);
+                joints.Bottom = FeetY - 1;
+            }
             rig.Joints = joints;
             return rig;
         }
@@ -1715,6 +1724,18 @@ namespace Game.Client
         const float Behind = 1;
 
         static PixelImage Render(Look look, Pose pose, HeroGear gear, Paint paint, bool blink, out Joints joints)
+        {
+            if (!Rolls(pose.Roll)) return Upright(look, pose, gear, paint, blink, out joints);
+            // Rolled over: the tucked body drawn as it stands and turned over forwards. Once it is past lying flat its
+            // other side shows, which is the view from the opposite way.
+            joints = Solve(look, pose, gear.Kind).Joints;
+            var m = RollOf(look, pose.Roll);
+            var plain = pose;
+            plain.Roll = 0;
+            return Rolled(Upright(m.Back ? Opposite(look) : look, plain, gear, paint, blink, out _), m);
+        }
+
+        static PixelImage Upright(Look look, Pose pose, HeroGear gear, Paint paint, bool blink, out Joints joints)
         {
             var colors = paint.Colors;
             bool shut = blink || pose.Shut > 0.5f;
@@ -1960,6 +1981,80 @@ namespace Game.Client
                     break;
                 }
             }
+        }
+
+        // ---- Rolling over forwards (Pose.Roll) ----
+
+        // The middle of the tucked body, which the roll turns about.
+        const float RollX = FeetX, RollY = FeetY - 7;
+        // How much of a step away from the viewer shows as a step up the screen for the rolling body: what keeps it
+        // from being seen edge on as it goes over toward the viewer or away.
+        const float RollDepth = 0.45f;
+
+        static bool Rolls(float degrees)
+        {
+            float turn = degrees % 360;
+            return MathF.Abs(turn) > 0.5f && MathF.Abs(turn) < 359.5f;
+        }
+
+        static Look Opposite(Look look) => look switch { Look.Down => Look.Up, Look.DownSide => Look.UpSide, Look.UpSide => Look.DownSide, Look.Up => Look.Down, _ => Look.Side };
+
+        // Where a point of the upright picture goes on the screen once the body is rolled over (X, Y from the middle,
+        // down the screen), and whether the body's other side shows.
+        readonly struct RollTurn
+        {
+            public readonly float A, B, C, D;
+            public readonly bool Back;
+
+            public RollTurn(float a, float b, float c, float d)
+            {
+                (A, B, C, D) = (a, b, c, d);
+                Back = a * d - b * c < 0;
+            }
+
+            public (float X, float Y) Put(float x, float y)
+            {
+                float dx = x - RollX, dy = y - RollY;
+                return (RollX + A * dx + B * dy, RollY + C * dx + D * dy);
+            }
+        }
+
+        // The body is a flat picture standing on the floor, turned head first toward the way it goes about the line
+        // across that way. To the side this is the picture turning on the screen; toward the viewer or away it is the
+        // picture closing flat and opening upside down with its other side showing. The diagonal views roll mostly
+        // sideways (a picture turned about a diagonal line would be edge on halfway).
+        static RollTurn RollOf(Look look, float degrees, bool drawn = true)
+        {
+            float way = look switch { Look.Down => -90, Look.DownSide => -20, Look.Side => 0, Look.UpSide => 20, _ => 90 } * Deg;
+            float tx = MathF.Cos(way), td = MathF.Sin(way);
+            float c = MathF.Cos(degrees * Deg), s = MathF.Sin(degrees * Deg);
+            // Right and up the screen from right and up the picture.
+            float xx = td * td + tx * tx * c, xu = tx * s;
+            float ux = -tx * s - RollDepth * td * tx * (1 - c), uu = c + RollDepth * td * s;
+            // Never much thinner than half: lying flat it is still a body, not a line.
+            // (Where the hands are is left to pass through the line, so they do not jump from frame to frame.)
+            if (drawn && MathF.Abs(tx) < 0.01f && MathF.Abs(uu) < 0.6f) uu = uu < 0 ? -0.6f : 0.6f;
+            return new RollTurn(xx, -xu, -ux, uu);
+        }
+
+        // The picture rolled over (each pixel taken from where it came from; the other side's picture mirrored, as it
+        // is seen from behind).
+        static PixelImage Rolled(PixelImage image, RollTurn m)
+        {
+            var result = new PixelImage(Size, Size);
+            float det = m.A * m.D - m.B * m.C;
+            for (int y = 0; y < Size; y++)
+            {
+                for (int x = 0; x < Size; x++)
+                {
+                    float dx = x + 0.5f - RollX, dy = y + 0.5f - RollY;
+                    float sx = (m.D * dx - m.B * dy) / det, sy = (-m.C * dx + m.A * dy) / det;
+                    if (m.Back) sx = -sx;
+                    int px = (int)MathF.Floor(RollX + sx), py = (int)MathF.Floor(RollY + sy);
+                    if (image.Inside(px, py) && image.IsSet(px, py)) result[x, y] = image[px, py];
+                }
+            }
+            return result;
         }
 
         // The floor point the body tips over about, and how far the picture slides back as it goes down so it lies
