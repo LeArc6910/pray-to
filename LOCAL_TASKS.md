@@ -2011,3 +2011,26 @@ DevTools/Local/setup.sh --commit
 - EditMode `BotTests.FirstHourReachesTheFirstMonsterCraftAndBoss(1UL)`(`BotTests.cs:281`): "at the warden's arena … Expected: True But was: False". 시드 1이 7:43에 레벨 3, 동굴 수호자 목표를 "monster: 몬스터 없음: 탐험 (갈 곳 없음)"으로 건너뜀, 칸 124,29에서 마지막 행동 "7:33 monster NoWay 몬스터에게 갈 길 없음", 멈춤 1·막힘 1. 위 13:30 보고처럼 Unity에서만 난다
 - Console 로그(`Logs/playmode.log`, `Logs/screens.log`): 실패한 시험 앞뒤에 예외·에러·경고가 **하나도 없다**. 나오는 것은 "There are no audio listeners in the scene"(배치에서 193번, 장면마다)와 `[playtest] ok …` 줄, 화면 실행 시작 때 "Scene file not found: 'Assets/Scenes/SampleScene.unity'"(에디터가 마지막에 연 장면을 찾는 것, 시험과 무관)뿐이다. 보이는 것: 배치에서만 실패하는 다섯(엘리트 이름, 만남 초상, 시험장 기록, 던전 문, 가방 일부)은 모두 화면에 그린 글·초상을 읽는 확인이라 배치 모드(그리지 않음)에서 빈 값이 나오는 것으로 보인다
 - **감시**: 이 컴퓨터에는 켜진 적이 없었다(시작프로그램에 없고 `Logs/watch.log`도 없었다). `watch.ps1 -Install`로 켰다(로그인할 때마다 최소화된 창으로 켜짐, 5분마다 봄). 방금 돌린 커밋을 시험한 것으로 적어 두어 곧바로 다시 돌지는 않는다
+
+### 2026-11-28 18:25 setup.ps1 (Unity 6000.6.3f1)
+
+- 프로젝트 설정: 성공
+- 패키지: com.unity.netcode.gameobjects 2.13.3, com.unity.transport 6.6.0, com.unity.render-pipelines.universal 17.6.0, com.unity.inputsystem 1.20.0, com.unity.multiplayer.playmode 3.0.0, com.unity.test-framework 1.8.0
+- EditMode 테스트: 1273개 중 1272개 통과, 1개 실패
+  - `Game.Core.Tests.BotTests.FirstHourReachesTheFirstMonsterCraftAndBoss(1UL): at the warden's arena`
+- PlayMode 테스트: 76개 중 66개 통과, 10개 실패
+  - `Game.Client.Tests.FeatureTests.ASingleShotIsLinedToItsTargetBeforeItFlies: A line to the player the shot is for.`
+  - `Game.Client.Tests.FeatureTests.ElitesWearTheirNamesAndWarnOfTheirBigAttack: A name over the leader and each champion.`
+  - `Game.Client.Tests.FeatureTests.EveryKindHasItsOwnAttacks: A blow its shell turned shows a grey number.`
+  - `Game.Client.Tests.FeatureTests.RumoursAndSlowRest: The goal list says only which way:`
+  - `Game.Client.Tests.FeatureTests.TheBagAndHudDraw: The food's buff has no icon.`
+  - `Game.Client.Tests.FeatureTests.TheEncounterWindowsDraw: Her portrait is in the talk box.`
+  - `Game.Client.Tests.LayoutTests.TheBagAndHudFit: 작은 휴대폰 가로 667×375: 배너가 [메뉴] 판에 겹친다 (x:0.00, y:301.00, width:667.00, height:64.00) (x:353.00, y:186.00, width:304.00, height:160.00)`
+  - `Game.Client.Tests.LayoutTests.TheFixedPartsKeepToTheSafeArea: 작은 휴대폰 가로(안전 영역 32 0 32 16) 667×375, 스킬 1: 겹침 - 시간·장소 줄 / 구르기`
+  - `Game.Client.Tests.LayoutTests.TheGrowthScreensFit: 작은 휴대폰 세로 360×640, 특성: 고른 점과 서랍이 하늘을 거의 다 덮는다 (84)`
+  - `Game.Client.Tests.TitleScreenTests.TheTestGroundsPanelAndHitLogDraw: The hit log is on the screen.`
+- 화면 캡처: 사진 212장, 장면 54개 중 50개 통과
+  - `Game.Client.Tests.FeatureTests.ADungeonGateLeadsIntoThePocketAndOut: The gate's button starts going in.`
+  - `Game.Client.Tests.FeatureTests.ASingleShotIsLinedToItsTargetBeforeItFlies: A line to the player the shot is for.`
+  - `Game.Client.Tests.FeatureTests.EveryKindHasItsOwnAttacks: A blow its shell turned shows a grey number.`
+  - `Game.Client.Tests.FeatureTests.TheBagAndHudDraw: The food's buff has no icon.`
