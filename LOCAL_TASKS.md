@@ -1315,7 +1315,7 @@ DevTools/Local/setup.sh --commit
 - [ ] 201단계: 소리 코드 일곱과 성별(2026-11-28) — `Docs/SoundCredits.md` 5차, `Docs/Gender.md`
   - 명령 한 줄을 다시 돌린다. 새 파일 `Assets/Tests/EditMode/GenderTests.cs`의 `.meta`가 생기면 커밋한다
   - 소리 파일 넣기(로컬 세션): 5차 표의 새 세트를 `Resources/Sfx/<세트>_1.wav`부터 넣는다(코드는 그대로, 없으면 지금 소리가 난다). 성별 신음 2(`voice_player_male_hurt`, `voice_player_female_hurt`), 원소 폭발 4(`sfx_spell_poison`·`_void`·`_water`·`_spirit`), 수확 10(`sfx_harvest_mushroom`·`bush`·`pod`·`geode`·`ore`·`clam`·`berry`·`root`·`leaf`·`melon`), 보스 포효 12(`roar_<보스 id>`, 프롬프트 예시는 5차 표). 넣으면 `Docs/SoundCredits.md`에 출처를 적는다
-  - (사람) 새 캐릭터 화면에서 [성별 ▶]으로 여자를 골라 미리보기와 게임 안 모습(몸통·턱, 옆모습 홍조)이 어색하지 않은지 본다
+  - (사람) 새 캐릭터 화면에서 [성별 ▶]으로 여자를 골라 미리보기와 게임 안 모습(몸통·턱·홍조)이 어색하지 않은지 본다
   - (사람) 시험장 시험판 [성별]로 남·여를 바꿔 맞아 보고 신음이 너무 잦거나 드물지 않은지, 마지막 휘두르기가 이제 다른 단과 맞는지, 버섯 어미(포자 굴)가 포자를 부를 때 칼 궤적·휘두르기 소리가 없는지, 모르그의 불 띠가 불 소리인지
 
 ## 결과 보고

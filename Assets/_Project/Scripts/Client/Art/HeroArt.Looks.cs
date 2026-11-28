@@ -124,7 +124,8 @@ namespace Game.Client
                     ['p'] = legs,
                     ['q'] = style.Pants == 0 ? legs : legs.Scale(0.8f),
                     // A cheek's flush (a woman's face).
-                    ['k'] = skin.Main.Mix(Rgba.Hex("#E0606A"), 0.45f),
+                    // Lighter than the skin and pink, so beside the eye it reads as a cheek, not a second eye.
+                    ['k'] = skin.Light.Mix(Rgba.Hex("#FF8FA0"), 0.55f),
                 },
             };
         }
@@ -170,11 +171,14 @@ namespace Game.Client
             switch (look)
             {
                 case Look.Down:
-                    Chin(chin, 3, -1);
-                    Chin(chin, 8, 1);
+                    // The chin under the eyes stays as the man's: narrowed, the outline would touch the eyes.
+                    Flush(eyes, 2);
+                    Flush(eyes, 9);
                     break;
                 case Look.DownSide:
-                    Chin(chin, 8, 1);
+                    // The far cheek's corner, not the one under the near eye (there the outline met the eye).
+                    Chin(chin, 3, -1);
+                    Flush(eyes, 9);
                     break;
                 case Look.Side:
                     Chin(chin, 9, 1);
