@@ -650,6 +650,7 @@ namespace Game.Client
             DrawCrops();
             DrawMachines();
             DrawPeople();
+            SpreadPeople();
             DrawStoryPeople();
             DrawTownsfolk();
             DrawStanding(deltaTime);
@@ -1657,10 +1658,13 @@ namespace Game.Client
                     var at = site.PersonAt(character, home, clock, _client.DayMinutes);
                     var before = site.PersonAt(character, home, clock - 6, _client.DayMinutes);
                     if (Vec2.Distance(self, at) > PeopleRange) continue;
+                    // Facing and bobbing go by their own way; where they are drawn is nudged clear of the others.
+                    bool walking = Vec2.Distance(at, before) > 0.01f;
+                    bool left = at.X < before.X - 0.005f;
+                    at = Spread(character.Id, at);
                     _storyInView.Add((character, at));
                     var color = Rgba.Hex(string.IsNullOrEmpty(character.Color) ? "#8A7A6A" : character.Color);
                     int frame = Mathf.FloorToInt(Time.time * PeopleArt.FramesPerSecond + home.X * 7 + home.Y * 3) % PeopleArt.Frames;
-                    bool walking = Vec2.Distance(at, before) > 0.01f;
                     var figure = Sprites.Standing($"story/{character.Id}/{frame}", () => PeopleArt.Look(character.Look, color, frame));
                     _storySeen.Add(character.Id);
                     if (!_storyPeople.TryGetValue(character.Id, out var renderer))
@@ -1669,7 +1673,7 @@ namespace Game.Client
                         _storyPeople[character.Id] = renderer;
                     }
                     renderer.sprite = figure;
-                    if (walking) renderer.flipX = at.X < before.X - 0.005f;
+                    if (walking) renderer.flipX = left;
                     float bob = walking ? Mathf.Abs(Mathf.Sin(Time.time * (character.Walk == "run" ? 16 : 10))) * 0.07f : 0;
                     renderer.transform.localPosition = new Vector3(at.X, at.Y - 0.3f + bob, 0);
                     renderer.sortingOrder = FootOrder(at.Y - 0.3f);
@@ -1708,6 +1712,8 @@ namespace Game.Client
                         if (Vec2.Distance(self, at) > PeopleRange) continue;
                         var before = person.At(clock - 6, _client.DayMinutes);
                         bool walking = Vec2.Distance(at, before) > 0.01f;
+                        bool left = at.X < before.X - 0.005f;
+                        at = Spread(person, at);
                         int frame = Mathf.FloorToInt(Time.time * PeopleArt.FramesPerSecond + person.Index * 5) % PeopleArt.Frames;
                         var color = Rgba.Hex(person.Kind.Color);
                         var figure = Sprites.Standing($"town/{person.Kind.Look}/{person.Kind.Color}/{frame}", () => PeopleArt.Look(person.Kind.Look, color, frame));
@@ -1715,7 +1721,7 @@ namespace Game.Client
                         var renderer = _townsfolkShown[used++];
                         renderer.enabled = true;
                         renderer.sprite = figure;
-                        if (walking) renderer.flipX = at.X < before.X - 0.005f;
+                        if (walking) renderer.flipX = left;
                         float bob = walking ? Mathf.Abs(Mathf.Sin(Time.time * (person.Kind.Walk == "run" ? 16 : 10) + person.Index)) * 0.07f : 0;
                         renderer.transform.localPosition = new Vector3(at.X, at.Y - 0.3f + bob, 0);
                         renderer.sortingOrder = FootOrder(at.Y - 0.3f);

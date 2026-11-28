@@ -128,6 +128,8 @@ namespace Game.Core
                     if (t == TileType.Road && d2 > (r - 4) * (r - 4)) gates.Add((x, y));
                 }
             var court = streets.Where(s => Distance(s, site) < 16).ToList();
+            // Spots someone already stands at: the next guard or stall keeper takes another while one is free.
+            var taken = new HashSet<(int X, int Y)>();
             var town = streets.Where(s => Distance(s, site) >= 3).ToList();
             foreach (var kind in kinds.Where(k => k.Place == site.Definition.Id))
             {
@@ -138,10 +140,10 @@ namespace Game.Core
                     switch (kind.Walk)
                     {
                         case "gate":
-                            route = Stand(gates.Count > 0 ? gates : town, random);
+                            route = Stand(gates.Count > 0 ? gates : town, random, taken);
                             break;
                         case "stall":
-                            route = Stand(stalls.Count > 0 ? stalls : town, random);
+                            route = Stand(stalls.Count > 0 ? stalls : town, random, taken);
                             break;
                         case "court":
                             route = Walk(map, court.Count > 0 ? court : town, random, site);
@@ -160,10 +162,12 @@ namespace Game.Core
 
         static bool Walkable(TileMap map, int x, int y) => map.InBounds(x, y) && !map.IsSolid(x, y) && map[x, y] != TileType.Water;
 
-        static List<Vec2> Stand(List<(int X, int Y)> spots, GameRandom random)
+        static List<Vec2> Stand(List<(int X, int Y)> spots, GameRandom random, HashSet<(int X, int Y)> taken)
         {
             if (spots.Count == 0) return new List<Vec2>();
-            var (x, y) = spots[random.Next(spots.Count)];
+            var free = spots.Where(s => !taken.Contains(s)).ToList();
+            var (x, y) = free.Count > 0 ? free[random.Next(free.Count)] : spots[random.Next(spots.Count)];
+            taken.Add((x, y));
             return new List<Vec2> { TileMap.Center(x, y) };
         }
 
