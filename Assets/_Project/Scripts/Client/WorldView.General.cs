@@ -254,6 +254,11 @@ namespace Game.Client
                     Hear(Sound.Heavy, at, 0.9f);
                     return true;
                 }
+                // The volley of bands (R4a) lands as plain fire along each band, not one call of fire the band's length.
+                case "meteors" when hazard.Shape == HazardShape.Line:
+                    BlastLanded(hazard, FxRamp.Fire, sparks: false, chunks: false, light: false);
+                    if (Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.12f);
+                    return true;
                 case "hellfire":
                 case "meteors":
                 {

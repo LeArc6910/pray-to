@@ -72,8 +72,15 @@ namespace Game.Core
                 float seconds = OrderTelegraph(attack) + attack.Count * OrderBurstGap + 2;
                 for (int i = 0; i < attack.Count; i++)
                 {
-                    var crystal = RaiseProp(boss, PropKind.Crystal, target.Position + Vec2.FromAngle(turn + i * 2 * MathF.PI / attack.Count) * OrderRaiseReach, seconds);
-                    if (crystal != null) spots.Add(crystal.Position);
+                    // Round the target; where the boss's body or another crystal is in the way, a little further round.
+                    for (int tries = 0; tries < 4; tries++)
+                    {
+                        float angle = turn + (i + tries * 0.25f) * 2 * MathF.PI / attack.Count;
+                        var crystal = RaiseProp(boss, PropKind.Crystal, target.Position + Vec2.FromAngle(angle) * (OrderRaiseReach + tries * 0.6f), seconds);
+                        if (crystal == null) continue;
+                        spots.Add(crystal.Position);
+                        break;
+                    }
                 }
                 if (spots.Count == 0) spots.Add(target.Position);
             }

@@ -1958,7 +1958,7 @@ async function order(browser) {
     await game.wait(4500);
     let s;
     await game.send('heal; clear; boss crystal_queen use resonance');
-    s = (await game.until(t => t.crystalsLit >= 1, 1500)) || await game.state();
+    s = (await game.until(t => t.crystalsLit >= 1 && t.crystals >= 2, 1500)) || await game.state();
     check(s.crystals >= 2 && s.crystalsShown >= 2 && s.orderMarks >= 2 && s.crystalsLit >= 1,
       `공명 순서: 수정이 하나씩 빛난다 (수정 ${s.crystals}, 그림 ${s.crystalsShown}, 표시 ${s.orderMarks}, 빛 ${s.crystalsLit})`);
     await game.shot(pc ? 'order-chime' : 'order-chime-phone', '공명 순서: 빛나는 수정(바닥 표시는 같이 찬다)');
@@ -2027,7 +2027,7 @@ async function order(browser) {
     await game.wait(3000);
     await game.send('heal; clear; boss mad_general hurt 0.33');
     await game.until(t => t.bossPhase === 3, 4000);
-    s = (await game.until(t => t.interlude && t.waves >= 1, 5000)) || await game.state();
+    s = (await game.until(t => t.interlude && t.waves >= 1 && has(t.interludeShown, '군기'), 5000)) || await game.state();
     check(s.interlude && s.banners >= 1 && has(s.interludeShown, '군기'),
       `군단 막간: 군기와 돌격, 안내 (막간 ${s.interlude}, 군기 ${s.banners}, 벽 ${s.waves}, "${s.interludeShown}")`);
     await game.shot(pc ? 'order-legion' : 'order-legion-phone', '군단 막간: 군기를 부수면 끝난다');

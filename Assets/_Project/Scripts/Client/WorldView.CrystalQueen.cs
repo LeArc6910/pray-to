@@ -262,6 +262,8 @@ namespace Game.Client
                 }
                 case "web_quake":
                 case "crystal_ripple":
+                // A crystal of the order bursting (R4a).
+                case "resonance":
                 {
                     // The floor ringing: crystals stand up round it and break. The ripple's stand near its inner edge
                     // and its wave runs on out.
@@ -276,21 +278,14 @@ namespace Game.Client
                 }
                 case "crystal_cross":
                 case "crystal_lattice":
+                // The crown's light is a beam now, turning at crystals (R4a): each leg a beam of light.
+                case "venom_share":
                 {
                     // A beam of light split through crystal along each arm.
                     BlastLanded(hazard, FxRamp.Crystal, sparks: false, chunks: false);
                     AddBossFx(BossFx.Beam, at, c);
                     if (Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.15f);
                     Hear(Sound.Zap, at, 0.9f);
-                    return true;
-                }
-                case "venom_share":
-                {
-                    // The crown's light coming down as a column on the gold circle (which burns gold, as it warned).
-                    BlastLanded(hazard, null, sparks: false, chunks: false, light: false);
-                    AddBossFx(BossFx.Column, at, c);
-                    if (Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.2f);
-                    Hear(Sound.Nova, at, 0.8f);
                     return true;
                 }
             }
