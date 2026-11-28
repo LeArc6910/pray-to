@@ -2778,6 +2778,7 @@ namespace Game.Client
                         if (fallen.Kind == BodyKind.Boss && fallen.Id == "silk_mother") SpiderFalls(fallen.Position);
                         else if (fallen.Kind == BodyKind.Boss && fallen.Id == "cave_warden") WardenFalls(fallen.Position);
                         else if (fallen.Kind == BodyKind.Boss && fallen.Id == "crystal_queen") CrystalQueenFalls(fallen.Position);
+                        else if (fallen.Kind == BodyKind.Boss && fallen.Id == "crown_wraith") CrownWraithFalls(fallen.Position);
                         else if (fallen.Kind != BodyKind.Player) Burst(fallen.Position, BodyColor(fallen), fallen.Kind == BodyKind.Minion ? 0.6f : fallen.Diameter);
                     }
                     else if (_departed.TryGetValue(e.Source, out var gone))
@@ -2787,6 +2788,7 @@ namespace Game.Client
                         if (gone.Kind == BodyKind.Boss && _bossInView?.Id == "silk_mother" && _bossesSeen.ContainsKey(e.Source)) SpiderFalls(gone.Position);
                         else if (gone.Kind == BodyKind.Boss && _bossInView?.Id == "cave_warden" && _bossesSeen.ContainsKey(e.Source)) WardenFalls(gone.Position);
                         else if (gone.Kind == BodyKind.Boss && _bossInView?.Id == "crystal_queen" && _bossesSeen.ContainsKey(e.Source)) CrystalQueenFalls(gone.Position);
+                        else if (gone.Kind == BodyKind.Boss && _bossInView?.Id == "crown_wraith" && _bossesSeen.ContainsKey(e.Source)) CrownWraithFalls(gone.Position);
                         else if (gone.Kind != BodyKind.Player) Burst(gone.Position, gone.Color, gone.Kind == BodyKind.Boss ? 2.4f : gone.Kind == BodyKind.Minion ? 0.6f : 0.8f);
                     }
                     if (_bossesSeen.TryGetValue(e.Source, out var boss))
@@ -3212,7 +3214,7 @@ namespace Game.Client
             ShowWeapon(body, weapon, facing, order, dead, offset);
             // A fallen player lies there in their own colours, dimmed; anything else dead is a grey ghost, but the cave
             // warden, whose fall is drawn on its own (WardenFalls).
-            body.Shape.color = dead ? (body.Kind == BodyKind.Player ? DownColor : body.Kind == BodyKind.Boss && (body.Id == "cave_warden" || body.Id == "crystal_queen") ? Color.clear : DeadColor) : tint;
+            body.Shape.color = dead ? (body.Kind == BodyKind.Player ? DownColor : body.Kind == BodyKind.Boss && (body.Id == "cave_warden" || body.Id == "crystal_queen" || body.Id == "crown_wraith") ? Color.clear : DeadColor) : tint;
             body.Shape.sortingOrder = order;
             body.Glow.transform.localScale = body.Shape.transform.localScale;
             body.Glow.color = dead ? Color.clear : body.FlashTime > 0 ? HitFlash : glow;
@@ -3326,6 +3328,11 @@ namespace Game.Client
             if (body.Kind == BodyKind.Boss && body.Id == "void_lord")
             {
                 AnimateVoidLord(body, facing, dead, moving);
+                return;
+            }
+            if (body.Kind == BodyKind.Boss && body.Id == "crown_wraith")
+            {
+                AnimateCrownWraith(body, facing, dead, moving);
                 return;
             }
 

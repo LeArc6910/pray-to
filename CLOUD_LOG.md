@@ -12,6 +12,14 @@
 - **로컬 확인**: 로컬 세션이 읽고 체크한다
 
 
+## 2026-11-28 14:00 왕관의 망령: 로컬 AI 그림과 제 몸짓·번개 이펙트·입장·쓰러짐 (로컬 세션이 코드까지)
+
+- **바뀐 것**: 사람 요청(남은 보스 셋을 각자 세션에서 물살 뱀처럼 로컬 AI 그림 + 코드 몸짓, 로컬 세션의 `.cs` 수정 허락). 그림은 ComfyUI(Z-Image-Turbo + 도트 LoRA 시안 여덟 장 → 사람이 4번 → Qwen-Image-Edit-2511 + 여러 각도 LoRA로 다섯 시점, 모두 Apache-2.0)를 64×64로 줄이고 해골 얼굴 몇 픽셀을 손으로 얹어 부위 지도(왕관·머리·두 팔과 어깨 축·꼬리·눈)와 함께 `Art/CrownWraithArt.Rows.cs`로(도구 `DevTools/ArtImport/LocalAi/crown_wraith_rows.py`·`crown_wraith_layout.json`). 몸짓은 `Art/CrownWraithArt.cs`(자세 스물셋: 공격 아홉의 전조·타격, 포효, 입장, 쓰러짐), 번개 이펙트 넷 `Art/CrownWraithFx.cs`(`BossFx.Thunder`·`Lance`·`Talons`·`ArcRing`, `BossEffects`를 partial로), 화면 `WorldView.CrownWraith.cs`(공격 id마다 전조, 예고 중 불꽃·안개, 착지의 번개, 돌진 잔상, 쓰러짐). 새 입장 `Manifest`(바닥의 왕관이 떠올라 벼락을 맞고 몸이 모인다, `arenas.csv` 3.8초·1.2초). 페이즈 배치 규칙(645e9b7)대로 2페이즈부터 눈과 왕관 불꽃이 달라진다. 공용 두건 몸(`CreatureArt.VoidLord`의 `crown_wraith` 줄)은 공허의 군주 세션도 쓰는 중이라 지우지 않았다(이제 망령은 그것을 쓰지 않는다). 피해·체력·예고·페이즈·빈도는 그대로
+- **확인**: `dotnet test` 1258 통과(공허의 군주와 합친 뒤), Unity 쪽 컴파일(로컬 Unity DLL, 에디터·WebGL) 오류 0, `--only wraith` 연속성 튀는 곳 0, 몸의 틈 89/1965장, `--only bossfx` 망령 일곱 줄 14~25조각(한도 72), Unity setup 결과는 `LOCAL_TASKS.md`
+- **요청 대조**: 로컬 AI로 8방향 ○(시안 여덟 장 → 사람이 4번) · 작은 시안 먼저 ○ · 제 몸 ○(두건 몸에서 떼어 냄) · 번개다운 전조와 이펙트 ○(공격 아홉 모두, 물과 겹치지 않음) · 제 입장 ○(`Manifest`) · 쓰러짐 ○(요청 밖이지만 왕관이 떨어지는 것이 망령답다고 판단) · 수치 그대로 ○ · 공용 두건 몸 그대로 ○ · PlayMode 장면 ○(`TheCrownWraithGathersAndWindsUp`, 사진 넷) · 웹 점검 구역 ○(`sweep.js --only wraith`, `bossfx`의 `wraith` 줄, `arenas`의 입장 표) · 문서 ○(`Docs/Bosses.md` 왕관의 망령 제 그림과 몸짓, `ArtSources.md`, `Commands.md`, `Codebase.md`, `HumanChecklist.md`) · 웹 점검 실행 ✗(이 컴퓨터에 node가 없다. 배포 뒤 클라우드가 `sweep.js --wait <커밋> --only wraith,bossfx,arenas`)
+- **로컬에서 할 일**: 없음(새 파일 `.meta`는 이 커밋에 함께 넣었다)
+- **로컬 확인**: [ ]
+
 ## 2026-11-28 13:50 웹 점검 스크립트가 뜨지 않던 것 고침
 
 - **바뀐 것**: `sweep.js`의 공허의 군주 구역 제목(`0ce364c`)이 따옴표 안에 줄바꿈을 그대로 담아 스크립트 전체가 문법 오류로 뜨지 않았다(어느 구역도 못 돌림). 다른 구역처럼 `\n`으로 고쳤다. `node --check` 통과

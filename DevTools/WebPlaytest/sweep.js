@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu title testground hunt harvest zones towns time basics first firstphone hour bag combat hero roll weapons arts bosses patterns veineater samurai knight warden antlion serpent voidlord queen general spider arenas world farm life npc factory defense gear skills skillfx layers monsterfx hazards bossfx hits shots blast mobwarn map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
+// Sections: menu title testground hunt harvest zones towns time basics first firstphone hour bag combat hero roll weapons arts bosses patterns veineater samurai knight warden antlion serpent voidlord wraith queen general spider arenas world farm life npc factory defense gear skills skillfx layers monsterfx hazards bossfx hits shots blast mobwarn map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -1399,6 +1399,77 @@ async function voidlord(browser) {
   const last = await game.state();
   check((last.bosses || '').includes('void_lord') && (last.bosses || '').includes(':p3:'), `체력을 깎으면 3페이즈 (${last.bosses})`);
   await game.shot('voidlord-phase3', '3페이즈(왕관·눈·구슬이 보랏빛, 별 다섯)');
+  await game.context.close();
+}
+
+// ---------------------------------------------------------------- 왕관의 망령 (2026-11-28, Docs/Bosses.md)
+// A drowned king under a rusted crown, floating on a ghostly tail: every attack has its own wind-up of the whole body
+// (the clawed hand drawn up and back before the rake, both arms raised before the bolts, a spear of lightning in the
+// drawn-back hand, hunched and thin as a ghost before the rush, the crown lifting off its head before the ring, rising
+// with the crown storming before the brands, a ball of lightning held overhead before the shared blow, the fists in
+// before the pulse). Only the brands (번개 낙인) show a warning sign. It comes in as a crown on the floor that rises and
+// gathers a body; it falls by coming apart into mist and leaving its crown. A picture mid wind-up and one just as the
+// blow lands, for each attack, its entrance, its phases and its fall.
+async function wraith(browser) {
+  note('\n## 왕관의 망령 (PC)\n');
+  const game = await open(browser, run, Profiles.pc, url);
+  await game.startSolo();
+  await game.wait(1200);
+  await game.send('equip void_sword void_helmet void_armor void_boots; heal');
+  await game.send('heal; goto boss crown_wraith');
+  await game.wait(700);
+  await game.shot('wraith-entrance', '입장: 바닥에 녹슨 왕관만 놓여 있다');
+  const woke = await game.until(t => has(t.banner, '왕관의 망령') || has(t.entrance, '왕관의 망령'), 8000, game.texts);
+  check(!!woke, `예배당에서 깨면 "왕관의 망령" 이름 카드나 배너 (${woke ? woke.banner || woke.entrance : '없음'})`);
+  await game.wait(1300);
+  await game.shot('wraith-strike', '입장: 왕관이 떠오르고 벼락이 내리친다');
+  await game.wait(900);
+  await game.shot('wraith-gather', '입장: 안개에서 몸이 모인다');
+  await game.wait(2200);
+  await game.shot('wraith-awake', '깨어난 왕관의 망령');
+  // [attack, name, telegraph seconds, strong, marked]
+  const uses = [
+    ['grasp', '망령의 손길(발톱 손을 뒤로 치켜듦)', 0.6, false, true],
+    ['lightning_fall', '벼락(두 팔을 하늘로)', 1.0, false, true],
+    ['soul_lance', '넋의 창(손에 번개 창이 생김)', 0.7, false, true],
+    ['phantom_rush', '유령 돌진(웅크리고 흐려짐)', 0.8, false, true],
+    ['crown_ring', '왕관의 고리(왕관이 머리 위로 떠오름)', 1.0, false, true],
+    ['deep_share', '깊은 수압(머리 위로 번개 구슬)', 1.1, false, true],
+    ['soul_ripple', '넋의 파문(주먹을 가슴으로)', 0.5, false, true],
+    ['storm_brand', '번개 낙인(필살기, 경고, 왕관이 폭풍처럼)', 1.4, true, true],
+  ];
+  for (const [attack, name, telegraph, strong, marked] of uses) {
+    await game.send('heal; clear');
+    await game.wait(1500);
+    await game.send(`heal; boss crown_wraith use ${attack}`);
+    await game.wait(Math.round(telegraph * 700));
+    const s = await game.state();
+    if (marked) check((s.marksShown || 0) > 0, `${name}: 전조 동안 바닥 표시가 보인다 (표시 ${s.marksShown})`);
+    check(!!s.warningSign === strong, `${name}: 경고 표지 ${strong ? '있음' : '없음'} (${s.warningSign})`);
+    await game.shot(`wraith-${attack}`, `${name} 전조`);
+    await game.wait(Math.round(telegraph * 300) + 160);
+    await game.shot(`wraith-${attack}-hit`, `${name} 떨어진 순간`);
+  }
+  await game.send('heal; clear; boss crown_wraith hurt 0.36');
+  await game.wait(800);
+  await game.shot('wraith-phase2', '2페이즈 포효(팔을 펴고 왕관에 불꽃)');
+  await game.send('heal; clear; boss crown_wraith hurt 0.33');
+  await game.wait(2500);
+  const last = await game.state();
+  check((last.bosses || '').includes('crown_wraith') && (last.bosses || '').includes(':p3:'), `체력을 깎으면 3페이즈 (${last.bosses})`);
+  await game.shot('wraith-phase3', '3페이즈(눈이 하얗고 왕관에 늘 불꽃)');
+  // Its fall: thrown back, coming apart into mist from the tail up, the crown dropping to the floor.
+  await game.send('heal; clear; boss crown_wraith hurt 1');
+  await game.wait(900);
+  await game.shot('wraith-fall', '쓰러지는 망령(번개가 꺼지며 처진다)');
+  await game.wait(1000);
+  await game.shot('wraith-fall-mist', '꼬리부터 안개로 흩어진다');
+  await game.wait(1000);
+  await game.shot('wraith-fallen', '바닥에 떨어진 왕관');
+  const after = await game.state();
+  check(!/crown_wraith:[1-9]/.test(after.bosses || ''), `쓰러뜨리면 체력 0 (${(after.bosses || '').split(' ')[0]})`);
+  await game.wait(2400);
+  await game.shot('wraith-gone', '왕관이 바래 사라진 뒤');
   await game.context.close();
 }
 
@@ -3180,6 +3251,9 @@ const BossBlows = {
   // The void lord's own void and frost (2026-11-28): claws, a star, a rift, a lance, the floor drawn in, a horizon.
   voidlord: ['cone -8 2.6 3.8 110 0 F void_lord grasp', 'circle -2.2 3 1.8 0 0 F void_lord star_fall', 'share 3 3.2 2 0 0 F void_lord gravity_share',
     'circle 7 3.2 2.6 0 0 F void_lord collapse', 'line -8 -3.4 8 1.6 0 F void_lord beam', 'ring 5 -2.4 4 1.2 0 F void_lord void_ripple'],
+  // The crown wraith's own lightning (2026-11-28): the claws, the bolts, the spear, the ring and the shared blow.
+  wraith: ['cone -8 2.6 3.4 110 0 F crown_wraith grasp', 'circle -2.2 3 1.5 0 0 F crown_wraith lightning_fall', 'share 3 3.2 1.8 0 0 F crown_wraith deep_share',
+    'circle 7 3.2 1.4 0 0 F crown_wraith storm_brand', 'line -8 -3.4 8 1.2 0 F crown_wraith soul_lance', 'ring 5 -2.4 3.4 1.4 0 F crown_wraith crown_ring'],
   // F3: the stone bosses' own attacks by their own names (E6 looked at them only as the warden's).
   vein: ['cone -8 2.6 3.6 120 0 F vein_eater claw', 'circle -2.6 3 1.5 0 0 F vein_eater cave_in', 'circle 2.4 2.6 2.6 0 0 F vein_eater burrow',
     'circle -6 -2.8 3.2 0 0 F vein_eater quake', 'circle 0.4 -3.4 1.2 0 0 F vein_eater spike_line', 'ring 5.6 -2.2 3.6 1.4 0 F vein_eater collapse_ring'],
@@ -3196,7 +3270,7 @@ async function bossfx(browser) {
   await game.send('goto wild');
   await clearRoom(game, 12, 7);
   await game.send('monsters hold; heal; face 1 0');
-  const Names = { queen: '수정 거미 여왕', general: '장군 모르그', stone: '돌 보스(수호자의 공격으로)', antlion: '개미귀신', serpent: '물살 뱀', voidlord: '공허의 군주', elements: '용암·공허·물·망령', vein: '광맥 포식자(제 공격 이름으로)', knight: '흑철 기사 발두인(제 공격 이름으로)' };
+  const Names = { queen: '수정 거미 여왕', general: '장군 모르그', stone: '돌 보스(수호자의 공격으로)', antlion: '개미귀신', serpent: '물살 뱀', voidlord: '공허의 군주', wraith: '왕관의 망령', elements: '용암·공허·물·망령', vein: '광맥 포식자(제 공격 이름으로)', knight: '흑철 기사 발두인(제 공격 이름으로)' };
   for (const [key, blows] of Object.entries(BossBlows)) {
     if (key === 'queen' || key === 'general') {
       // What falls onto the warnings before the blow.
@@ -5008,6 +5082,7 @@ const OwnEntrances = [
   ['crystal_queen', 3.6, 1.4, '결정 고치에 금빛이 번지다 깨지고, 다리를 펴고 일어나 왕관을 빛낸다'],
   ['antlion', 3.8, 1.3, '굴 바닥에 턱 끝만 내놓고 숨어 모래를 튕기다 솟아올라 턱을 닫는다'],
   ['tide_serpent', 3.6, 1.2, '물속에 잠겨 물결만 보이다 머리를 내밀고, 볏을 펴며 솟아올라 포효한다'],
+  ['crown_wraith', 3.8, 1.2, '바닥에 놓인 녹슨 왕관이 떠오르고 벼락을 맞아, 안개에서 몸이 모여 팔을 펴고 포효한다'],
   ['void_lord', 3.8, 1.2, '제단 바닥에 균열이 열리고 얼음 왕관부터 솟아 눈을 밝히고, 망토를 펼치며 떠올라 포효한다'],
   ['mad_general', 3.8, 1.1, '꽂아 둔 대검 앞에 무릎 꿇었다가 일어나 칼을 뽑아 들고 포효한다'],
   ['vein_eater', 3.2, 1.2, '흙더미가 들썩이다 바닥을 뚫고 솟는다'], ['silk_mother', 3.4, 1.2, '천장에서 실을 타고 내려와 다리를 편다'],
@@ -9136,7 +9211,7 @@ async function towns(browser) {
   }
 }
 
-const Sections = { menu, title, testground, hunt, harvest, zones, towns, time, basics, first, firstphone, hour, bag, combat, hero, roll, weapons, arts, bosses, patterns, veineater, samurai, knight, warden, antlion, serpent, voidlord, queen, general, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, layers, monsterfx, hazards, bossfx, hits, shots, blast, mobwarn, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
+const Sections = { menu, title, testground, hunt, harvest, zones, towns, time, basics, first, firstphone, hour, bag, combat, hero, roll, weapons, arts, bosses, patterns, veineater, samurai, knight, warden, antlion, serpent, voidlord, wraith, queen, general, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, layers, monsterfx, hazards, bossfx, hits, shots, blast, mobwarn, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

@@ -108,6 +108,16 @@ namespace Game.Client
         // Rings turning opposite ways round a band, stars running round it, frost thrown off the outside. Size the band's
         // outer radius, Inner its inner (0: a whole circle).
         Horizon,
+        // ---- the crown wraith (2026-11-28, CrownWraithFx.cs): lightning and drowned souls ----
+        // A forked bolt down out of the dark onto a circle, arcs crawling over the floor. Size its radius. Big: the
+        // heavier (struck twice).
+        Thunder,
+        // A spear of lightning thrown down a line. Size its length, Width how wide, Dir its way.
+        Lance,
+        // The claws of its spectral hand raked through a wedge, crackling. Size the reach, Width the wedge's degrees.
+        Talons,
+        // Lightning running round a ring's band. Size the outer radius, Inner the inner. Plain: the smaller ripple.
+        ArcRing,
 
         // ---- the bosses with no effects of their own (the lava titan, the void lord, the crown wraith) ----
         // What the blow is made of, laid over the shared landing at a few places in its shape (Form): fire that
@@ -220,6 +230,10 @@ namespace Game.Client
                 case BossFx.Rift: life = Rift(c, t, o); break;
                 case BossFx.Singularity: life = Singularity(c, t, o); break;
                 case BossFx.Horizon: life = Horizon(c, t, o); break;
+                case BossFx.Thunder: life = Thunder(c, t, o); break;
+                case BossFx.Lance: life = Lance(c, t, o); break;
+                case BossFx.Talons: life = Talons(c, t, o); break;
+                case BossFx.ArcRing: life = ArcRing(c, t, o); break;
                 case BossFx.Element: life = Element(c, t, o); break;
                 default: return false;
             }

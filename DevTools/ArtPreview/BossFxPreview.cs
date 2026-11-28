@@ -82,6 +82,14 @@ namespace Game.Client
             Add("tide_serpent", "undertow", BossFx.Maelstrom, HazardForm.Donut, 7f, 1.2f, 0, water, r => { r.Context.Inner = 1.2f * T; (r.Wide, r.Tall, r.AtY) = (240, 240, 0.5f); });
             Add("tide_serpent", "tidal_trail", BossFx.Geyser, HazardForm.Circle, 1.2f, 0, 0, water, r => { r.Tall = 128; r.AtY = 0.75f; });
             Add("tide_serpent", "spray_rain", BossFx.Geyser, HazardForm.Circle, 1.4f, 0, 0, water, r => { r.Context.Big = true; r.Tall = 144; r.AtY = 0.78f; });
+            var bolt = FxRamp.Bolt;
+            Add("crown_wraith", "grasp", BossFx.Talons, HazardForm.Cone, 3.4f, 110, 0, bolt, r => { r.Context.Width = 110; r.AtX = 0.2f; r.AtY = 0.5f; r.Tall = 144; });
+            Add("crown_wraith", "lightning_fall", BossFx.Thunder, HazardForm.Circle, 1.5f, 0, 0, bolt, r => { r.Tall = 160; r.AtY = 0.8f; });
+            Add("crown_wraith", "storm_brand", BossFx.Thunder, HazardForm.Circle, 1.4f, 0, 0, bolt, r => { r.Context.Big = true; r.Tall = 176; r.AtY = 0.82f; });
+            Add("crown_wraith", "soul_lance", BossFx.Lance, HazardForm.Band, 11f, 1.2f, 0, bolt, r => { r.Wide = 216; r.Tall = 64; r.AtX = 0.06f; r.AtY = 0.5f; });
+            Add("crown_wraith", "crown_ring", BossFx.ArcRing, HazardForm.Donut, 6.5f, 2.4f, 0, bolt, r => { r.Context.Inner = 2.4f * T; (r.Wide, r.Tall, r.AtY) = (232, 232, 0.5f); });
+            Add("crown_wraith", "soul_ripple", BossFx.ArcRing, HazardForm.Donut, 7f, 1.2f, 0, bolt, r => { r.Context.Inner = 1.2f * T; r.Context.Plain = true; (r.Wide, r.Tall, r.AtY) = (240, 240, 0.5f); });
+            Add("crown_wraith", "deep_share", BossFx.Thunder, HazardForm.Circle, 1.8f, 0, 0, null, r => { r.Tone = WarnTone.Gather; r.Context.Ramp = bolt; r.Context.Big = true; r.Tall = 176; r.AtY = 0.82f; });
             Add("tide_serpent", "deep_share", BossFx.Geyser, HazardForm.Circle, 1.8f, 0, 0, null, r => { r.Tone = WarnTone.Gather; r.Context.Ramp = water; r.Context.Big = true; r.Tall = 160; r.AtY = 0.78f; });
             var voidRamp = FxRamp.Violet;
             Add("void_lord", "grasp", BossFx.VoidClaw, HazardForm.Cone, 3.8f, 110, 0, voidRamp, r => { r.Context.Width = 110; r.AtX = 0.2f; r.AtY = 0.5f; r.Tall = 144; });

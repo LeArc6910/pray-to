@@ -415,6 +415,9 @@ namespace Game.Client
                 case "voidlord":
                     VoidLord(folder, arena);
                     return true;
+                case "wraith":
+                    CrownWraith(folder, arena);
+                    return true;
                 case "crystal_queen":
                     CrystalQueen(folder, arena);
                     return true;

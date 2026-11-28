@@ -178,7 +178,7 @@ namespace Game.Client
         // shared landing alone.
         void BossBlow(HazardState hazard)
         {
-            if (VeinEaterLanded(hazard) || KnightLanded(hazard) || SpiderLanded(hazard) || WardenLanded(hazard) || AntlionLanded(hazard) || SerpentLanded(hazard) || VoidLordLanded(hazard) || CrystalQueenLanded(hazard) || GeneralLanded(hazard)) return;
+            if (VeinEaterLanded(hazard) || KnightLanded(hazard) || SpiderLanded(hazard) || WardenLanded(hazard) || AntlionLanded(hazard) || SerpentLanded(hazard) || VoidLordLanded(hazard) || CrownWraithLanded(hazard) || CrystalQueenLanded(hazard) || GeneralLanded(hazard)) return;
             if (ElementLanded(hazard)) return;
             BlastLanded(hazard);
         }

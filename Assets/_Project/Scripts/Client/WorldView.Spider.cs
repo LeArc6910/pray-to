@@ -746,6 +746,8 @@ namespace Game.Client
             public bool Warden;
             // The crystal queen's (WorldView.CrystalQueen.cs), and whether its crystal has shattered yet.
             public bool Queen, Shattered;
+            // The crown wraith's (WorldView.CrownWraith.cs).
+            public bool Wraith;
         }
 
         readonly System.Collections.Generic.List<Fall> _falls = new System.Collections.Generic.List<Fall>();
@@ -783,6 +785,11 @@ namespace Game.Client
                 if (fall.Queen)
                 {
                     if (!UpdateQueenFall(fall)) _falls.RemoveAt(i);
+                    continue;
+                }
+                if (fall.Wraith)
+                {
+                    if (!UpdateWraithFall(fall)) _falls.RemoveAt(i);
                     continue;
                 }
                 float age = Time.time - fall.Since;

@@ -150,8 +150,9 @@ namespace Game.Client
             yield return Posed<GeneralPose>("mad_general", GeneralArt.FramesOf, (v, p, f) => GeneralArt.Draw(v, p, f, 1), GeneralPose.Idle);
             yield return Posed<SerpentPose>("tide_serpent", SerpentArt.FramesOf, (v, p, f) => SerpentArt.Draw(v, p, f, 1), SerpentPose.Idle);
             yield return Posed<VoidLordPose>("void_lord", VoidLordArt.FramesOf, (v, p, f) => VoidLordArt.Draw(v, p, f, 1), VoidLordPose.Idle);
+            yield return Posed<CrownWraithPose>("crown_wraith", CrownWraithArt.FramesOf, (v, p, f) => CrownWraithArt.Draw(v, p, f, 1), CrownWraithPose.Idle);
             // The bosses with the shared pictures.
-            var drawn = new HashSet<string> { "cave_warden", "black_knight", "silk_mother", "shrine_samurai", "vein_eater", "antlion", "crystal_queen", "mad_general", "tide_serpent", "void_lord" };
+            var drawn = new HashSet<string> { "cave_warden", "black_knight", "silk_mother", "shrine_samurai", "vein_eater", "antlion", "crystal_queen", "mad_general", "tide_serpent", "void_lord", "crown_wraith" };
             var color = Rgba.Hex("#8C7A6B");
             foreach (var id in Ids(Path.Combine(root, "Assets", "_Project", "Data", "Bosses", "bosses.csv")).Where(i => !drawn.Contains(i)))
             {

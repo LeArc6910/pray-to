@@ -88,6 +88,7 @@ namespace Game.Client
             if (body.Id == "antlion") AntlionExtras(body, view);
             if (body.Id == "tide_serpent") SerpentExtras(body, view);
             if (body.Id == "void_lord") VoidLordExtras(body, view);
+            if (body.Id == "crown_wraith") CrownWraithExtras(body, view);
             if (body.Id == "crystal_queen") CrystalQueenExtras(body, view);
             if (body.Id == "mad_general") GeneralExtras(body, view);
         }

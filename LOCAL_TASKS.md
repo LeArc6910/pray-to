@@ -1905,3 +1905,33 @@ DevTools/Local/setup.sh --commit
 - 커밋한 것: 새 스크립트 넷의 `.meta`(`VoidLordArt.cs`, `VoidLordArt.Rows.cs`, `BossFx.Void.cs`, `WorldView.VoidLord.cs`). Unity가 이 작업 폴더에서 새로 만든 다른 `.meta` 470여 개와 `GameSheets.asset` 변경은 이 작업 밖이라 남겼다
 - **웹 점검은 하지 않았다**: 이 컴퓨터에 node·Playwright가 없다. 배포 뒤 클라우드가 `sweep.js --wait <커밋> --only voidlord,bossfx,arenas`
 - 사람이 볼 것: `Docs/HumanChecklist.md` "공허의 군주"
+
+### 2026-11-28 12:27 setup.ps1 (Unity 6000.6.3f1)
+
+- 프로젝트 설정: 성공
+- 패키지: com.unity.netcode.gameobjects 2.13.3, com.unity.transport 6.6.0, com.unity.render-pipelines.universal 17.6.0, com.unity.inputsystem 1.20.0, com.unity.multiplayer.playmode 3.0.0, com.unity.test-framework 1.8.0
+- EditMode 테스트: 1238개 중 1237개 통과, 1개 실패
+  - `Game.Core.Tests.BotTests.FirstHourReachesTheFirstMonsterCraftAndBoss(1UL): at the warden's arena`
+- PlayMode 테스트: 73개 중 61개 통과, 12개 실패
+  - `Game.Client.Tests.FeatureTests.ADungeonRunGoesToItsMasterAndItsEndChest: The gate's button starts going in.`
+  - `Game.Client.Tests.FeatureTests.ASingleShotIsLinedToItsTargetBeforeItFlies: A line to the player the shot is for.`
+  - `Game.Client.Tests.FeatureTests.ElitesWearTheirNamesAndWarnOfTheirBigAttack: A name over the leader and each champion.`
+  - `Game.Client.Tests.FeatureTests.EveryKindHasItsOwnAttacks: A blow its shell turned shows a grey number.`
+  - `Game.Client.Tests.FeatureTests.RumoursAndSlowRest: The goal list says only which way:`
+  - `Game.Client.Tests.FeatureTests.TheBagAndHudDraw: The food's buff has no icon.`
+  - `Game.Client.Tests.FeatureTests.TheCrownWraithGathersAndWindsUp: The bolts can be forced once it fights.`
+  - `Game.Client.Tests.FeatureTests.TheEncounterWindowsDraw: Her portrait is in the talk box.`
+  - `Game.Client.Tests.LayoutTests.TheBagAndHudFit: 작은 휴대폰 가로 667×375: 배너가 [메뉴] 판에 겹친다 (x:0.00, y:301.00, width:667.00, height:64.00) (x:353.00, y:186.00, width:304.00, height:160.00)`
+  - `Game.Client.Tests.LayoutTests.TheFixedPartsKeepToTheSafeArea: 작은 휴대폰 가로(안전 영역 32 0 32 16) 667×375, 스킬 1: 겹침 - 시간·장소 줄 / 구르기`
+  - `Game.Client.Tests.LayoutTests.TheGrowthScreensFit: 작은 휴대폰 세로 360×640, 특성: 고른 점과 서랍이 하늘을 거의 다 덮는다 (84)`
+  - `Game.Client.Tests.TitleScreenTests.TheTestGroundsPanelAndHitLogDraw: The hit log is on the screen.`
+- Unity가 바꾼 스크립트 (커밋하지 않음): warning: in the working copy of 'Assets/Tests/EditMode/ArenaTests.cs', LF will be replaced by CRLF the next time Git touches it, warning: in the working copy of 'Assets/Tests/PlayMode/FeatureTests.cs', LF will be replaced by CRLF the next time Git touches it, warning: in the working copy of 'Assets/_Project/Scripts/Client/Art/BossFx.cs', LF will be replaced by CRLF the next time Git touches it, warning: in the working copy of 'Assets/_Project/Scripts/Client/WorldView.Bosses.cs', LF will be replaced by CRLF the next time Git touches it, warning: in the working copy of 'Assets/_Project/Scripts/Client/WorldView.Entrance.cs', LF will be replaced by CRLF the next time Git touches it, warning: in the working copy of 'Assets/_Project/Scripts/Client/WorldView.Hazards.cs', LF will be replaced by CRLF the next time Git touches it, warning: in the working copy of 'Assets/_Project/Scripts/Client/WorldView.Spider.cs', LF will be replaced by CRLF the next time Git touches it, warning: in the working copy of 'Assets/_Project/Scripts/Client/WorldView.cs', LF will be replaced by CRLF the next time Git touches it, warning: in the working copy of 'Assets/_Project/Scripts/Core/Simulation/ArenaSheet.cs', LF will be replaced by CRLF the next time Git touches it, warning: in the working copy of 'DevTools/ArtPreview/BossFxPreview.cs', LF will be replaced by CRLF the next time Git touches it, warning: in the working copy of 'DevTools/ArtPreview/GapCheck.cs', LF will be replaced by CRLF the next time Git touches it, warning: in the working copy of 'DevTools/ArtPreview/Motions.cs', LF will be replaced by CRLF the next time Git touches it, Assets/Tests/EditMode/ArenaTests.cs, Assets/Tests/PlayMode/FeatureTests.cs, Assets/_Project/Scripts/Client/Art/BossFx.cs, Assets/_Project/Scripts/Client/WorldView.Bosses.cs, Assets/_Project/Scripts/Client/WorldView.Entrance.cs, Assets/_Project/Scripts/Client/WorldView.Hazards.cs, Assets/_Project/Scripts/Client/WorldView.Spider.cs, Assets/_Project/Scripts/Client/WorldView.cs, Assets/_Project/Scripts/Core/Simulation/ArenaSheet.cs, DevTools/ArtPreview/BossFxPreview.cs, DevTools/ArtPreview/GapCheck.cs, DevTools/ArtPreview/Motions.cs
+
+### 2026-11-28 12:50 왕관의 망령: 로컬 AI 그림과 몸짓·번개 이펙트·입장·쓰러짐 (로컬 세션, 사람 허락으로 코드까지)
+
+- 사람 요청(남은 보스 셋을 각자 세션에서 물살 뱀처럼): 왕관의 망령을 ComfyUI로 그림(정면 시안 여덟 장 → 사람이 4번 → 여러 각도 LoRA로 다섯 시점, 새 모델 없음), 이 세션이 몸짓·이펙트·입장·쓰러짐 코드까지 했다(`CLOUD_LOG.md` 2026-11-28 12:40, `Docs/Bosses.md` 왕관의 망령 제 그림과 몸짓)
+- GPU: 다른 두 보스 세션과 `gpu-lock.json`(owner boss-crown-wraith, 포트 8193)으로 번갈아 썼다. 시안 11:47~11:48, 각도 11:5x~11:59. 묶음마다 ComfyUI를 끄고 잠금을 지웠다
+- 위 12:27 setup의 실패 중 `TheCrownWraithGathersAndWindsUp`는 이 작업의 것: 입장 동안 플레이어가 쓰러져 강제 공격이 안 됐다. 물살 뱀처럼 `Toughen()`을 넣고 그 시험만 다시 돌려 **통과**. `BotTests.FirstHourReachesTheFirstMonsterCraftAndBoss(1)`는 공허의 군주 세션(12:14)도 같은 것을 적었다(`dotnet test`에서는 통과, 이 작업과 무관). PlayMode의 나머지 열하나는 02:20·12:14와 같은 목록
+- 커밋한 것: 새 스크립트 넷의 `.meta`(`CrownWraithArt.cs`, `CrownWraithArt.Rows.cs`, `CrownWraithFx.cs`, `WorldView.CrownWraith.cs`). Unity가 만든 다른 `.meta`와 `GameSheets.asset` 변경은 이 작업 밖이라 남겨 두었다
+- **웹 점검은 하지 않았다**: 이 컴퓨터에 node가 없다. 배포 뒤 클라우드가 `sweep.js --wait <커밋> --only wraith,bossfx,arenas`
+- 사람이 볼 것: `Docs/HumanChecklist.md` "왕관의 망령"

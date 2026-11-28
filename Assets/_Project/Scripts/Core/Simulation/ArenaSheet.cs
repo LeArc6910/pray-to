@@ -81,6 +81,9 @@ namespace Game.Core
         // A rift opening in the altar's floor: the crown rising out of it, the eyes lit, the whole of him drawn up out
         // of it with the cape spread and a roar (the void lord).
         Rift,
+        // Only its rusted crown lying on the floor in a little mist: the crown rises, lightning strikes it, the body
+        // gathers out of the mist under it and it spreads its arms with a roar (the crown wraith).
+        Manifest,
     }
 
     public sealed class ArenaDefinition

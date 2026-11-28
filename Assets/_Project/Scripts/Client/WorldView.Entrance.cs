@@ -156,7 +156,7 @@ namespace Game.Client
         {
             // Under the floor or up in the roof it casts no shadow: asleep, and under the floor until it breaks through.
             var entrance = view.Boss.Arena?.Entrance ?? BossEntrance.Common;
-            bool hidden = entrance == BossEntrance.Burrow || entrance == BossEntrance.Thread || entrance == BossEntrance.Ambush || entrance == BossEntrance.Surface || entrance == BossEntrance.Rift;
+            bool hidden = entrance == BossEntrance.Burrow || entrance == BossEntrance.Thread || entrance == BossEntrance.Ambush || entrance == BossEntrance.Surface || entrance == BossEntrance.Rift || entrance == BossEntrance.Manifest;
             if (view.BossState == BossState.Dormant && hidden && !view.IsDead) body.Shadow.enabled = false;
             if (view.BossState != BossState.Enter)
             {
@@ -167,6 +167,7 @@ namespace Game.Client
             if (entrance == BossEntrance.Ambush && body.EnterFrame < AntlionArt.EnterBurst) body.Shadow.enabled = false;
             if (entrance == BossEntrance.Surface && body.EnterFrame < SerpentArt.EnterBurst) body.Shadow.enabled = false;
             if (entrance == BossEntrance.Rift && body.EnterFrame < VoidLordArt.EnterBurst) body.Shadow.enabled = false;
+            if (entrance == BossEntrance.Manifest && body.EnterFrame < CrownWraithArt.EnterStrike) body.Shadow.enabled = false;
             var feet = body.Position;
             float since = Time.time - body.BossSince;
             bool puff = Time.time >= body.DustAt;
@@ -412,6 +413,45 @@ namespace Game.Client
                     {
                         AddFlash(feet + new Vector3(0, 2.2f, 0), 1.6f, VoidLordColor, FlashKind.Ring);
                         Hear(Sound.Roar, feet, 1);
+                    }
+                    break;
+
+                case BossEntrance.Manifest:
+                    // Mist creeping over the chapel floor round the crown lying there; the crown stirs with a ring of
+                    // metal and rises; lightning strikes it out of the dark; the body gathers under it, the eyes light,
+                    // and it spreads its arms with a roar (CrownWraithArt.Enter).
+                    if (frame < CrownWraithArt.EnterStrike && puff)
+                    {
+                        body.DustAt = Time.time + 0.14f;
+                        Chips(feet + (Vector3)(Random.insideUnitCircle * 1.3f), Vector3.up * 0.3f, FxRamp.Spirit, 1, 10, 80);
+                    }
+                    if (Reached(2)) Hear(Sound.Hammer, feet, 0.4f);
+                    if (Reached(CrownWraithArt.EnterLift))
+                    {
+                        Hear(Sound.Wake, feet, 0.6f);
+                        Bits(feet + new Vector3(0, 0.4f, 0), Vector3.up, WraithBolt, 3);
+                    }
+                    if (Reached(CrownWraithArt.EnterStrike))
+                    {
+                        // The bolt out of the dark onto the crown.
+                        AddBossFx(BossFx.Thunder, feet + new Vector3(0, 2.4f, 0), new BossContext { Ramp = FxRamp.Bolt, Size = 1.4f * Ppu, Big = true, Seed = 23 });
+                        AddFlash(feet + new Vector3(0, 2.4f, 0), 3f, WraithBolt, FlashKind.Burst);
+                        ScreenFlash(new Color(1, 0.97f, 0.85f, 0.3f), 0.12f);
+                        if (Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.2f);
+                        Hear(Sound.Thunder, feet, 1);
+                    }
+                    if (frame > CrownWraithArt.EnterStrike && frame < CrownWraithArt.EnterEyes && puff)
+                    {
+                        // Mist drawn up into the body as it gathers.
+                        body.DustAt = Time.time + 0.08f;
+                        Chips(feet + (Vector3)(Random.insideUnitCircle * 1.6f), Vector3.up, FxRamp.Spirit, 2, 20, 40);
+                    }
+                    if (Reached(CrownWraithArt.EnterEyes)) AddFlash(feet + new Vector3(0, 2.3f, 0), 0.8f, WraithBolt, FlashKind.Impact);
+                    if (!body.EntersAgain && Reached(CrownWraithArt.EnterRoar))
+                    {
+                        AddFlash(feet + new Vector3(0, 2f, 0), 1.8f, WraithSoul, FlashKind.Ring);
+                        HearRoar("crown_wraith", feet, 1);
+                        Hear(Sound.Zap, feet, 0.8f);
                     }
                     break;
 

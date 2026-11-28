@@ -869,6 +869,37 @@ namespace Game.Client.Tests
             Assert.IsTrue(_root.Playing);
         }
 
+        // The crown wraith (Docs/Bosses.md 왕관의 망령, 2026-11-28): only its rusted crown lying on the chapel floor, the
+        // crown rising and the body gathering under it, then mid wind-up of its bolts (both arms raised to the dark) and of
+        // its brands (rising with the crown storming, the warning sign).
+        [UnityTest, Category(Screens.Category)]
+        public IEnumerator TheCrownWraithGathersAndWindsUp()
+        {
+            yield return Start();
+            Toughen();
+            var boss = World.Bosses.FirstOrDefault(b => b.Definition.Id == "crown_wraith");
+            Assert.IsNotNull(boss, "No crown wraith.");
+            Assert.AreEqual(BossEntrance.Manifest, boss.Definition.Arena.Entrance, "arenas.csv gives the crown wraith its own entrance.");
+            World.BossesHold = true;
+            Player.Position = boss.Home + new Vec2(0, -4);
+            Player.Corrections++;
+            yield return new WaitForSecondsRealtime(SceneSeconds);
+            yield return Screens.Take("wraith-crown");
+            World.BossesHold = false;
+            yield return new WaitForSecondsRealtime(2.6f);
+            Assert.AreEqual(BossState.Enter, boss.State, "Woken, the crown wraith comes in first.");
+            yield return Screens.Take("entrance-wraith");
+            yield return new WaitForSecondsRealtime(4f);
+            Assert.IsTrue(World.ForceAttack(boss, "lightning_fall"), "The bolts can be forced once it fights.");
+            yield return new WaitForSecondsRealtime(0.7f);
+            yield return Screens.Take("wraith-bolts-windup");
+            yield return new WaitForSecondsRealtime(2.5f);
+            Assert.IsTrue(World.ForceAttack(boss, "storm_brand"));
+            yield return new WaitForSecondsRealtime(1.0f);
+            yield return Screens.Take("wraith-brand-windup");
+            Assert.IsTrue(_root.Playing);
+        }
+
         // The crystal spider queen (Docs/Bosses.md 수정 거미 여왕, 2026-11-27): asleep in a cocoon of crystal in its nest,
         // the cocoon cracking and bursting as it wakes, then mid wind-up of its crystal cross (the crown gathering light,
         // the front legs opened like a fan) and of its eggs (the abdomen lowered and glowing).
