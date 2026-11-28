@@ -6,7 +6,7 @@
 |---|---|---|
 | A | 무기 종류 11가지(Core·시트), 무기 두 벌, 스킬이 힘을 받는 규칙, HUD·가방, 시험장 | 됨 (이 문서) |
 | B | 새 종류의 그림: 손에 든 모습, 종류마다 제 연타 동작과 타격감, 탄 모양 | 됨 (아래 묶음 B) |
-| C | 무기마다 고유 기술 하나(되받아치기·모아 베기·관통 사격 등, 마나 없이 재사용만) | 그다음 |
+| C | 무기마다 고유 기술 하나(되받아치기·모아 베기·관통 사격 등, 마나 없이 재사용만) | 설계 확인 중 (아래 묶음 C) |
 
 ## 무기 종류 (`Data/Loot/weapon_kinds.csv`)
 
@@ -128,3 +128,13 @@
 - **타격감**: `Client/WeaponFeel.cs`, 표는 `Docs/Feel.md` "무기 종류마다"
 - **탄 모양**: `BasicAttack.Look`(`ShotLook`: 석궁 볼트, 부메랑, 오브, 완드 불꽃)을 탄 상태에 실어 보낸다(통신 0.117.0). 부메랑은 날며 돈다, 오브 탄은 멈춘 곳에서 그 색으로 번쩍이고 고리가 퍼지며 가까우면 화면이 조금 흔들린다. 그림 `ItemArt.CrossbowBolt`·`BoomerangShot`·`OrbShot`·`Spark`
 - **확인**: `ArtPreview --only weapons`(`weapons_held.png`, `weapons_combo.png` 종류마다 연타 다섯 장, `weapons_shots.png`), `--only hero`(새 8종의 `hero_<종류>` 연속성 0), Core 시험 `EachKindsShotHasItsLookAndTheSnapshotCarriesIt`, 웹 점검 `hero`(동작 시간 ≤ 공격 간격)·`weapons`(무거운·가벼운 타격, 탄 모양, 오브 폭발), PlayMode `weapon-<종류>` 여덟 장. 손맛·소리는 사람(`LOCAL_TASKS.md` 202단계)
+
+
+## 묶음 C 설계 (2026-11-28, 사람 확인 기다림)
+
+- 기술 11가지는 사람이 고른 표 그대로(검 되받아치기 … 오브 중력 구체). 곡괭이·맨손은 없음
+- 조작: PC 마우스 오른쪽과 **V**(키 바꾸기 "무기 기술"), 휴대폰은 공격 단추 바로 위 단추. 대검은 누르는 동안 모으고 떼면 벤다(휴대폰도 누르고 있기)
+- 숫자: `weapon_kinds.csv`에 열 `art,art_power,art_cooldown,art_reach,art_arc,art_time,art_count` 더함(새 시트 없음)
+- 대기: 종류마다 따로(바꿔 든 무기의 기술은 제 대기만 본다). 무기를 바꿔도 대기는 이어진다
+- 통신: 명령 `WeaponArt`(누름·뗌, 겨눈 방향), 스냅숏에 종류별 대기 끝 시각, 사건 `ArtUsed`. 저장하지 않는다(대기는 접속마다 0)
+- 시안: `ArtPreview --only weaponarts`(`out/weapon_arts.png`)

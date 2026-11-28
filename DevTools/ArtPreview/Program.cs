@@ -94,7 +94,7 @@ namespace Game.Client
                 // --only sizes: just the monsters' size classes as the game draws them (out/sizes/, SizesPreview, B0b).
                 return WriteSizes(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out")) ? 0 : 1;
             }
-            if (args.Length == 2 && args[0] == "--only" && args[1] != "arenas" && args[1] != "gear" && args[1] != "weapons" && args[1] != "map" && args[1] != "uimock" && args[1] != "biomemock" && args[1] != "dungeons" && args[1] != "portraits" && args[1] != "ui" && args[1] != "depth" && args[1] != "sizes" && args[1] != "biomes" && args[1] != "flat")
+            if (args.Length == 2 && args[0] == "--only" && args[1] != "arenas" && args[1] != "gear" && args[1] != "weapons" && args[1] != "weaponarts" && args[1] != "map" && args[1] != "uimock" && args[1] != "biomemock" && args[1] != "dungeons" && args[1] != "portraits" && args[1] != "ui" && args[1] != "depth" && args[1] != "sizes" && args[1] != "biomes" && args[1] != "flat")
             {
                 string anim = Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out", "anim");
                 Directory.CreateDirectory(anim);
@@ -179,6 +179,12 @@ namespace Game.Client
             if (args.Length == 2 && args[0] == "--only" && args[1] == "weapons")
             {
                 WeaponPreview.Write(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out"), loot);
+                return 0;
+            }
+            // --only weaponarts: the weapon kinds' own arts as a mock-up (out/weapon_arts.png, WeaponArtsPreview, Docs/Weapons.md 묶음 C).
+            if (args.Length == 2 && args[0] == "--only" && args[1] == "weaponarts")
+            {
+                WeaponArtsPreview.Write(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out"));
                 return 0;
             }
             // --only gear: the hunting sets', elite uniques' and boss sets' icons and the hunting trophies (out/gear.png, GearPreview).
