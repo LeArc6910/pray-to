@@ -81,6 +81,14 @@ namespace Game.Client
                 int rise = Mathf.FloorToInt(since / 0.07f);
                 frame = rise < WardenArt.RoarRise ? rise : WardenArt.RoarRise + Mathf.FloorToInt(Time.time * 10) % 4;
             }
+            else if (body.BossState == BossState.Stun)
+            {
+                // Its charge driven into a pillar: crushed against it and thrown back, then reeling, the core bare.
+                pose = WardenPose.Stun;
+                const float HitSeconds = 0.035f;
+                int hit = Mathf.FloorToInt(since / HitSeconds);
+                frame = hit < WardenArt.StunHit ? hit : WardenArt.StunHit + Mathf.FloorToInt((since - WardenArt.StunHit * HitSeconds) * 9) % WardenArt.StunLoop;
+            }
             else if (body.BossState == BossState.Charge)
             {
                 pose = WardenPose.Charge;
@@ -152,7 +160,7 @@ namespace Game.Client
             // A foot coming down on a heavy step (frames 2 and 6 of the stride).
             if (pose == WardenPose.Walk && (frame == 2 || frame == 6) && body.KnightStep != frame) Thud(body, 0.04f, 0.4f);
             body.KnightStep = pose == WardenPose.Walk ? frame : -1;
-            if (pose != WardenPose.Enter && pose != WardenPose.Walk && pose != WardenPose.Idle && pose != WardenPose.Charge && pose != WardenPose.Roar)
+            if (pose != WardenPose.Enter && pose != WardenPose.Walk && pose != WardenPose.Idle && pose != WardenPose.Charge && pose != WardenPose.Roar && pose != WardenPose.Stun)
             {
                 // The swing begins: a heavy whoosh; a roof punch lands with grit raining down.
                 if (frame == 0 && WardenArt.StrikeFrame(pose) > 0) Hear(Sound.Heavy, body.Position, 0.9f);

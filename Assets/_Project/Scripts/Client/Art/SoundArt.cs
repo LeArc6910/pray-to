@@ -119,6 +119,15 @@ namespace Game.Client
         UiConfirm,
         UiCancel,
         UiFail,
+        // Things in a boss's arena (2026-11-28, R2b): a pillar of rock grinding up out of the floor; a charge
+        // driven into a pillar (a great thud, the stone breaking and its pieces falling); the warden's core laid bare
+        // (a glassy ring that hangs in the air); the vein eater biting through a vein (a crunch of rock and crystal);
+        // its rage coming on (a roar, low and short).
+        PillarRise,
+        PillarCrash,
+        CoreExposed,
+        VeinCrunch,
+        Enrage,
     }
 
     // A monster's kind of voice (2026-11-09): what it sounds like when it notices someone, attacks and is struck.
@@ -595,6 +604,61 @@ namespace Game.Client
                     parts.Add(Noise(0.55f, 0.45f, 0.35f, 0.96f, attack: 0.01f, decay: 3.5f, seed: 76));
                     Crackle(parts, 0.6f, 0.3f, 4, 0.25f, 77);
                     level = 0.6f;
+                    break;
+                case Sound.PillarRise:
+                    // Stone grinding on stone, rising, the floor rumbling under it; it seats with a knock.
+                    parts.Add(Noise(0, 0.6f, 0.8f, 0.2f, attack: 0.08f, decay: 0.8f, seed: 81));
+                    parts.Add(Tone(Wave.Saw, 0, 0.58f, 44, 78, 0.5f, attack: 0.1f, decay: 0.7f, vibrato: 0.12f, vibratoRate: 23));
+                    parts.Add(Tone(Wave.Square, 0.05f, 0.5f, 58, 96, 0.22f, attack: 0.1f, decay: 1, vibrato: 0.2f, vibratoRate: 31));
+                    Crackle(parts, 0.05f, 0.5f, 9, 0.3f, 82);
+                    parts.Add(Tone(Wave.Sine, 0.58f, 0.16f, 120, 50, 0.8f, attack: 0.003f, decay: 5));
+                    parts.Add(Noise(0.58f, 0.2f, 0.4f, 0.35f, decay: 5, seed: 83));
+                    level = 0.6f;
+                    break;
+                case Sound.PillarCrash:
+                    // The thud of the body into it, the stone cracking apart, the pieces coming down.
+                    parts.Add(Tone(Wave.Sine, 0, 0.42f, 110, 30, 1, attack: 0.002f, decay: 3));
+                    parts.Add(Tone(Wave.Square, 0, 0.16f, 150, 46, 0.5f, decay: 5));
+                    parts.Add(Noise(0, 0.14f, 1, 0.3f, attack: 0.001f, decay: 5, seed: 84));
+                    parts.Add(Noise(0.02f, 0.32f, 0.7f, 0.75f, attack: 0.004f, decay: 3.5f, seed: 85));
+                    Crackle(parts, 0.08f, 0.5f, 12, 0.5f, 86);
+                    parts.Add(Tone(Wave.Triangle, 0.3f, 0.1f, 170, 80, 0.45f, decay: 6));
+                    parts.Add(Tone(Wave.Triangle, 0.44f, 0.09f, 210, 100, 0.35f, decay: 6));
+                    parts.Add(Tone(Wave.Triangle, 0.55f, 0.08f, 150, 70, 0.25f, decay: 6));
+                    parts.Add(Noise(0.3f, 0.4f, 0.3f, 0.5f, attack: 0.02f, decay: 2.5f, seed: 87));
+                    level = 0.95f;
+                    break;
+                case Sound.CoreExposed:
+                    // A crack of stone, then glass singing: three partials that do not quite agree, shimmering.
+                    parts.Add(Noise(0, 0.05f, 0.5f, 0.6f, attack: 0.001f, decay: 7, seed: 88));
+                    parts.Add(Tone(Wave.Sine, 0.02f, 0.9f, 1245, 1240, 0.5f, attack: 0.004f, decay: 2.2f, vibrato: 0.006f, vibratoRate: 6));
+                    parts.Add(Tone(Wave.Sine, 0.02f, 0.8f, 1868, 1860, 0.32f, attack: 0.004f, decay: 2.6f, vibrato: 0.008f, vibratoRate: 7.5f));
+                    parts.Add(Tone(Wave.Sine, 0.04f, 0.65f, 2795, 2780, 0.2f, attack: 0.004f, decay: 3.2f));
+                    parts.Add(Tone(Wave.Triangle, 0.02f, 0.5f, 622, 620, 0.22f, attack: 0.01f, decay: 2.5f));
+                    parts.Add(Tone(Wave.Sine, 0.3f, 0.6f, 3320, 3300, 0.1f, attack: 0.1f, decay: 2));
+                    parts.Add(Noise(0.02f, 0.3f, 0.12f, 0.97f, attack: 0.002f, decay: 4, seed: 89));
+                    level = 0.5f;
+                    break;
+                case Sound.VeinCrunch:
+                    // Two bites: rock giving way under the teeth, crystal snapping bright on top.
+                    parts.Add(Noise(0, 0.09f, 1, 0.4f, attack: 0.002f, decay: 4, seed: 90));
+                    parts.Add(Tone(Wave.Square, 0, 0.08f, 190, 70, 0.5f, decay: 5));
+                    parts.Add(Noise(0.01f, 0.05f, 0.5f, 0.93f, attack: 0.001f, decay: 6, seed: 91));
+                    parts.Add(Noise(0.13f, 0.12f, 1, 0.45f, attack: 0.002f, decay: 4, seed: 92));
+                    parts.Add(Tone(Wave.Square, 0.13f, 0.1f, 150, 55, 0.6f, decay: 5));
+                    parts.Add(Tone(Wave.Sine, 0.14f, 0.12f, 2600, 2100, 0.2f, attack: 0.001f, decay: 6));
+                    parts.Add(Tone(Wave.Sine, 0.17f, 0.1f, 3400, 3000, 0.14f, attack: 0.001f, decay: 7));
+                    Crackle(parts, 0.02f, 0.26f, 8, 0.4f, 93);
+                    level = 0.7f;
+                    break;
+                case Sound.Enrage:
+                    // A roar from the chest: a low saw swelling fast and falling, rough with a slow flutter, breath over it.
+                    parts.Add(Tone(Wave.Saw, 0, 0.5f, 96, 58, 0.8f, attack: 0.05f, decay: 1.4f, vibrato: 0.09f, vibratoRate: 17));
+                    parts.Add(Tone(Wave.Square, 0, 0.45f, 143, 84, 0.3f, attack: 0.05f, decay: 1.8f, vibrato: 0.12f, vibratoRate: 21));
+                    parts.Add(Tone(Wave.Sine, 0, 0.5f, 48, 30, 0.6f, attack: 0.03f, decay: 1.2f));
+                    parts.Add(Noise(0, 0.46f, 0.5f, 0.55f, attack: 0.06f, decay: 1.8f, seed: 94));
+                    parts.Add(Noise(0.02f, 0.3f, 0.2f, 0.9f, attack: 0.05f, decay: 3, seed: 95));
+                    level = 0.85f;
                     break;
                 case Sound.Sting:
                     parts.Add(Noise(0, 0.07f, 0.8f, 0.92f, attack: 0.001f, decay: 7, seed: 67));

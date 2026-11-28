@@ -1048,6 +1048,20 @@ M3에서 만든 보스전 규칙과 시트 작성법이다. 코드는 `Assets/_P
 - 소리(`Art/SoundArt.cs`): `LavaBubble`(거품이 부풀다 둔하게 터짐) — 주인공 9칸 안의 해로운 용암에서 0.9~2.3초에 많아야 한 번(`WorldView.Bubble`, 수는 `BubblesHeard`). `Overheat`(낮은 울림이 올라가다 쿵) — 분노 켜짐. 분노가 꺼질 때는 `Sizzle`(식는 소리)
 - 미리보기: `--only ground` → `DevTools/ArtPreview/out/ground/sheet.png`·`sheet_gray.png`
 
+### R2b 그림 (2026-11-29, 규칙·화면 연결은 따로)
+
+동굴 수호자의 기둥·기절, 그룸의 광맥, 시구레의 벚꽃 결계, 아라네의 거미줄 커튼(`Docs/BossRedesign.md` 5.1·5.9·5.10·5.12). 함수 이름·인자는 그대로이고, 더한 것은 `GroundArt.PropPivot`·`GroundArt.VeinCracked`·`WardenPose.Stun`·소리 다섯이다.
+
+- **바위 기둥**(`GroundArt.Prop(PropKind.Pillar, frame)`, 32×48): 바위 셋을 쌓은 기둥, 발 지름 1.8칸·키 2.5칸쯤. 수호자의 돌·이끼 색(`WardenArt` 팔레트), 왼쪽 위에서 빛, 꼭대기와 턱마다 이끼가 흘러내림, 발밑 그림자·돌 조각. 4장은 양옆에 돌가루 한 알씩 떨어질 뿐 거의 정지
+- **세워 놓기**: `GroundArt.PropPivot(kind)`(0~1, 아래에서 위)가 발이 닿는 줄이다(기둥 0.18, 광맥 0.28, 분출구 0.5). 기둥·광맥은 그림이 위로 길어서 가운데가 아니라 이 줄에 맞춰 놓아야 한다(`Sprites.Get(key, draw, new Vector2(0.5f, PropPivot))`), 사람·보스와 앞뒤 순서도 발 기준으로
+- **광맥**(`PropKind.Vein`, 28×30): 철곡의 바위 덩이(그룸의 바위 색)에 흑요석 띠와 청록 결정 다섯. 4장 맥박(어둠 → 밝음 → 가장 밝음 → 밝음, 밝을 때 둘레에 빛). `GroundArt.VeinCracked(frame, cracks)`: 0 온전(`Prop`과 같음), 1 결정 하나가 부러지고 옆구리를 한 입 베어 먹힘·금 한 줄, 2 깊게 베어 먹히고 큰 결정이 그루터기·조각이 둘레에 흩어짐(빛도 약해짐)
+- **벚꽃 결계**(`GroundArt.Edge(EdgeKind.Petal, …)`): 쌓인 꽃잎 더미. 안쪽 마루는 들쭉날쭉하고 밝은 꽃잎, 그 앞 7픽셀에 흩어진 낱장(장마다 팔랑임), 뒤로 갈수록 그늘이 짙다. 꽃잎은 5픽셀 칸에 하나, 네 방향으로 누워 제 박자로 작은 원을 돌아 4장 고리
+- **거미줄 커튼**(`EdgeKind.Web`): 13픽셀쯤마다 방사 가닥(끝은 밑단 안쪽으로 내려와 물방울), 6픽셀마다 가닥 사이에 늘어진 가로줄(몇 줄은 끊김), 만나는 곳에 밝은 이음. 사이는 옅은 막(바깥으로 짙어짐), 가닥 곁은 어둡게 해 어느 바닥에서도 실이 보인다. 4장은 가닥이 0.8픽셀쯤 흔들림
+- **수호자 기절**(`WardenPose.Stun`, 22장): 박힘 14장(`WardenArt.StunHit`, 0.035초씩 = 0.49초: 달리던 자세로 박혀 눌림 → 뒤로 튕기며 팔이 벌어지고 가슴 바위가 깨져 떨어짐) → 비틀거림 고리 8장(`StunLoop`, 초당 9장: 좌우로 흔들리고 팔이 늘어지고 눈빛이 가물거림). 핵은 정면 반지름 3.5 → 7.5픽셀(대각 6.5, 옆 5.5)로 드러나 가운데가 희게 타고, 깨진 테두리에서 금 다섯 줄로 빛이 새고 둘레 돌이 물든다. 뒤·뒤대각은 핵이 안 보여 가슴 옆선에 빛만 번진다. 3페이즈는 붉은 핵 그대로. `WorldView.Warden.cs`가 `BossState.Stun`일 때 이 자세를 쓴다
+- **점검**: 연속성(`anim/warden_continuity.txt`, `stun` 줄: 돌진 → 박힘 → 고리 두 번) 튀는 곳 0. 몸의 틈(`--only gaps`) 수호자 319/1615 → 336/1725: 기절 110장 중 17장이 잡혔고, 사진으로 본 큰 것은 뒤대각의 팔과 몸통 사이 틈(rd 그림에 있는 것, 걷기 +84와 같은 종류)과 드러난 핵 곁 팔 사이라 메우지 않았다
+- **소리**(`Sound` 끝에 다섯, 부르는 곳은 화면 연결에서): `PillarRise`(돌 갈리는 소리가 올라가다 쿵 자리 잡음, 0.78초), `PillarCrash`(큰 쿵 + 돌 깨짐 + 조각 떨어짐), `CoreExposed`(돌 금 가는 소리 뒤 유리 같은 울림 0.9초), `VeinCrunch`(두 번 와작, 결정이 깨지는 높은 소리), `Enrage`(낮고 짧은 포효 0.5초)
+- 미리보기: `--only ground` → `DevTools/ArtPreview/out/ground/r2b.png`·`r2b_gray.png`와 소리 다섯(`.wav`), `--only warden` → `anim/warden_frames_stun.png`·`warden_turn.png`(아래 세 줄)·`warden.gif`
+
 ## 보스 둘레 (2026-11-28)
 
 사람 요청: "보스 아레나 주변에는 일반 몬스터가 스폰되지 않게 해줘 (보스가 소환하는 몬스터는 제외)". 아레나(반지름 10칸, `WorldGenerator.ArenaRadius`)와 둘레 **6칸**(`World.BossGroundMargin`), 곧 보스 자리에서 16칸 안이 보스의 땅이다(`World.BossGround.cs`).

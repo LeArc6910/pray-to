@@ -5,7 +5,9 @@ namespace Game.Client
 {
     // --only ground (2026-11-28, Docs/Bosses.md "R2a 그림"): a boss's ground on one sheet, each kind's four frames: a
     // pool and a strip of lava, cooled rock, shallow water, a crack as a strip and as a pool, a piece of the lava edge
-    // with an island on it, the vent (and R2b's pillar and vein as they stand), and a small scene of them together.
+    // with an island on it, the vent, and a small scene of them together; then R2b's (Docs/Bosses.md "R2b 그림"): the
+    // pillar's and the vein's four frames, the vein cracked once and twice, a piece of the petal wall and of the web
+    // curtain, and each in a small scene (r2b.png, with the sounds).
     static class GroundPreview
     {
         const int Scale = 3;
@@ -55,10 +57,8 @@ namespace Game.Client
                 Put(GroundArt.Ground(HazardShape.Rock, false, 28, 28, 1, f), x + 36, top + 10);
             }
             y += 132;
-            // The vent's four frames, then R2b's pillar and vein as they stand.
+            // The vent's four frames.
             for (int f = 0; f < F; f++) Put(GroundArt.Prop(PropKind.Vent, f), 8 + f * 32, y);
-            Put(GroundArt.Prop(PropKind.Pillar, 0), 146, y);
-            Put(GroundArt.Prop(PropKind.Vein, 0), 180, y);
             y += 32;
             // Together: lava with a rock on it, a vent, a strip of lava and a crack across.
             Put(GroundArt.Ground(HazardShape.Lava, false, 64, 64, 2, 1), 4, y);
@@ -77,6 +77,42 @@ namespace Game.Client
             foreach (var sound in new[] { Sound.LavaBubble, Sound.Overheat })
                 Wav.Save(SoundArt.Make(sound), SoundArt.SampleRate, Path.Combine(folder, sound.ToString().ToLowerInvariant() + ".wav"));
             System.Console.WriteLine($"ground: {Path.Combine(folder, "sheet.png")}");
+
+            // ---- R2b: the pillar, the vein, the petal wall and the web curtain. ----
+            var r2b = new PixelImage(Width, 420);
+            for (int ty = 0; ty < r2b.Height; ty++)
+                for (int tx = 0; tx < r2b.Width; tx++)
+                    r2b[tx, ty] = floor[tx % floor.Width, ty % floor.Height];
+            sheet = r2b;
+            y = 4;
+            // The pillar's four frames, and one beside a tile-wide mark of its foot (0.9 tiles round).
+            for (int f = 0; f < F; f++) Put(GroundArt.Prop(PropKind.Pillar, f), 6 + f * 38, y);
+            Put(GroundArt.Prop(PropKind.Pillar, 0), 170, y);
+            for (int a = 0; a < 40; a++)
+                sheet[(int)(170 + 15.5f + 14.4f * System.Math.Cos(a * System.Math.PI / 20)), (int)(y + 39.5f + 14.4f * System.Math.Sin(a * System.Math.PI / 20))] = new Rgba(255, 255, 255);
+            y += 54;
+            // The vein's four frames, then cracked once and twice (four frames each).
+            for (int cracks = 0; cracks <= 2; cracks++)
+            {
+                for (int f = 0; f < F; f++) Put(GroundArt.VeinCracked(f, cracks), 6 + f * 34, y);
+                y += 34;
+            }
+            // The petal wall (arena 9 tiles, 2.5 of wall) and the web curtain (arena 10, 2 of web): the top of each,
+            // two frames.
+            foreach (var (kind, arena, band) in new[] { (EdgeKind.Petal, 9f, 2.5f), (EdgeKind.Web, 10f, 2f) })
+            {
+                int outer = (int)(arena * 16), inner = (int)((arena - band) * 16);
+                for (int f = 0; f < F; f++)
+                    Put(GroundArt.Edge(kind, outer, inner, f), 6 + f % 2 * 104, y + f / 2 * 62, outer - 50, 0, 100, 58);
+                y += 126;
+            }
+            var cut2 = new PixelImage(Width, y);
+            cut2.Draw(sheet, 0, 0);
+            Png.Save(SkillFxPreview.Scaled(cut2, Scale), Path.Combine(folder, "r2b.png"));
+            Png.Save(SkillFxPreview.Scaled(SkillFxPreview.Grey(cut2), Scale), Path.Combine(folder, "r2b_gray.png"));
+            foreach (var sound in new[] { Sound.PillarRise, Sound.PillarCrash, Sound.CoreExposed, Sound.VeinCrunch, Sound.Enrage })
+                Wav.Save(SoundArt.Make(sound), SoundArt.SampleRate, Path.Combine(folder, sound.ToString().ToLowerInvariant() + ".wav"));
+            System.Console.WriteLine($"ground: {Path.Combine(folder, "r2b.png")}");
             return true;
         }
     }

@@ -40,6 +40,10 @@ namespace Game.Client
         // Its fall (WorldView.WardenFalls): staggered back, the core flickering out, down on its knees, slumped forward
         // onto its fists, and crumbling into a heap of rubble.
         Die,
+        // Its charge driven into a pillar (2026-11-28, R2b, Docs/BossRedesign.md 5.1): crushed against it, thrown back
+        // off it with the rock of its chest breaking away, then reeling on its feet for the two seconds it is stunned,
+        // the core laid bare and blazing (frames StunHit.. loop).
+        Stun,
     }
 
     // The cave warden of the fallen shrine (2026-11-26): a hulking golem of mossy cave rock with an amber crystal core
@@ -543,6 +547,17 @@ namespace Game.Client
             public float StepA, LiftA, StepB, LiftB, Lean, Stretch, Lift, Shove, Drop, Glow, Eyes;
             // How far it has broken apart into falling stones (0 whole, 1 a heap), as it dies.
             public float Crumble;
+            // Stunned: how much of the chest's rock has broken away from over the core (0 whole, 1 the core laid bare),
+            // and how far that rock has fallen (0 still in the chest, 1 lying at its feet).
+            public float Bare, Shed;
+
+            public Pose Open(float bare, float shed)
+            {
+                var p = this;
+                p.Bare = bare;
+                p.Shed = shed;
+                return p;
+            }
 
             // The same pose with one arm put elsewhere.
             public Pose A(float raise, float ahead, float inward = 0)
@@ -592,6 +607,7 @@ namespace Game.Client
                 StepA = L(a.StepA, b.StepA), LiftA = L(a.LiftA, b.LiftA), StepB = L(a.StepB, b.StepB), LiftB = L(a.LiftB, b.LiftB),
                 Lean = L(a.Lean, b.Lean), Stretch = L(a.Stretch, b.Stretch), Lift = L(a.Lift, b.Lift), Shove = L(a.Shove, b.Shove),
                 Drop = L(a.Drop, b.Drop), Glow = L(a.Glow, b.Glow), Eyes = L(a.Eyes, b.Eyes), Crumble = L(a.Crumble, b.Crumble),
+                Bare = L(a.Bare, b.Bare), Shed = L(a.Shed, b.Shed),
             };
         }
 
@@ -821,6 +837,27 @@ namespace Game.Client
         public const int DieKnees = 13;
         public const int DieCrumble = 20;
 
+        // ---- Stunned against a pillar: the frames it takes to be crushed into it and thrown back off it (the chest's
+        // rock breaking away as it goes), then the loop it reels through, swaying from foot to foot with its arms
+        // hanging, its eyes guttering, the bare core beating. ----
+
+        public const int StunHit = 14;
+        public const int StunLoop = 8;
+
+        static Pose Dazed(float cycle)
+        {
+            float s = (float)System.Math.Sin(cycle), twice = (float)System.Math.Sin(2 * cycle);
+            float sag = 0.5f - 0.5f * (float)System.Math.Cos(2 * cycle);
+            return P(lean: -2 + 4 * s, stretch: -0.05f + 0.012f * twice, stepA: -1 + 2 * s, stepB: 1 - 2 * s, drop: 2 + 0.8f * sag, shove: -2 + 1.5f * s,
+                glow: 2.3f + 0.3f * twice, eyes: 0.55f + 0.25f * (float)System.Math.Cos(2 * cycle)).A(1 + s, -3 * s, -0.3f).B(1 - s, 3 * s, -0.3f).Open(1, 1);
+        }
+
+        // Head first into the pillar, as it ran.
+        static readonly Pose Struck = P(-1, 7, 0.2f, lean: 12, stretch: -0.14f, drop: 1, shove: 2, glow: 1.6f);
+        static readonly Pose Crushed = P(2, 5, 0.1f, lean: 9, stretch: -0.16f, drop: 2, shove: 2, glow: 2.6f).Open(0.5f, 0.05f);
+        // Thrown back off it, the arms flung out, the chest open.
+        static readonly Pose Thrown = P(6, -2, -0.7f, lean: -4, stretch: -0.02f, stepA: -3, stepB: 2, shove: -3, glow: 2.6f, eyes: 0.3f).Open(1, 0.6f);
+
         // ---- Frames. ----
 
         // The frames a roar takes to fling the arms open, before it shakes there (frames RoarRise.. loop).
@@ -859,6 +896,7 @@ namespace Game.Client
             WardenPose.Roar => RoarRise + 4,
             WardenPose.Enter => EnterFrames.Length,
             WardenPose.Die => Death.Frames.Length,
+            WardenPose.Stun => StunHit + StunLoop,
             _ => BlowOf(pose)?.Frames.Length ?? 4,
         };
 
@@ -984,6 +1022,9 @@ namespace Game.Client
                     return EnterFrames[f];
                 case WardenPose.Die:
                     return Death.Frames[f];
+                case WardenPose.Stun:
+                    if (f < StunHit) return Keys(f / (float)StunHit, (0, Struck), (0.12f, Crushed), (0.62f, Thrown), (1, Dazed(0)));
+                    return Dazed((f - StunHit) / (float)StunLoop * 2 * (float)System.Math.PI);
                 default:
                 {
                     var blow = BlowOf(pose);
@@ -1118,6 +1159,52 @@ namespace Game.Client
             return c.Mix(Blaze, System.Math.Min(1, (glow - 1) * 0.8f));
         }
 
+        // The core in the chest of each view's picture (its middle, and how far the amber reaches from it), and how
+        // far it reaches with the chest's rock gone; nothing from behind, where the light only spills round its sides.
+        static (float X, float Y, float Whole, float Bare)? CoreOf(BossView view) => view switch
+        {
+            BossView.Front => (33, 30.5f, 3.5f, 7.5f),
+            BossView.FrontSide => (37, 30.5f, 3, 6.5f),
+            BossView.Side => (38.5f, 28.5f, 2, 5.5f),
+            _ => null,
+        };
+
+        static readonly Rgba CoreRim = new Rgba(233, 131, 37);
+        static readonly Rgba CoreMid = new Rgba(241, 144, 46);
+        static readonly Rgba CoreHot = new Rgba(252, 182, 55);
+
+        // A pixel of the body (canvas x, y, its own colour c) with the chest broken open by `bare`: inside the hole the
+        // core itself, white-hot at its heart and amber toward its edge, a facet catching the light; round it the
+        // broken edge of the rock, cracks running out from it with the light in them, and the stone near it lit warm.
+        static Rgba Bared(Rgba c, float x, float y, (float X, float Y, float Whole, float Bare) core, float bare, float glow, int phase)
+        {
+            float dx = x - (core.X + Margin), dy = y - (core.Y + Headroom);
+            float d = (float)System.Math.Sqrt(dx * dx + dy * dy);
+            double angle = System.Math.Atan2(dy, dx);
+            int spoke = (int)System.Math.Floor((angle + System.Math.PI) / (System.Math.PI / 6));
+            float reach = core.Whole + (core.Bare - core.Whole) * bare + (Hash(spoke, 7) - 0.5f) * 1.8f * bare;
+            if (d > reach + 6) return c;
+            Rgba Heat(Rgba amber) => phase >= 3 ? amber.Mix(Ember, 0.45f) : amber;
+            float beat = System.Math.Min(1, System.Math.Max(0, (glow - 1.6f) / 1.2f));
+            if (d < reach - 1)
+            {
+                float t = d / reach;
+                var amber = t < 0.34f + 0.12f * beat ? Blaze : t < 0.62f ? CoreHot.Mix(Blaze, 0.25f + 0.45f * beat) : t < 0.84f ? CoreMid.Mix(Blaze, 0.25f * beat) : CoreRim;
+                // A facet across it, upper left to lower right.
+                if (t >= 0.34f && System.Math.Abs(dx - dy + 1.5f) < 0.6f) amber = amber.Mix(Blaze, 0.6f);
+                return Heat(amber);
+            }
+            if (d < reach) return Hash((int)x, (int)y) < 0.5f ? Ink : StoneDark;
+            // Five cracks out from the hole.
+            for (int k = 0; k < 5; k++)
+            {
+                double off = angle - (0.5 + k * 1.3);
+                if (System.Math.Cos(off) > 0 && System.Math.Abs(System.Math.Sin(off)) * d < 0.55f && d < reach + 2.5f + 2 * Hash(k, 3))
+                    return Heat(CoreRim.Mix(Blaze, 0.3f * beat)).Mix(c, 1 - bare);
+            }
+            return c.Mix(Heat(CoreHot), 0.3f * bare * (1 - (d - reach) / 6));
+        }
+
         // One frame. A wind-up runs through its telegraph, a blow through its swing, strike, hold and recovery, a walk,
         // a charge and the idle loop. In the last phase its core burns red-hot. Faces right; WorldView flips it for the
         // left.
@@ -1167,6 +1254,7 @@ namespace Game.Client
             }
             var a = Place(fistA.X, fistA.Y);
             var b = Place(fistB.X, fistB.Y);
+            var core = CoreOf(view);
             joints.FistAX = a.X;
             joints.FistAY = a.Y;
             joints.FistBX = b.X;
@@ -1183,6 +1271,14 @@ namespace Game.Client
                     var c = body[x * w / wide, sy];
                     if (c.A == 0) continue;
                     if (IsAmber(c)) c = Glowing(c, sy - Headroom < 23 ? p.Eyes : p.Glow, phase);
+                    if (p.Bare > 0)
+                    {
+                        int bx = x * w / wide;
+                        if (core is var (coreX, coreY, whole, open)) c = Bared(c, bx, sy, (coreX, coreY, whole, open), p.Bare, p.Glow, phase);
+                        // From behind the core's light spills round the sides of the chest.
+                        else if (sy - Headroom >= 22 && sy - Headroom <= 40 && (body[bx - 1, sy].A == 0 || body[bx + 1, sy].A == 0 || body[bx - 2, sy].A == 0 || body[bx + 2, sy].A == 0))
+                            c = c.Mix(phase >= 3 ? CoreHot.Mix(Ember, 0.45f) : CoreHot, 0.55f * p.Bare);
+                    }
                     int px = left + x + shift;
                     if (p.Crumble > 0)
                     {
@@ -1203,6 +1299,26 @@ namespace Game.Client
                     joints.Bottom = System.Math.Max(joints.Bottom, row);
                     joints.Left = System.Math.Min(joints.Left, px);
                     joints.Right = System.Math.Max(joints.Right, px);
+                }
+            }
+            // The rock that was over the core: five stones breaking out of the chest, falling ahead of it and coming to
+            // rest on the floor at its feet.
+            if (p.Shed > 0 && core is var (holeX, holeY, _, _))
+            {
+                var from = Place(holeX + Margin, holeY + Headroom);
+                int floorRow = Height - 1 - Floor + 1;
+                for (int k = 0; k < 5; k++)
+                {
+                    // Each a little after the one before; out from the chest as it falls (ahead of it from the side,
+                    // to both sides from the front).
+                    float fall = System.Math.Max(0, System.Math.Min(1, p.Shed * 1.5f - k * 0.1f));
+                    if (fall <= 0) continue;
+                    float aside = view == BossView.Front ? (k % 2 == 0 ? 1 : -1) * (2 + k * 1.6f) : 3 + k * 2.4f;
+                    int size = k < 2 ? 3 : 2;
+                    int sx = R(from.X + aside * (0.4f + 0.6f * fall)), sy = R(from.Y + 2 + (floorRow - size - from.Y - 2 + k % 2) * fall * fall);
+                    for (int j = 0; j < size; j++)
+                        for (int i = 0; i < size; i++)
+                            image[sx + i, sy + j] = j == size - 1 ? (fall >= 1 ? Ink : StoneDark) : i == 0 && j == 0 ? StoneLight : k == 1 && i == 1 && j == 0 ? Moss : i + j < size - 1 ? Stone : StoneDark;
                 }
             }
             // A fist too fast to see: a pale streak from where it was a frame before, behind the body.
