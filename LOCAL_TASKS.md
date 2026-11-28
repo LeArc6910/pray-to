@@ -1988,3 +1988,26 @@ DevTools/Local/setup.sh --commit
   - `Game.Client.Tests.FeatureTests.ASingleShotIsLinedToItsTargetBeforeItFlies: A line to the player the shot is for.`
   - `Game.Client.Tests.FeatureTests.EveryKindHasItsOwnAttacks: A blow its shell turned shows a grey number.`
   - `Game.Client.Tests.FeatureTests.TheBagAndHudDraw: The food's buff has no icon.`
+
+### 2026-11-28 17:50 200단계 확인과 감시 켜기 (로컬 세션)
+
+- 위 17:42 setup(`-NoPull` 없이, `-Commit`)의 자세한 결과. 같은 결과 커밋에 Unity가 만든 `.meta` 483개(시험·시트·소리·이펙트 개편·무기·성별 등 그동안 쌓인 것 전부)와 `GameSheets.asset`, `ProjectSettings/` 셋(Graphics·PackageManager·Quality, Unity가 고쳐 쓴 것)이 들어갔다. 이제 `.meta` 없는 파일이 없다
+- `local-screens` 브랜치를 처음 만들어 사진 218장을 올렸다(장면 54개 중 51개 통과)
+- **고친 열둘 중 열이 통과**: `MonstersWarnAndStrikeFromTheSheet`·`MonsterWarningsFillAsShapesAndLeavePools`·`APackNoticesTogetherWithMarks`·`TheMadGeneralRisesAndGivesOrders`·`TheCaveWardenWakesAndWindsUp`·`TheAntlionBurstsUpAndWindsUp`·`TheCrystalQueenHatchesAndWindsUp`·`TheDirtCaveStandsItsPropsAndALampIsLit`·`TheIceAndSandCavesStandTheirPropsAndThePlacesTakeTheirLooks`·`TheLavaZoneAndTheAbyssStandTheirPropsAndThePlacesTakeTheirLooks`(배치·화면 둘 다)
+- **둘은 아직 실패**:
+  - `ElitesWearTheirNamesAndWarnOfTheirBigAttack`: 배치 모드에서만 실패, 화면 실행(창이 보이는 Unity)에서는 통과. `FeatureTests.cs:1342` "A name over the leader and each champion. Expected: 4 But was: 0". 로그: `[playtest] ok goto wild at 489,546`, `[playtest] ok clear` 뒤 에러 없음
+  - `EveryKindHasItsOwnAttacks`: 배치·화면 둘 다 실패. `FeatureTests.cs:1389` "A blow its shell turned shows a grey number. Expected: greater than 0 But was: 0". 로그: `[playtest] ok goto wild at 536,479`(화면 실행은 547,535), `[playtest] ok clear` 뒤 에러 없음
+- **고치지 않은 일곱은 모두 실패**(전체 메시지):
+  - `RumoursAndSlowRest`(`FeatureTests.cs:1534`): "The goal list says only which way: " 뒤가 빈 문자열, "Expected: True But was: False". 화면 실행 대상 아님
+  - `TheBagAndHudDraw`(`FeatureTests.cs:432`, `StringAssert.Contains`): "The food's buff has no icon. Expected: String containing "버섯 수프"". 배치에서는 "But was: <string.Empty>", **화면 실행에서는 "But was: "얼어붙음""**(버프 아이콘 자리에 얼어붙음이 먼저 있다)
+  - `TheEncounterWindowsDraw`(`FeatureTests.cs:507`, `StringAssert.StartsWith`): "Her portrait is in the talk box. Expected: String starting with "merchant:" But was: <string.Empty>". 배치에서만 실패, 화면 실행에서는 통과
+  - `TheTestGroundsPanelAndHitLogDraw`(`TitleScreenTests.cs:131`): "The hit log is on the screen. Expected: greater than 1 But was: 0". 배치에서만 실패, 화면 실행에서는 통과. 로그: `[playtest] ok test gear | 철 세트(희귀 · 높은 값 · +3) · 방어 71 · 생명력 223 · 피해 40`, `ok test boss | 동굴 수호자의 방 · Lv 3 · 구리 단계`, `ok test mob | 동굴 딱정벌레 우두머리 3마리 · 2구역`
+  - `LayoutTests.TheBagAndHudFit`(`LayoutTests.cs:644`): 한 줄뿐 — "작은 휴대폰 가로 667×375: 배너가 [메뉴] 판에 겹친다 (x:0, y:301, w:667, h:64) (x:353, y:186, w:304, h:160)"
+  - `LayoutTests.TheFixedPartsKeepToTheSafeArea`(`LayoutTests.cs:84`): 모두 "작은 휴대폰 가로(안전 영역 32 0 32 16) 667×375"에서 — 스킬 1: 시간·장소 줄/구르기. 스킬 2: 미니맵/퀵슬롯 3·4·5, HUD/퀵슬롯 0, 시간·장소 줄/구르기, 터치 단추 0/퀵슬롯 3·4, 터치 단추 1/퀵슬롯 5. 스킬 3·4: 스킬 2와 같고 시간·장소 줄/스킬 0·스킬 1이 더해짐(모두 29줄)
+  - `LayoutTests.TheGrowthScreensFit`(`LayoutTests.cs:342`): "작은 휴대폰 세로 360×640, 특성: 고른 점과 서랍이 하늘을 거의 다 덮는다 (84)", 가로 667×375 특성에서 확대 단추·포인트·모두 되돌리기가 고른 점과 겹침, 모두 되돌리기와 서랍 겹침, "고른 점이 하늘 밖 (x:22, y:15, w:623, h:150)", "고른 점과 서랍이 하늘을 거의 다 덮는다 (-173)"
+- **새로 실패한 둘**(지난 보고의 목록에 없던 것):
+  - `ADungeonGateLeadsIntoThePocketAndOut`(`FeatureTests.cs:1659`): "The gate's button starts going in. Expected: True But was: False". 배치에서만 실패, 화면 실행에서는 통과
+  - `ASingleShotIsLinedToItsTargetBeforeItFlies`(`FeatureTests.cs:1052`): "A line to the player the shot is for. Expected: greater than 0 But was: 0". 배치·화면 둘 다 실패
+- EditMode `BotTests.FirstHourReachesTheFirstMonsterCraftAndBoss(1UL)`(`BotTests.cs:281`): "at the warden's arena … Expected: True But was: False". 시드 1이 7:43에 레벨 3, 동굴 수호자 목표를 "monster: 몬스터 없음: 탐험 (갈 곳 없음)"으로 건너뜀, 칸 124,29에서 마지막 행동 "7:33 monster NoWay 몬스터에게 갈 길 없음", 멈춤 1·막힘 1. 위 13:30 보고처럼 Unity에서만 난다
+- Console 로그(`Logs/playmode.log`, `Logs/screens.log`): 실패한 시험 앞뒤에 예외·에러·경고가 **하나도 없다**. 나오는 것은 "There are no audio listeners in the scene"(배치에서 193번, 장면마다)와 `[playtest] ok …` 줄, 화면 실행 시작 때 "Scene file not found: 'Assets/Scenes/SampleScene.unity'"(에디터가 마지막에 연 장면을 찾는 것, 시험과 무관)뿐이다. 보이는 것: 배치에서만 실패하는 다섯(엘리트 이름, 만남 초상, 시험장 기록, 던전 문, 가방 일부)은 모두 화면에 그린 글·초상을 읽는 확인이라 배치 모드(그리지 않음)에서 빈 값이 나오는 것으로 보인다
+- **감시**: 이 컴퓨터에는 켜진 적이 없었다(시작프로그램에 없고 `Logs/watch.log`도 없었다). `watch.ps1 -Install`로 켰다(로그인할 때마다 최소화된 창으로 켜짐, 5분마다 봄). 방금 돌린 커밋을 시험한 것으로 적어 두어 곧바로 다시 돌지는 않는다
