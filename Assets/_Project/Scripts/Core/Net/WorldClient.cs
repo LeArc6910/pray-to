@@ -1423,7 +1423,23 @@ namespace Game.Core
                     {
                         if (hazard.Shape == HazardShape.Pull && HostTick <= latest.Tick + hazard.TicksLeft)
                             Position = World.PullStep(Map, Position, hazard.Position, hazard.Size, hazard.Width, _myDoors);
+                        // R3: a push out of a middle, a sand pit's drag, a thread stretched too far (whichever end is
+                        // this player's: told by where the host last had them).
+                        else if (hazard.Shape == HazardShape.Push && HostTick <= latest.Tick + hazard.TicksLeft)
+                            Position = World.PushStep(Map, Position, hazard.Position, hazard.Size, hazard.Width, _myDoors);
+                        else if (hazard.Shape == HazardShape.Pit && HostTick <= latest.Tick + hazard.TicksLeft)
+                            Position = World.PitStep(Map, Position, hazard.Position, hazard.Size, _myDoors);
+                        else if (hazard.Shape == HazardShape.Tether && HostTick <= latest.Tick + hazard.TicksLeft)
+                        {
+                            var end = hazard.Position + hazard.Direction * hazard.Size;
+                            var me = latest.Self.Position;
+                            if (Vec2.Distance(end, me) < 1) Position = World.ThreadStep(Map, Position, hazard.Position, _myDoors);
+                            else if (Vec2.Distance(hazard.Position, me) < 1) Position = World.ThreadStep(Map, Position, end, _myDoors);
+                        }
                     }
+                    if (latest.Props != null)
+                        foreach (var prop in latest.Props)
+                            if (prop.Kind == PropKind.Pit) Position = World.PitStep(Map, Position, prop.Position, prop.Radius, _myDoors);
                 }
             }
             if (!Map.InPocket(Position)) Visited = BiomeVisits.Mark(Visited, Biomes.At(Position));

@@ -62,6 +62,22 @@ namespace Game.Core
         // pillar of its own shields (in the pillar's shadow from where the boss stood). With no pillar standing, two
         // rise as it winds up (World.Shelters).
         Cover,
+        // R3 (2026-11-28, Docs/BossRedesign.md 5.12, the silk mother's thread): when its telegraph ends, threads take
+        // hold (World.LayThreads): alone, from the boss to the player; together, between count pairs of players.
+        // Stretched past World.ThreadSlack, a thread drags its player back (toward the boss, or toward each other); two
+        // held closer than World.ThreadSnap snap it and are both hurt. World.ThreadCuts cuts of a swing part it; it
+        // lasts spread seconds.
+        Tether,
+        // R3 (T7, the tide serpent's wave): count walls of water, spread seconds apart, sweep the whole arena from the
+        // side away from the target through it at speed, each with a gap width tiles wide somewhere along it (the
+        // gaps marked green while it winds up). One struck is hurt and pushed on (World.Waves).
+        Wave,
+        // R3 (T7, the squeezing tide): two walls come in from either side of the arena and stop width tiles apart
+        // across its middle (marked green): wherever they pass is struck.
+        Close,
+        // R3 (5.4, the tidal wave, a finisher): the half of the arena the boss raises its head toward is struck; the
+        // other half is safe.
+        Half,
     }
 
     // How plainly an attack is announced (2026-11-12, the vein eater). Marked is how every boss announced every attack
@@ -116,6 +132,9 @@ namespace Game.Core
         // stands the seconds given: it stops the boss's shots and stuns the boss that charges into it. A trail raises
         // one where its last blast lands.
         Pillar,
+        // R3 (2026-11-28, the antlion): a sand pit that drags whoever is in it toward its middle (World.PitPull) and
+        // bites at the middle (HazardShape.Pit).
+        Pit,
     }
 
     public enum AttackTarget : byte
@@ -127,6 +146,8 @@ namespace Game.Core
         Each,
         // Centred on the boss itself.
         Self,
+        // Centred on the middle of its arena (R3, the antlion's maw).
+        Middle,
     }
 
     public sealed class BossAttack
@@ -151,8 +172,10 @@ namespace Game.Core
             MonsterDefinition summon,
             AttackWarning warning = AttackWarning.Marked,
             PoolKind pool = PoolKind.None,
-            float linger = 0)
+            float linger = 0,
+            float pull = 0)
         {
+            Pull = pull;
             Warning = warning;
             Pool = pool;
             Linger = linger;
@@ -209,6 +232,17 @@ namespace Game.Core
         // A third part is the first phase it leaves it in ("lava:5:2"); a boost may change the seconds (linger).
         public PoolKind Pool { get; }
         public float Linger { get; private set; }
+
+        // R3 (2026-11-28, T4, pull column): while it winds up, whoever is in reach is dragged at this many tiles a second
+        // toward the middle of its area (the boss for a cone, line, charge or ring of its own), the whole arena over;
+        // less than nothing pushes out from the middle instead, within a ring's safe middle (or a circle). Slower than
+        // a walk, so it can be walked against (World.Drags).
+        public float Pull { get; private set; }
+
+        // A burrow that chases (R3, T5, length its speed): the boss goes under and a mound (the antlion's sand, the
+        // serpent's V of ripples) comes after the target at length tiles a second, stops World.MoundStop before the
+        // end, and the boss bursts up where it stopped.
+        public bool Chases => Shape == AttackShape.Burrow && Length > 0;
         public int PoolFrom { get; internal set; } = 1;
 
         // Another attack of the same boss laid at the same moment on the same target, landing FollowDelay seconds
@@ -220,8 +254,9 @@ namespace Game.Core
 
         // Whether it may come again straight after itself (boost repeat, and a raging boss's one more: World.Rage).
         public bool CanRepeat => !(Shape == AttackShape.Charge || Shape == AttackShape.Spiral || Shape == AttackShape.Summon
-            || Shape == AttackShape.Counter || Shape == AttackShape.Vent || Shape == AttackShape.Refuge || Shape == AttackShape.Burrow
-            || Shape == AttackShape.Leap || Shape == AttackShape.Pluck || Shape == AttackShape.Orbit || Shape == AttackShape.Eat || Shape == AttackShape.Cover);
+            || Shape == AttackShape.Counter || Shape == AttackShape.Vent || Shape == AttackShape.Refuge || Shape == AttackShape.Burrow && !Chases
+            || Shape == AttackShape.Leap || Shape == AttackShape.Pluck || Shape == AttackShape.Orbit || Shape == AttackShape.Eat || Shape == AttackShape.Cover
+            || Shape == AttackShape.Tether || Shape == AttackShape.Wave || Shape == AttackShape.Close || Shape == AttackShape.Half);
 
         // Whether it marks ground that lands by itself when the telegraph ends (what a follow-up may be).
         public bool LaysAreas => Shape switch
@@ -278,7 +313,12 @@ namespace Game.Core
         // ready again (World.RollCooldownSeconds), so each one can be rolled through.
         public float AgainSeconds => Shape == AttackShape.Charge
             ? Math.Max(Telegraph * Again, Math.Min(Telegraph, LeastAgainTelegraph))
+            // A mound that comes again chases a moment before it stops (R3).
+            : Chases ? Math.Max(Telegraph * Again, World.MoundStop + LeastChase)
             : Math.Max(Telegraph * Again, World.RollCooldownSeconds - RepeatGapSeconds);
+
+        // The least a mound chases before it stops (R3).
+        public const float LeastChase = 0.5f;
 
         // The pause between a blow and its repeat: the follow-through, then the next wind-up (World.UpdateBoss).
         public const float RepeatGapSeconds = 0.15f;
@@ -340,7 +380,7 @@ namespace Game.Core
             public char Op { get; }
             public float Value { get; }
 
-            public static readonly string[] Fields = { "count", "repeat", "tele", "again", "radius", "length", "angle", "width", "spread", "speed", "cooldown", "hold", "linger" };
+            public static readonly string[] Fields = { "count", "repeat", "tele", "again", "radius", "length", "angle", "width", "spread", "speed", "cooldown", "hold", "linger", "pull" };
 
             float On(float now) => Op == '+' ? now + Value : Op == '*' ? now * Value : Value;
 
@@ -361,6 +401,7 @@ namespace Game.Core
                     case "cooldown": a.Cooldown = On(a.Cooldown); break;
                     case "hold": a.Hold = Math.Max(0, On(a.Hold)); break;
                     case "linger": a.Linger = Math.Max(0, On(a.Linger)); break;
+                    case "pull": a.Pull = On(a.Pull); break;
                 }
             }
         }
@@ -633,7 +674,8 @@ namespace Game.Core
                         row["summon"].Length > 0 ? FindMonster(monsters, row["summon"]) : null,
                         Warning(row["warn"]),
                         pool.Kind,
-                        pool.Seconds) { PoolFrom = pool.From };
+                        pool.Seconds,
+                        row["pull"].Length == 0 ? 0 : SheetValues.ParseSignedDecimal(row["pull"], "pull")) { PoolFrom = pool.From };
                     Validate(attack);
                     boosts[attack] = Boosts(row["boost"], boss.PhaseCount, shape);
                     boss.Add(attack);
@@ -774,6 +816,22 @@ namespace Game.Core
                 case AttackShape.Burrow:
                 case AttackShape.Leap:
                     Need(attack.Radius > 0 && attack.Damage > 0 && (attack.Count == 0 || attack.Speed > 0), "radius, damage(돌을 흩뿌리면 count와 speed)");
+                    // A mound that chases (length, R3) stops World.MoundStop before it bursts, after chasing a while.
+                    Need(!attack.Chases || attack.Telegraph >= World.MoundStop + BossAttack.LeastChase, $"쫓는 둔덕(length)이면 {World.MoundStop + BossAttack.LeastChase}초 이상의 telegraph");
+                    Need(attack.Shape == AttackShape.Burrow || attack.Length == 0, "length 비움(쫓는 둔덕은 burrow만)");
+                    break;
+                case AttackShape.Tether:
+                    Need(attack.Count > 0 && attack.Spread > 0 && attack.Damage > 0, "count(실 수), spread(남는 초), damage(터질 때)");
+                    break;
+                case AttackShape.Wave:
+                    Need(attack.Speed > 0 && attack.Count > 0 && attack.Width >= 0 && (attack.Count == 1 || attack.Spread > 0) && attack.Damage > 0,
+                        "speed, count(몇 겹), width(틈, 0이면 없음), spread(겹 사이 초), damage");
+                    break;
+                case AttackShape.Close:
+                    Need(attack.Speed > 0 && attack.Width > 0 && attack.Damage > 0, "speed, width(가운데 남는 틈), damage");
+                    break;
+                case AttackShape.Half:
+                    Need(attack.Damage > 0, "damage");
                     break;
                 case AttackShape.Pluck:
                     Need(attack.Radius > 0 && attack.Damage > 0, "radius(거미줄이 없을 때의 원), damage");
@@ -798,6 +856,16 @@ namespace Game.Core
                     Need(attack.Damage > 0 && attack.Target == AttackTarget.Self, "damage, target self");
                     break;
             }
+            // A pull drags toward an area's middle, or (less than nothing) pushes out from a ring's or circle's (R3).
+            if (attack.Pull != 0 && !(attack.Shape == AttackShape.Circle || attack.Shape == AttackShape.Cone || attack.Shape == AttackShape.Line
+                || attack.Shape == AttackShape.Ring || attack.Shape == AttackShape.Charge))
+                throw new FormatException($"pull은 circle, cone, line, ring, charge에만 씁니다({attack.Shape}).");
+            if (attack.Pull < 0 && !(attack.Shape == AttackShape.Ring || attack.Shape == AttackShape.Circle))
+                throw new FormatException("pull이 0보다 작으면(밀어냄) ring·circle에만 씁니다.");
+            if (Math.Abs(attack.Pull) >= PlayerStats.BaseMoveSpeed * 0.8f)
+                throw new FormatException($"pull은 걸음({PlayerStats.BaseMoveSpeed})의 80%보다 느려야 거슬러 걸을 수 있습니다.");
+            if (attack.Target == AttackTarget.Middle && attack.Shape != AttackShape.Circle)
+                throw new FormatException("target middle은 circle에만 씁니다.");
             if ((attack.Warning == AttackWarning.Near || attack.Warning == AttackWarning.Far)
                 && !(attack.Shape == AttackShape.Circle || attack.Shape == AttackShape.Cone || attack.Shape == AttackShape.Ring))
                 throw new FormatException($"warn near·far는 보스에서 재는 공격(circle, cone, ring)에만 씁니다({attack.Shape}).");
@@ -837,7 +905,8 @@ namespace Game.Core
                 "crack" => PoolKind.Crack,
                 "rock" => PoolKind.Rock,
                 "pillar" => PoolKind.Pillar,
-                _ => throw new FormatException($"pool은 비우거나 web, venom, lava, water, crack, rock, pillar 가운데 하나와 초입니다('{cell}')."),
+                "pit" => PoolKind.Pit,
+                _ => throw new FormatException($"pool은 비우거나 web, venom, lava, water, crack, rock, pillar, pit 가운데 하나와 초입니다('{cell}')."),
             };
             if (parts.Length != 2 && parts.Length != 3) throw new FormatException($"pool은 lava:6처럼, 늦게 깔면 lava:5:2(2페이즈부터)처럼 적습니다('{cell}').");
             float seconds = SheetValues.ParseDecimal(parts[1], "pool");
@@ -846,7 +915,7 @@ namespace Game.Core
             if (from < 1 || from > 3) throw new FormatException("pool의 페이즈는 1~3입니다.");
             bool circles = shape == AttackShape.Circle || shape == AttackShape.Trail || shape == AttackShape.Burrow || shape == AttackShape.Leap;
             // Ground (not webs or venom) may also lie along a charge's run and a cross's arms (2026-11-28, R2).
-            bool strips = (shape == AttackShape.Charge || shape == AttackShape.Cross) && kind >= PoolKind.Lava && kind != PoolKind.Pillar;
+            bool strips = (shape == AttackShape.Charge || shape == AttackShape.Cross) && kind >= PoolKind.Lava && kind != PoolKind.Pillar && kind != PoolKind.Pit;
             if (!circles && !strips)
                 throw new FormatException($"pool은 원으로 떨어지는 공격(circle, trail, burrow, leap)에, 용암·물·균열·바위는 charge·cross에도 씁니다({shape}).");
             return (kind, seconds, from);

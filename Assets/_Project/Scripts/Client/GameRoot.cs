@@ -113,6 +113,10 @@ namespace Game.Client
         internal int PropsShown => _view?.PropsShown ?? 0;
         internal int PropsShownOf(PropKind kind) => _view?.PropsShownOf(kind) ?? 0;
         internal int ShadesShown => _view?.ShadesShown ?? 0;
+        // R3: threads, walls of water and drags drawn now.
+        internal int ThreadsShown => _view?.ThreadsShown ?? 0;
+        internal int WavesShown => _view?.WavesShown ?? 0;
+        internal int DragsShown => _view?.DragsShown ?? 0;
         internal bool RageShown => _view?.RageShown ?? false;
         // Ordinary monsters' marks, pools, one-off effects, pieces and shots as drawn (WorldView.MonsterFx).
         internal int MonsterMarksShown => _view?.MonsterMarksShown ?? 0;

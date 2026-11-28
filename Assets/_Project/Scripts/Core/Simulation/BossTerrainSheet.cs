@@ -14,6 +14,8 @@ namespace Game.Core
         Lava,
         Petal,
         Web,
+        // R3 (2026-11-28, the tide serpent's last phase): shallow water that only slows (World.PlayerWadeSpeed).
+        Water,
     }
 
     // From Phase on, the outer Width tiles of the arena are Kind; Islands of cooled rock stand in lava's band.
@@ -40,6 +42,9 @@ namespace Game.Core
         Vent,
         Pillar,
         Vein,
+        // R3 (2026-11-28, the antlion): a sand pit that drags whoever is in it toward its middle (World.PitPull) and
+        // bites there. A phase's first stands in the arena's middle, wide (World.BigPitRadius); the rest round it.
+        Pit,
     }
 
     // How a boss rages in a phase (rage column, T9): it takes Hurt of its health (since the last) and then for Seconds
@@ -84,7 +89,8 @@ namespace Game.Core
                 "lava" => EdgeKind.Lava,
                 "petal" => EdgeKind.Petal,
                 "web" => EdgeKind.Web,
-                _ => throw new FormatException($"edge의 종류는 lava, petal, web 가운데 하나입니다('{parts[1]}')."),
+                "water" => EdgeKind.Water,
+                _ => throw new FormatException($"edge의 종류는 lava, petal, web, water 가운데 하나입니다('{parts[1]}')."),
             };
             float width = SheetValues.ParseDecimal(parts[2], "edge");
             if (width < 1 || width > 4) throw new FormatException("edge의 폭은 1~4칸입니다(아레나 반지름 10칸).");
@@ -114,7 +120,8 @@ namespace Game.Core
                         "vent" => PropKind.Vent,
                         "pillar" => PropKind.Pillar,
                         "vein" => PropKind.Vein,
-                        _ => throw new FormatException($"props의 종류는 vent, pillar, vein 가운데 하나입니다('{bits[0]}')."),
+                        "pit" => PropKind.Pit,
+                        _ => throw new FormatException($"props의 종류는 vent, pillar, vein, pit 가운데 하나입니다('{bits[0]}')."),
                     };
                     int count = bits.Length == 2 ? SheetValues.ParseNumber(bits[1], "props") : 1;
                     if (bits.Length > 2 || count < 1) throw new FormatException($"props는 vent*3처럼 적습니다('{item}').");

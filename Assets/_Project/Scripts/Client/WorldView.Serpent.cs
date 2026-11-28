@@ -25,7 +25,10 @@ namespace Game.Client
             "whirlpool" or "undertow" => SerpentPose.Whirl,
             "deep_share" => SerpentPose.Crash,
             "tidal_cross" => SerpentPose.Slam,
-            "spray_rain" => SerpentPose.Spout,
+            "spray_rain" or "tsunami" => SerpentPose.Spout,
+            "dive" => SerpentPose.Crash,
+            "wave" => SerpentPose.Surge,
+            "squeeze" => SerpentPose.Whirl,
             _ => attack.Shape switch
             {
                 AttackShape.Cone => SerpentPose.Lash,
@@ -90,6 +93,12 @@ namespace Game.Client
                 // Slithering, the coils rippling.
                 pose = SerpentPose.Walk;
                 frame = Mathf.FloorToInt(body.Walked * 8) % SerpentArt.FramesOf(pose);
+            }
+            else if (body.BossState == BossState.Telegraph && attack != null && attack.Chases)
+            {
+                // R3, the dive: down into the water, then only its ripples (a V across the floor) run after its target.
+                if (since < MoundDive) (pose, frame) = (SerpentPose.Dive, Through(SerpentPose.Dive, since / MoundDive));
+                else (pose, frame) = (SerpentPose.Enter, 0);
             }
             else if (body.BossState == BossState.Telegraph && attack != null)
             {
@@ -157,6 +166,18 @@ namespace Game.Client
             var ahead = new Vector3(view.Facing.X, view.Facing.Y, 0);
             var head = feet + new Vector3(0, 2.2f, 0);
             if (view.BossState != BossState.Telegraph || attack == null || attack.Shape == AttackShape.Summon) return;
+            // R3, the dive: a V of ripples spreading back from where it swims under (placeholder until its own picture).
+            if (attack.Chases)
+            {
+                if (puff && since >= MoundDive)
+                {
+                    var back = -ahead;
+                    var left = new Vector3(-ahead.y, ahead.x, 0);
+                    Chips(feet + ahead * 0.5f, back + left * 0.7f, FxRamp.Mist, 1, 14, 10);
+                    Chips(feet + ahead * 0.5f, back - left * 0.7f, FxRamp.Mist, 1, 14, 10);
+                }
+                return;
+            }
             float progress = Mathf.Clamp01(since / TelegraphOf(body, attack));
             switch (SerpentArt.WindUpOf(SerpentBlowOf(attack)))
             {
@@ -186,7 +207,7 @@ namespace Game.Client
                 case SerpentPose.Rise:
                     // Spray streaming off it as it rears; before the spout the hall begins to shake.
                     if (puff) Chips(head + (Vector3)(Random.insideUnitCircle * 0.6f), Vector3.down + ahead * 0.2f, FxRamp.Cold, 2, 18, 40);
-                    if (attack.Id == "spray_rain" && Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.03f + 0.08f * progress);
+                    if ((attack.Id == "spray_rain" || attack.Id == "tsunami") && Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.03f + 0.08f * progress);
                     break;
                 case SerpentPose.Flare:
                     // A shimmer over its spread frills.

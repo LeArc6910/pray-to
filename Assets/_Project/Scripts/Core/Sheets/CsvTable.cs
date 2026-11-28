@@ -167,6 +167,13 @@ namespace Game.Core
             throw new FormatException($"{label} '{raw}'는 0 이상의 수가 아닙니다.");
         }
 
+        // A number that may be less than nothing (boss_attacks.csv pull: less than nothing pushes).
+        public static float ParseSignedDecimal(string raw, string label)
+        {
+            if (float.TryParse(raw, NumberStyles.AllowDecimalPoint | NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out float number)) return number;
+            throw new FormatException($"{label} '{raw}'는 수가 아닙니다.");
+        }
+
         public static bool IsValidId(string id) =>
             id.Length > 0 && id.All(c => c < 128 && (char.IsLetterOrDigit(c) || c == '_' || c == '-'));
 

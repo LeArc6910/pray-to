@@ -146,6 +146,9 @@ node DevTools/WebPlaytest/sweep.js --wait <커밋> --only ground
 # 기둥·광맥·결계(R2b, Docs/Bosses.md 기둥·광맥·벽 돌기): 동굴 수호자·그룸 봇 전투(알맞음, 위 명령의 boss-id·장비·레벨만 바꿈: cave_warden 구리 5, vein_eater 미스릴 29)와 웹 점검 구역 props(PC·휴대폰)
 dotnet run --project DevTools/CoreSandbox -- --boss 600 1 --boss-id vein_eater --gear mithril_sword,mithril_armor,mithril_helmet,mithril_boots,mithril_ring,mithril_amulet --classes warrior,fire_mage --reaction 0.5 --level 29 --build
 node DevTools/WebPlaytest/sweep.js --wait <커밋> --only props
+# 끌기·숨기·벽(R3, Docs/Bosses.md 끌기·숨기·벽): 개미귀신(철 12)·물살 뱀(미스릴 22)·아라네(공허 45) 봇 전투(알맞음, 위 명령의 boss-id·장비·레벨만 바꿈, --roll-miss 0.4로 놓치는 봇)와 웹 점검 구역 forces(PC·휴대폰)
+dotnet run --project DevTools/CoreSandbox -- --boss 600 1 --boss-id antlion --gear iron_sword,iron_armor,iron_helmet,iron_boots,iron_ring,iron_amulet --classes warrior,fire_mage --reaction 0.5 --level 12 --build
+node DevTools/WebPlaytest/sweep.js --wait <커밋> --only forces
 ```
 
 ```

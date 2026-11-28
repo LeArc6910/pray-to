@@ -2933,7 +2933,10 @@ namespace Game.Client
                 json.Field("bossAt", awake == null ? null : $"{awake.Position.X - player.Position.X:0.00},{awake.Position.Y - player.Position.Y:0.00}");
                 // Standing in a warning on the floor: the nearest way out of every warning (a share marker is to stand
                 // in), or 0,0 when there is none; null when safe.
-                bool Danger(Vec2 at) => world.Hazards.Any(h => h.Shape != HazardShape.Share && h.Shape != HazardShape.Web && h.Contains(at, World.PlayerRadius));
+                // A pull or push is walked against, green ground is where to be, and a wall of water is a danger where it
+                // will still cross (R3).
+                bool Danger(Vec2 at) => world.Hazards.Any(h => h.Shape != HazardShape.Share && h.Shape != HazardShape.Web && h.Shape != HazardShape.Pull
+                    && h.Shape != HazardShape.Push && !h.Safe && (h.Shape == HazardShape.Wave ? world.WaveStrikes(h, at) : h.Contains(at, World.PlayerRadius)));
                 if (Danger(player.Position))
                 {
                     string way = "0,0";
@@ -3016,6 +3019,17 @@ namespace Game.Client
                 json.Field("shadesShown", root.ShadesShown);
                 json.Field("bossAway", fighting?.Away ?? false);
                 json.Field("bossShots", world.Projectiles.Count(p => !p.Friendly && fighting != null && p.Source == fighting.Id));
+                // R3 (Docs/Bosses.md 끌기·숨기·벽): sand pits (standing and on the ground) and drawn, threads, walls of
+                // water, pulls and pushes laid and drawn, and whether the boss is a mound chasing.
+                json.Field("pits", world.Props.Count(p => p.Kind == PropKind.Pit) + world.Hazards.Count(h => h.Shape == HazardShape.Pit));
+                json.Field("pitsShown", root.PropsShownOf(PropKind.Pit) + root.GroundShown(HazardShape.Pit));
+                json.Field("threads", world.Hazards.Count(h => h.Shape == HazardShape.Tether));
+                json.Field("threadsShown", root.ThreadsShown);
+                json.Field("waves", world.Hazards.Count(h => h.Shape == HazardShape.Wave));
+                json.Field("wavesShown", root.WavesShown);
+                json.Field("drags", world.Hazards.Count(h => h.Shape == HazardShape.Pull || h.Shape == HazardShape.Push));
+                json.Field("dragsShown", root.DragsShown);
+                json.Field("bossChasing", fighting != null && fighting.State == BossState.Telegraph && fighting.Attack != null && fighting.Attack.Chases);
                 json.Field("wading", player.Afflictions.Wading);
                 json.Field("snared", player.Afflictions.Snared);
                 // Ordinary monsters' attacks (monster_attacks.csv, 2026-11-21): those near that fight from the sheet with

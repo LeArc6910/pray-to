@@ -161,6 +161,8 @@ namespace Game.Core
             if (attack.Warning == AttackWarning.Strong || attack.Shape == AttackShape.Counter) return HitKind.Ultimate;
             if (attack.Shape == AttackShape.Burst || attack.Shape == AttackShape.Spiral || attack.Shape == AttackShape.Orbit) return HitKind.Barrage;
             if (attack.Shape == AttackShape.Share) return HitKind.Share;
+            // A chasing mound is marked only for the moment it stops (World.MoundStop, R3): a quick one.
+            if (attack.Chases) return HitKind.Quick;
             if (attack.Shape == AttackShape.Charge && attack.Count >= 2) return HitKind.Combo;
             if (attack.Weight == 0) return HitKind.FollowUp;
             return attack.Telegraph >= HeavyTelegraph ? HitKind.Heavy : attack.Telegraph >= SlowTelegraph ? HitKind.Slow : HitKind.Quick;

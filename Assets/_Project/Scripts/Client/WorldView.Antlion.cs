@@ -14,6 +14,9 @@ namespace Game.Client
         static readonly Color SandColor = new Color(0.86f, 0.68f, 0.42f);
         static readonly Color SandDarkColor = new Color(0.55f, 0.4f, 0.25f);
 
+        // How long a chasing mound's boss takes to go under before the mound runs (R3).
+        const float MoundDive = 0.3f;
+
         // Which blow follows each of its attacks (by the attack's id, boss_attacks.csv; an attack it does not know by
         // name by its shape).
         static AntlionPose AntlionBlowOf(BossAttack attack) => attack.Id switch
@@ -25,7 +28,8 @@ namespace Game.Client
             "quicksand" or "sand_spiral" => AntlionPose.Churn,
             "sandstorm" => AntlionPose.Crash,
             "sand_cross" => AntlionPose.Clap,
-            "sinkholes" => AntlionPose.Erupt,
+            "sinkholes" or "maw" => AntlionPose.Erupt,
+            "drag_bite" => AntlionPose.Snap,
             _ => attack.Shape switch
             {
                 AttackShape.Cone => AntlionPose.Snap,
@@ -96,6 +100,12 @@ namespace Game.Client
                 {
                     (pose, frame) = (AntlionPose.Dive, Through(AntlionPose.Dive, progress));
                 }
+                else if (attack.Chases)
+                {
+                    // R3: under the sand at once, then a mound runs after its target (and sits still once it stops).
+                    if (since < MoundDive) (pose, frame) = (AntlionPose.Dive, Through(AntlionPose.Dive, since / MoundDive));
+                    else (pose, frame) = (AntlionPose.Burrow, moving ? Mathf.FloorToInt(Time.time * 16) % AntlionArt.FramesOf(AntlionPose.Burrow) : 0);
+                }
                 else
                 {
                     var blow = AntlionBlowOf(attack);
@@ -114,10 +124,11 @@ namespace Game.Client
             else if (body.BossState == BossState.Recover && attack != null)
             {
                 // From the strike on (or up out of the sand where a run ends), each frame for its own time.
-                var blow = attack.Shape == AttackShape.Charge ? AntlionPose.Emerge : AntlionBlowOf(attack);
+                bool emerges = attack.Shape == AttackShape.Charge || attack.Chases;
+                var blow = emerges ? AntlionPose.Emerge : AntlionBlowOf(attack);
                 if (attack.Shape != AttackShape.Summon)
                 {
-                    int strike = attack.Shape == AttackShape.Charge ? 0 : AntlionArt.StrikeFrame(blow);
+                    int strike = emerges ? 0 : AntlionArt.StrikeFrame(blow);
                     float left = since;
                     for (int k = strike; k < AntlionArt.FramesOf(blow); k++)
                     {
@@ -163,6 +174,12 @@ namespace Game.Client
             if (puff) body.DustAt = Time.time + 0.1f;
             var feet = body.Position;
             var ahead = new Vector3(view.Facing.X, view.Facing.Y, 0);
+            // R3: the mound running after its target throws sand up off its back.
+            if (view.BossState == BossState.Telegraph && attack != null && attack.Chases)
+            {
+                if (puff && since >= MoundDive) Chips(feet, Vector3.up - ahead * 0.6f, FxRamp.Dust, 2, 12, 60);
+                return;
+            }
             if (view.BossState == BossState.Telegraph && attack != null && attack.Shape != AttackShape.Summon)
             {
                 float progress = Mathf.Clamp01(since / TelegraphOf(body, attack));

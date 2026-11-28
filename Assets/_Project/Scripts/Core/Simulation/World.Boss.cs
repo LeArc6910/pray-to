@@ -179,6 +179,7 @@ namespace Game.Core
             RunRage(boss);
             WorkEdge(boss);
             WorkProps(boss);
+            WorkPits(boss);
 
             switch (boss.State)
             {
@@ -211,6 +212,8 @@ namespace Game.Core
                     }
                     // Eating (R2b), it runs to the vein through its telegraph.
                     if (boss.Attack?.Shape == AttackShape.Eat) RunToVein(boss);
+                    // A mound (R3) comes after its target under the floor, then stops.
+                    if (boss.Attack?.Chases == true) Chase(boss);
                     if (--boss.StateTicks <= 0) Unleash(boss);
                     break;
 
@@ -415,6 +418,8 @@ namespace Game.Core
                 if (boss.PillarTaughtTick == Tick)
                     for (int i = laid; i < _hazards.Count; i++) _hazards[i].Damage = 0;
             }
+            // A pull toward its middle, or a push out of a ring's safe middle, while it winds up (pull column, R3).
+            if (attack.Pull != 0) LayDrag(boss, attack, laid, resolve, cause);
             // Its follow-up (follow column) is marked now too and lands a moment after: one roll does not clear both.
             // Only in the follow-up's own phases (2026-11-28: the rings come from phase 2, so phase 1 lays one pattern).
             bool follows = attack.FollowUp != null && !again && !repeat && attack.FollowUp.InPhase(boss.Phase);
@@ -424,7 +429,7 @@ namespace Game.Core
                 LayHazards(boss, follow, target, fighters, boss.Facing, resolve + Ticks(attack.FollowDelay), Cause(boss, follow));
             }
             if (attack.Shape == AttackShape.Charge) boss.ChargeDirection = boss.Facing;
-            if (attack.GoesAway && attack.Shape != AttackShape.Orbit) boss.LandAt = LandingFor(boss, target.Position);
+            if (attack.GoesAway && attack.Shape != AttackShape.Orbit) boss.LandAt = attack.Chases ? boss.Position : LandingFor(boss, target.Position);
 
             // A later phase sometimes lays another area attack of this phase at once, on someone (else, when there is
             // anyone else), resolving a moment after. Not with a follow-up laid: at most two patterns at once (2026-11-28).
@@ -534,6 +539,7 @@ namespace Game.Core
             {
                 case AttackShape.Circle:
                     var centres = attack.Target == AttackTarget.Self ? new[] { boss.Position }
+                        : attack.Target == AttackTarget.Middle ? new[] { boss.Home }
                         : attack.Target == AttackTarget.Each ? fighters.Select(p => p.Position).ToArray()
                         : new[] { target.Position };
                     foreach (var centre in centres)
@@ -615,6 +621,18 @@ namespace Game.Core
                     // Where it comes out of the wall shakes (World.NextOrbit set it).
                     AddHazard(boss, cause, HazardShape.Circle, boss.LandAt, facing, boss.Definition.Radius + OrbitMark, 0, 0, resolve);
                     break;
+                case AttackShape.Burrow when attack.Chases:
+                    // A mound: marked only once it stops (World.Chase).
+                    break;
+                case AttackShape.Wave:
+                    LayWaves(boss, attack, target, resolve, cause);
+                    break;
+                case AttackShape.Close:
+                    LayClose(boss, attack, resolve, cause);
+                    break;
+                case AttackShape.Half:
+                    LayHalf(boss, attack, resolve, cause);
+                    break;
                 case AttackShape.Burrow:
                 case AttackShape.Leap:
                     // Where it will come down, which is where the boss will stand.
@@ -673,6 +691,9 @@ namespace Game.Core
                     break;
                 case AttackShape.Eat:
                     Eat(boss);
+                    break;
+                case AttackShape.Tether:
+                    LayThreads(boss, attack);
                     break;
                 case AttackShape.Counter:
                     // Answered, it rests as after any blow; left alone, it stands open (CounterOpening).
@@ -924,10 +945,15 @@ namespace Game.Core
                 }
                 if (Tick < hazard.ResolveTick)
                 {
-                    Pending(hazard);
+                    // A wall on its way, a push out of a middle (R3); the rest as before.
+                    if (hazard.Shape == HazardShape.Wave) WorkWave(hazard);
+                    else if (hazard.Shape == HazardShape.Push) Pushes(hazard);
+                    else Pending(hazard);
                     if (Tick < hazard.ResolveTick) continue;
                 }
                 _hazards.RemoveAt(i);
+                // A wall has struck on its way and is gone at its end.
+                if (hazard.Shape == HazardShape.Wave) continue;
                 LeavePool(hazard);
                 LeaveMonsterPool(hazard);
                 if (hazard.Plucks != 0) (plucked ??= new List<int>()).Add(hazard.Plucks);
@@ -968,6 +994,11 @@ namespace Game.Core
         // A web snares whoever is in it; venom hurts whoever stands in it, every VenomSeconds from when it fell.
         void Linger(Hazard pool)
         {
+            if (pool.Shape == HazardShape.Tether)
+            {
+                WorkThread(pool);
+                return;
+            }
             if (pool.IsGround)
             {
                 LingerGround(pool);

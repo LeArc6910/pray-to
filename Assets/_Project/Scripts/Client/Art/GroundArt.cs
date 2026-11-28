@@ -113,6 +113,7 @@ namespace Game.Client
                         case HazardShape.Lava: image[x, y] = Lava(x, y, inside, 300 + variant, frame); break;
                         case HazardShape.Rock: image[x, y] = Rock(x, y, inside, d, 320 + variant, frame); break;
                         case HazardShape.Water: image[x, y] = Water(x, y, inside, 340 + variant, frame); break;
+                        case HazardShape.Pit: image[x, y] = Pit(x - cx, y - cy, d, frame); break;
                         default:
                             image[x, y] = strip ? CrackStrip(x, y, width, height, d, 360 + variant, frame)
                                 : CrackPool(x - cx, y - cy, half, d, x, y, 360 + variant, frame);
@@ -120,6 +121,21 @@ namespace Game.Client
                     }
                 }
             return image;
+        }
+
+        // R3 (placeholder until its pixel art): a sand funnel, pale at its rim and dark at its throat, with a swirl of
+        // grains running in.
+        static readonly Rgba PitRim = new Rgba(222, 186, 126, 255), PitSand = new Rgba(196, 156, 98, 255),
+            PitShade = new Rgba(150, 110, 64, 255), PitThroat = new Rgba(70, 48, 30, 255);
+
+        static Rgba Pit(float dx, float dy, float d, int frame)
+        {
+            double angle = Math.Atan2(dy, dx);
+            float swirl = (float)Math.Sin(angle * 3 + d * 9 - frame * Math.PI / 2);
+            if (d < 0.18f) return PitThroat;
+            if (d > 0.9f) return PitRim;
+            var tone = d < 0.45f ? PitShade : PitSand;
+            return swirl > 0.75f ? (d < 0.45f ? PitThroat : PitShade) : tone;
         }
 
         static float Wobble(int x, int variant) => (float)Math.Sin(x * 0.7f + variant) * 0.5f + (float)Math.Sin(x * 1.9f + variant * 3) * 0.5f;
@@ -311,6 +327,13 @@ namespace Game.Client
                             + 0.6f * (float)Math.Sin(angle * 6 + lap * Math.PI / 2);
                         float inside = Math.Min(r - bank, outer - r + 1.5f);
                         if (inside > 0) image[x, y] = Lava(x, y, inside, 500, lap);
+                        continue;
+                    }
+                    if (kind == EdgeKind.Water)
+                    {
+                        float shore = floor + 1.2f * (float)Math.Sin(angle * 7 + lap * Math.PI / 2) + 0.7f * (float)Math.Sin(angle * 19 + 1);
+                        float wet = Math.Min(r - shore, outer - r + 1.5f);
+                        if (wet > 0) image[x, y] = Water(x, y, wet, 540, lap);
                         continue;
                     }
                     var pixel = kind == EdgeKind.Petal ? Petal(x, y, r, angle, floor, outer, lap) : Web(r, angle, floor, outer, lap);

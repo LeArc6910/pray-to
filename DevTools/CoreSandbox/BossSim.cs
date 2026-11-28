@@ -177,6 +177,9 @@ namespace CoreSandbox
                 // A boss's ground (R2): water and cooled rock harm no one; a blast that spares rock is no danger on it,
                 // and off it the bot heads for the nearest rock.
                 if (hazard.Shape == HazardShape.Water || hazard.Shape == HazardShape.Rock) continue;
+                // Green ground is where to be; a pull or push is walked against by getting out of what it is for (R3);
+                // a wall of water is read apart (below).
+                if (hazard.Safe || hazard.Shape == HazardShape.Pull || hazard.Shape == HazardShape.Push || hazard.Shape == HazardShape.Wave) continue;
                 if (!hazard.Contains(player.Position, World.PlayerRadius + 0.3f)) continue;
                 // A blast that spares the shaded (R2b): behind the nearest pillar from the boss.
                 if (hazard.Shades)
@@ -239,6 +242,15 @@ namespace CoreSandbox
                 away += side * (across >= 0 ? 1 : -1);
             }
             if (beams >= 2 && away.Length < 1.2f) away = outOfStar;
+            // A wall of water that will cross where the bot stands (R3): into its gap, or ahead of a closing wall to the
+            // middle it leaves.
+            foreach (var wave in world.Hazards.Where(h => h.Shape == HazardShape.Wave))
+            {
+                if (world.Tick + World.Ticks(1.5f) < wave.StartTick - reactionTicks || !world.WaveStrikes(wave, player.Position)) continue;
+                var side = new Vec2(-wave.Direction.Y, wave.Direction.X);
+                float across = Vec2.Dot(player.Position - wave.Position, side);
+                away += wave.Width > 0 ? side * (across > 0 ? -2 : 2) : wave.Direction * 2;
+            }
             // Out of a boss's edge that bites, back toward its middle.
             var edged = world.Bosses.FirstOrDefault(b => !b.IsDead && World.InEdge(b, player.Position));
             if (edged != null && world.BadGround(player.Position)) away += (edged.Home - player.Position).Normalized * 2;
@@ -249,7 +261,7 @@ namespace CoreSandbox
         // that does not (or stand still).
         static Vec2 RoundGround(World world, Player player, Vec2 way)
         {
-            bool Bad(Vec2 at) => world.BadGround(at) || world.Hazards.Any(h => (h.Shape == HazardShape.Lava || h.Shape == HazardShape.Crack) && h.Damage > 0
+            bool Bad(Vec2 at) => world.BadGround(at) || world.Hazards.Any(h => (h.Shape == HazardShape.Lava || h.Shape == HazardShape.Crack || h.Shape == HazardShape.Pit) && h.Damage > 0
                 && h.Contains(at, World.PlayerRadius) && !(h.Shape == HazardShape.Lava && world.OnRock(h.Source, at)));
             if (Bad(player.Position)) return way;
             foreach (float turn in new[] { 0f, 45, -45, 90, -90 })

@@ -801,9 +801,9 @@ namespace Game.Client.Tests
             yield return new WaitForSecondsRealtime(0.45f);
             yield return Screens.Take("antlion-bite-windup");
             yield return new WaitForSecondsRealtime(2.5f);
-            Assert.IsTrue(World.ForceAttack(boss, "sinkholes"));
+            Assert.IsTrue(World.ForceAttack(boss, "maw"));
             yield return new WaitForSecondsRealtime(1.0f);
-            yield return Screens.Take("antlion-sinkholes-windup");
+            yield return Screens.Take("antlion-maw-windup");
             Assert.IsTrue(_root.Playing);
         }
 
@@ -863,9 +863,9 @@ namespace Game.Client.Tests
             yield return new WaitForSecondsRealtime(0.5f);
             yield return Screens.Take("serpent-jet-windup");
             yield return new WaitForSecondsRealtime(2.5f);
-            Assert.IsTrue(World.ForceAttack(boss, "spray_rain"));
+            Assert.IsTrue(World.ForceAttack(boss, "tsunami"));
             yield return new WaitForSecondsRealtime(1.0f);
-            yield return Screens.Take("serpent-spray-windup");
+            yield return Screens.Take("serpent-tsunami-windup");
             Assert.IsTrue(_root.Playing);
         }
 
@@ -1247,7 +1247,7 @@ namespace Game.Client.Tests
             Feel.SkillFxHold = 0.14f;
             Lay("lava_titan", "slam", HazardShape.Circle, -6, 2.8f, 2, 0);
             Lay("void_lord", "star_fall", HazardShape.Circle, -1, 3, 1.8f, 0);
-            Lay("tide_serpent", "spray_rain", HazardShape.Circle, 3.5f, 3, 1.6f, 0);
+            Lay("tide_serpent", "dive", HazardShape.Circle, 3.5f, 3, 1.6f, 0);
             Lay("crown_wraith", "grasp", HazardShape.Cone, -6, -3.2f, 3.2f, 80);
             Lay("crown_wraith", "lightning_fall", HazardShape.Circle, 2, -3.2f, 1.5f, 0);
             view.EndStagedWarnings(land: true);

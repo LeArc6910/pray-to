@@ -1336,9 +1336,12 @@ namespace Game.Client
             // With them, the marks of monsters' attacks that start at the monster, made here from the sheet
             // (WorldView.MonsterFx.cs): those are not sent.
             GroupPools(_client.Hazards().Concat(_stagedMarks));
+            // Pulls, pushes, threads and walls of water (R3) are drawn as themselves (WorldView.Forces.cs).
+            DrawForces(_client.Hazards());
             foreach (var view in _client.Hazards().Concat(_attachedMarks).Concat(_stagedMarks))
             {
                 var hazard = view.State;
+                if (IsForce(hazard)) continue;
                 _seen.Add(hazard.Id);
                 // An ordinary monster's mark is the same picture, fainter inside, with its own pieces over it (a web or
                 // venom it left is drawn as a boss's is).

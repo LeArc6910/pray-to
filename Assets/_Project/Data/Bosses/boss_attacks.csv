@@ -1,4 +1,4 @@
-boss,id,name,phases,shape,target,telegraph,damage,radius,length,angle,width,count,spread,speed,cooldown,weight,summon,warn,pool,follow,boost
+boss,id,name,phases,shape,target,telegraph,damage,radius,length,angle,width,count,spread,speed,cooldown,weight,summon,warn,pool,follow,boost,pull
 cave_warden,slam,내려찍기,,circle,nearest,1.0,184,2.0,,,,1,,,1.0,30,,,,,2:repeat=1;3:repeat=2
 cave_warden,sweep,휩쓸기,,cone,nearest,0.9,161,,3.5,100,,,,,0.8,25,,,,,3:repeat=1
 cave_warden,rock_burst,돌 파편,,burst,self,0.6,51,0.3,,,,10,,7,1.0,20,,,,,2:count=14;3:count=18 repeat=1
@@ -47,28 +47,25 @@ void_lord,void_lance,공허 창,2|3,line,farthest,1.0,563,,13,,1.6,,,,1.0,16,,,,
 void_lord,black_holes,검은 구멍,3,circle,each,1.4,462,1.6,,,,3,2.6,,1.1,16,,strong,,,
 void_lord,void_ripple,공허 파문,2|3,ring,nearest,0.5,243,1.2,7.5,,,,,,0.9,0,,,,,
 tide_serpent,tail_sweep,꼬리 휩쓸기,,cone,nearest,0.6,409,,3.6,120,,,,,0.8,25,,,,whirlpool:0.5,2:repeat=1;3:repeat=1
-tide_serpent,water_jet,물줄기,,line,nearest,0.7,409,,12,,1.4,,,,1.0,20,,,,undertow:0.5,3:repeat=2
-tide_serpent,bubble_burst,물방울,1|2,burst,self,0.5,114,0.3,,,,12,,7,0.9,20,,,,,2:count=16
-tide_serpent,tidal_trail,밀물,,trail,farthest,0.7,354,1.2,9,,,5,,9,0.9,18,,,,undertow:0.5,3:count=7 length=11
-tide_serpent,whirlpool,소용돌이,2|3,ring,self,1.0,354,2.4,6.5,,,,,,1.0,18,,,,,
-tide_serpent,deep_share,수압,2|3,share,random,1.1,666,1.8,,,,,,,1.0,14,,,,,
-tide_serpent,bubble_spiral,물방울 나선,3,spiral,self,0.5,114,0.3,,22,5,6,,7,1.3,15,,,,,
+tide_serpent,water_jet,물줄기,,line,nearest,0.7,409,,12,,1.4,,,,1.0,20,,,,,3:repeat=2
+tide_serpent,bubble_burst,물방울,1|2,circle,each,0.8,409,0.8,,,,3,2.6,,0.9,20,,,water:4,,2:count=4
+tide_serpent,tidal_trail,밀물,,trail,farthest,0.7,354,1.2,9,,,5,,9,0.9,18,,,,,3:count=7 length=11
+tide_serpent,whirlpool,소용돌이,2|3,ring,self,1.0,354,2.4,6.5,,,,,,1.0,18,,,,,,-1.5
+tide_serpent,dive,잠수 덮치기,,burrow,nearest,2.0,409,1.6,4.5,,,,,8,1.2,20,,,,,2:repeat=1;3:repeat=2 count=10
+tide_serpent,wave,파도,2|3,wave,nearest,1.0,409,,,,1.5,1,,6,1.0,20,,,,,3:count=2 spread=1.2
+tide_serpent,squeeze,조이는 물살,3,close,self,1.0,409,,,,1.5,,,4,1.1,16,,,,,
 tide_serpent,call_crabs,게 부르기,3,summon,self,0.8,,,,,,3,3,,1.0,10,lake_crab,,,,
-tide_serpent,tidal_cross,물살 십자,2|3,cross,self,1.0,375,,9,45,1.5,,,,1.0,16,,,,,
-tide_serpent,spray_rain,물보라,3,circle,each,1.4,326,1.4,,,,3,2.6,,1.1,16,,strong,,,
-tide_serpent,undertow,역류,2|3,ring,nearest,0.5,171,1.2,7,,,,,,0.9,0,,,,,
-antlion,bite,물어뜯기,,cone,nearest,0.6,250,,3.2,90,,,,,0.8,25,,,,sand_ripple:0.5,3:repeat=1
-antlion,sand_jet,모래 분사,,line,nearest,0.7,250,,10,,1.4,,,,1.0,20,,,,sand_ripple:0.5,3:repeat=1
-antlion,pit,개미지옥,,circle,farthest,0.9,277,2.2,,,,1,,,1.0,20,,,,,3:count=2 spread=2.5
+tide_serpent,tsunami,해일,3,half,nearest,1.6,326,,,,,,,,1.1,16,,strong,,,
+antlion,bite,물어뜯기,,cone,nearest,0.6,250,,3.2,90,,,,,0.8,25,,,,,3:repeat=1
+antlion,sand_jet,모래 분사,,line,nearest,0.7,250,,10,,1.4,,,,1.0,20,,,,,3:repeat=1
+antlion,pit,개미지옥,,circle,farthest,0.9,277,2.2,,,,1,,,1.0,20,,,pit:6,,2:linger=10;3:count=2 spread=2.5 linger=10
 antlion,sand_trail,모래 물결,,trail,nearest,0.6,244,1.1,8,,,5,,8,0.9,18,,,,,3:count=7 length=10
-antlion,burrow,파고들기,1|2,charge,farthest,0.8,281,,10,,2.4,,,16,1.2,20,,,,,2:count=2
-antlion,quicksand,모래늪,2|3,ring,self,1.0,250,2.4,6,,,,,,1.0,18,,,,,
-antlion,sandstorm,모래 폭풍,2|3,share,random,1.1,458,1.8,,,,,,,1.0,12,,,,,
+antlion,mound,둔덕 습격,,burrow,nearest,2.0,250,1.6,4.5,,,,,8,1.2,20,,,,,2:repeat=1;3:repeat=2 count=8
+antlion,drag_bite,끌고 물기,2|3,cone,nearest,0.8,250,,3.6,100,,,,,1.0,20,,,,,3:pull*1.5,2
+antlion,quicksand,모래늪,2|3,ring,self,1.0,250,2.4,6,,,,,,1.0,18,,,,,,-1.5
 antlion,sand_spiral,모래 나선,3,spiral,self,0.5,79,0.3,,22,5,6,,7,1.3,14,,,,,
 antlion,call_scorpions,전갈 부르기,3,summon,self,0.8,,,,,,3,3,,1.0,10,sand_scorpion,,,,
-antlion,sand_cross,모래 십자,2|3,cross,nearest,0.9,277,,8,0,1.3,,,,1.0,16,,,,,
-antlion,sinkholes,함몰,3,circle,each,1.4,224,1.5,,,,3,2.6,,1.1,16,,strong,,,
-antlion,sand_ripple,모래 파문,2|3,ring,nearest,0.5,118,1.2,7,,,,,,0.9,0,,,,,
+antlion,maw,개미지옥의 입,3,circle,middle,1.6,224,4,,,,1,,,1.1,16,,strong,,,,2.4
 mad_general,cleave,베어 가르기,,cone,nearest,0.8,285,,3.4,110,,,,,0.8,30,,,,ember_wake:0.5,2:repeat=1;3:repeat=2
 mad_general,hellfire,불길 호령,,circle,random,1.2,418,1.5,,,,4,4,,1.0,25,,,,,3:count=6
 mad_general,dark_cross,유령 창진,2|3,cross,nearest,1.0,262,,9,45,1.2,,,,0.9,18,,,,ember_wake:0.5,
@@ -126,6 +123,7 @@ silk_mother,web_shot,거미줄 뿜기,,circle,random,0.9,688,1.9,,,,3,3.2,,0.9,2
 silk_mother,pounce,덮치기,1|2,charge,farthest,0.8,799,,10,,2.4,,,22,1.1,18,,,,,2:count=2
 silk_mother,venom_spit,독액 뿜기,2|3,burst,nearest,0.8,223,0.45,,48,,4,,10,0.9,20,,,,,3:repeat=1
 silk_mother,venom_pool,독 웅덩이,2|3,circle,each,1.1,688,1.5,,,,2,2.4,,1.0,18,,,venom:5,silk_ripple:0.5,3:count=3
+silk_mother,thread,실 잇기,2|3,tether,nearest,0.9,745,,,,,1,8,,1.0,14,,,,,3:count=2
 silk_mother,thread_drop,실 타고 내려찍기,2|3,leap,nearest,1.8,637,2.8,,,,8,,7,1.5,14,,strong,web:6,silk_net:0.6,3:repeat=1 again=0.9
 silk_mother,brood,알주머니 터뜨리기,3,summon,self,1.0,,,,,,4,3,,1.0,10,silk_spiderling,,,,3:count=5
 silk_mother,eight_legs,여덟 다리 내려찍기,3,cross,self,2.0,637,2.2,8.5,22.5,1.3,2,,,1.6,14,,strong,,,

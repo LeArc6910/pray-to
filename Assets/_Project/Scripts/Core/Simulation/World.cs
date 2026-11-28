@@ -417,6 +417,8 @@ namespace Game.Core
             }
             // A boss's vein in the swing breaks a little (R2b).
             if (SwingProps(player, reach, arc, () => RollDamage(stats, out _) * more)) hit = true;
+            // A boss's thread in the swing is cut once (R3).
+            if (SwingThreads(player, reach, arc)) hit = true;
             return hit;
         }
 

@@ -39,7 +39,7 @@ namespace Game.Client
             : Sprites.Get($"fx/prop/{kind}/{frame}", () => GroundArt.Prop(kind, frame), new Vector2(0.5f, GroundArt.PropPivot(kind)));
 
         static bool IsGround(HazardState hazard) => hazard.Shape == HazardShape.Lava || hazard.Shape == HazardShape.Water
-            || hazard.Shape == HazardShape.Crack || hazard.Shape == HazardShape.Rock;
+            || hazard.Shape == HazardShape.Crack || hazard.Shape == HazardShape.Rock || hazard.Shape == HazardShape.Pit;
 
         // Ground on the floor now, for the playtests (each kind).
         public int GroundShown(HazardShape shape) => _marks.Values.Count(m => m.State.Shape == shape);
@@ -98,6 +98,12 @@ namespace Game.Client
                     float set = Mathf.Clamp01(age / 0.6f);
                     mark.Edge.color = new Color(1, 1, 1, fade);
                     mark.Fill.color = new Color(GroundLavaColor.r, GroundLavaColor.g, GroundLavaColor.b, (1 - set) * 0.25f * fade);
+                    break;
+                case HazardShape.Pit:
+                    // A sand pit (R3): its funnel turns slowly; the first of a fight (harmless) is dimmer.
+                    mark.Edge.color = new Color(1, 1, 1, fade * (hazard.Harmful ? 1 : 0.7f));
+                    mark.Edge.transform.localRotation = Quaternion.Euler(0, 0, -Time.time * 25);
+                    mark.Fill.color = new Color(SandDarkColor.r, SandDarkColor.g, SandDarkColor.b, fade * 0.15f);
                     break;
                 case HazardShape.Water:
                     mark.Edge.color = new Color(1, 1, 1, fade * 0.9f);
@@ -222,6 +228,12 @@ namespace Game.Client
             foreach (var prop in _client.Props())
             {
                 _propsSeen.Add(prop.Id);
+                // A sand pit (R3) lies in the floor as a pit of ground does, as wide as it is.
+                if (prop.Kind == PropKind.Pit)
+                {
+                    DrawPitProp(prop);
+                    continue;
+                }
                 if (!_propSprites.TryGetValue(prop.Id, out var sprite))
                 {
                     sprite = Renderer(_root.transform, "Prop", PropSprite(prop.Kind, 0), Color.white);
@@ -268,6 +280,25 @@ namespace Game.Client
                 }
                 _propsKnown.Remove(id);
             }
+        }
+
+        // A standing sand pit: the ground picture of a pit its size, turning slowly, under everyone.
+        void DrawPitProp(PropState prop)
+        {
+            if (!_propSprites.TryGetValue(prop.Id, out var sprite))
+            {
+                sprite = Renderer(_root.transform, "Pit", GroundSprite(HazardShape.Pit, false, prop.Radius * 2, prop.Radius * 2, prop.Id, 0), Color.white);
+                sprite.sortingOrder = 31;
+                _propSprites[prop.Id] = sprite;
+                _propsKnown[prop.Id] = (Time.time, prop.Kind, prop.Position, prop.Health, -1);
+                Impact(new Vector3(prop.Position.X, prop.Position.Y, 0), 0.8f);
+            }
+            int frame = Mathf.FloorToInt(Time.time * 4 + prop.Id) % GroundArt.Frames;
+            sprite.sprite = GroundSprite(HazardShape.Pit, false, prop.Radius * 2, prop.Radius * 2, prop.Id, frame);
+            sprite.transform.localPosition = new Vector3(prop.Position.X, prop.Position.Y, 0);
+            sprite.transform.localRotation = Quaternion.Euler(0, 0, -Time.time * 20);
+            float grown = Mathf.Clamp01((Time.time - _propsKnown[prop.Id].Born) / 0.6f);
+            sprite.transform.localScale = Vector3.one * (0.3f + 0.7f * grown);
         }
 
         // ---- The cave warden's core overload (AttackShape.Cover, R2b): the shadow behind each pillar is marked on the

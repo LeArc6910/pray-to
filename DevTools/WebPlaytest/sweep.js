@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu title testground hunt harvest zones towns time basics first firstphone hour bag combat hero roll weapons arts bosses patterns tempo ground props veineater samurai knight warden antlion serpent titan voidlord wraith queen general spider arenas world farm life npc factory defense gear skills skillfx layers monsterfx hazards bossfx hits shots blast mobwarn map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
+// Sections: menu title testground hunt harvest zones towns time basics first firstphone hour bag combat hero roll weapons arts bosses patterns tempo ground props forces veineater samurai knight warden antlion serpent titan voidlord wraith queen general spider arenas world farm life npc factory defense gear skills skillfx layers monsterfx hazards bossfx hits shots blast mobwarn map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -1353,12 +1353,10 @@ async function antlion(browser) {
     ['sand_jet', '모래 분사(머리를 모래에 묻음)', 0.7, false, true],
     ['pit', '개미지옥(몸을 흔들며 모래를 긁음)', 0.9, false, true],
     ['sand_trail', '모래 물결(머리를 낮게 앞으로)', 0.6, false, true],
-    ['burrow', '파고들기(땅속으로)', 0.8, false, true],
+    ['mound', '둔덕 습격(땅속으로, 둔덕이 쫓아옴)', 2.0, false, false],
     ['quicksand', '모래늪(반쯤 가라앉음)', 1.0, false, true],
-    ['sandstorm', '모래 폭풍(일어섬)', 1.1, false, true],
-    ['sand_cross', '모래 십자(턱을 양옆으로)', 0.9, false, true],
     ['sand_spiral', '모래 나선(가라앉아 돈다)', 0.5, false, false],
-    ['sinkholes', '함몰(필살기, 경고)', 1.4, true, true],
+    ['maw', '개미지옥의 입(필살기, 경고)', 1.6, true, true],
   ];
   for (const [attack, name, telegraph, strong, marked] of uses) {
     await game.send('heal; clear');
@@ -1371,10 +1369,7 @@ async function antlion(browser) {
     await game.shot(`antlion-${attack}`, `${name} 전조`);
     await game.wait(Math.round(telegraph * 300) + 160);
     await game.shot(`antlion-${attack}-hit`, `${name} 떨어진 순간`);
-    if (attack === 'burrow') {
-      await game.wait(250);
-      await game.shot('antlion-burrow-run', '파고들기: 모래 둔덕이 바닥을 달린다');
-    }
+
   }
   await game.send('heal; clear; boss antlion hurt 0.36');
   await game.wait(800);
@@ -1413,13 +1408,11 @@ async function serpent(browser) {
   const uses = [
     ['tail_sweep', '꼬리 휩쓸기(머리를 낮게 젖히고 똬리를 감음)', 0.6, false, true],
     ['water_jet', '물줄기(머리를 젖히고 목이 부풂)', 0.7, false, true],
-    ['bubble_burst', '물방울(온몸이 부풂)', 0.5, false, false],
+    ['bubble_burst', '물방울(온몸이 부풂)', 0.8, false, true],
     ['tidal_trail', '밀물(머리를 바닥에 박음)', 0.7, false, true],
     ['whirlpool', '소용돌이(똬리를 감으며 가라앉음)', 1.0, false, true],
-    ['deep_share', '수압(높이 솟음)', 1.1, false, true],
-    ['tidal_cross', '물살 십자(볏을 펼침)', 1.0, false, true],
-    ['bubble_spiral', '물방울 나선(부풀어 돈다)', 0.5, false, false],
-    ['spray_rain', '물보라(필살기, 경고, 가장 높이 솟음)', 1.4, true, true],
+    ['dive', '잠수 덮치기(물속으로, 물결이 쫓아옴)', 2.0, false, false],
+    ['tsunami', '해일(필살기, 경고, 고개를 든 쪽)', 1.6, true, true],
   ];
   for (const [attack, name, telegraph, strong, marked] of uses) {
     await game.send('heal; clear');
@@ -1814,6 +1807,134 @@ async function props(browser) {
       s = await game.state();
       check(Math.abs(s.floor - 8) < 0.01 && s.edgeShown, `아라네 3페이즈: 거미줄 커튼, 남은 바닥 8 (${s.floor}, 그림 ${s.edgeShown})`);
       await game.shot('props-web', '아라네 3페이즈: 가장자리 2칸 거미줄 커튼');
+    }
+    await game.context.close();
+  }
+}
+
+// ---------------------------------------------------------------- 끌기·숨기·벽 (R3, 2026-11-28, Docs/Bosses.md)
+// The antlion's sand pits (thrown, harmless the first time; the big one in the middle from phase 2, three small ones
+// round it in phase 3), its mound that chases and stops before it bursts up, the drag before its bite, the quicksand
+// that pushes out of the safe middle, the maw that draws the whole arena in; the tide serpent's wave with its gap (green
+// while it winds up, then the wall running), its dive (ripples chasing), the water edge, the walls that close in and the
+// tidal wave; the silk mother's thread. Every warning is pictured while it is still coming (R2b: a picture 0.9 s on
+// was after the blow).
+async function forces(browser) {
+  for (const profile of [Profiles.pc, Profiles.phone]) {
+    const pc = profile === Profiles.pc;
+    note(`\n## 끌기·숨기·벽 (${pc ? 'PC' : '휴대폰'})\n`);
+    const game = await open(browser, run, profile, url);
+    await game.startSolo();
+    await game.wait(1200);
+    await game.send('xp 2000000; equip void_sword void_helmet void_armor void_boots; heal');
+    await game.send('heal; goto boss antlion');
+    await game.until(t => has(t.banner, '개미귀신') || has(t.entrance, '개미귀신'), 8000, game.texts);
+    await game.wait(4500);
+    let s;
+    if (pc) {
+      await game.send('heal; clear; boss antlion use pit');
+      await game.wait(1300);
+      s = await game.state();
+      check(s.pits >= 1 && s.pitsShown >= 1, `개미지옥: 모래 구덩이가 남는다 (구덩이 ${s.pits}, 그림 ${s.pitsShown})`);
+      await game.shot('forces-pit', '개미지옥: 남은 모래 구덩이(첫 번은 피해 없음, 가운데로 끌림)');
+      await game.send('heal; clear; boss antlion use mound');
+      await game.wait(600);
+      s = await game.state();
+      check(s.bossChasing && s.bossAway, `둔덕 습격: 땅속에서 쫓아온다 (쫓음 ${s.bossChasing}, 숨음 ${s.bossAway})`);
+      await game.shot('forces-mound-run', '둔덕 습격: 모래 둔덕이 쫓아온다');
+      // It stops 0.8 s before it bursts (a 2 s wind-up): look in the stop, before the burst.
+      await game.wait(850);
+      s = await game.state();
+      check((s.marksShown || 0) > 0, `둔덕이 멈춘 자리에 표시 (표시 ${s.marksShown})`);
+      await game.shot('forces-mound-stop', '둔덕이 멈춘 자리: 0.8초 뒤 솟는다');
+      await game.wait(1500);
+    }
+    await game.send('heal; clear; boss antlion hurt 0.36');
+    await game.until(t => t.bossPhase === 2, 4000);
+    await game.wait(2500);
+    s = await game.state();
+    check(s.pits >= 1 && s.pitsShown >= 1, `2페이즈: 가운데 큰 개미지옥 (구덩이 ${s.pits}, 그림 ${s.pitsShown})`);
+    await game.shot(pc ? 'forces-bigpit' : 'forces-bigpit-phone', '2페이즈: 가운데 큰 개미지옥');
+    await game.send('heal; boss antlion use drag_bite');
+    await game.wait(350);
+    s = await game.state();
+    check(s.drags >= 1 && s.dragsShown >= 1, `끌고 물기: 끌어당기는 동안 모래가 흐른다 (끌림 ${s.drags}, 그림 ${s.dragsShown})`);
+    await game.shot(pc ? 'forces-drag' : 'forces-drag-phone', '끌고 물기: 보스 쪽으로 끌린다(옆으로 걸어 피한다)');
+    if (pc) {
+      await game.wait(1500);
+      await game.send('heal; clear; boss antlion use quicksand');
+      await game.wait(400);
+      s = await game.state();
+      check(s.drags >= 1, `모래늪: 안전한 가운데에서 바깥으로 밀어낸다 (밀림 ${s.drags})`);
+      await game.shot('forces-quicksand', '모래늪: 고리 안이 안전, 바깥으로 밀어낸다');
+      await game.wait(1500);
+      await game.send('heal; clear; boss antlion hurt 0.33');
+      await game.until(t => t.bossPhase === 3, 4000);
+      await game.wait(2500);
+      s = await game.state();
+      check(s.pits >= 4, `3페이즈: 둘레에 작은 구덩이 셋 (구덩이 ${s.pits}, 그림 ${s.pitsShown})`);
+      await game.shot('forces-pits3', '3페이즈: 큰 구덩이와 작은 구덩이 셋');
+      await game.send('heal; clear; boss antlion use maw');
+      await game.wait(550);
+      s = await game.state();
+      check(s.warningSign && s.drags >= 1, `개미지옥의 입: 경고 표지와 아레나 전체 끌림 (표지 ${s.warningSign}, 끌림 ${s.drags})`);
+      await game.shot('forces-maw', '필살 「개미지옥의 입」: 처음부터 바깥으로 달린다');
+      await game.wait(2000);
+    }
+
+    await game.send('heal; clear; goto boss tide_serpent');
+    await game.until(t => has(t.banner, '물살 뱀') || has(t.entrance, '물살 뱀'), 8000, game.texts);
+    await game.wait(4500);
+    await game.send('heal; clear; boss tide_serpent hurt 0.36');
+    await game.until(t => t.bossPhase === 2, 4000);
+    await game.wait(2500);
+    await game.send('heal; clear; boss tide_serpent use wave');
+    await game.wait(450);
+    s = await game.state();
+    check(s.waves >= 1 && s.wavesShown >= 1 && s.shadesShown >= 1, `파도: 벽이 서고 틈이 초록으로 (벽 ${s.waves}, 그림 ${s.wavesShown}, 틈 ${s.shadesShown})`);
+    await game.shot(pc ? 'forces-wave-gap' : 'forces-wave-gap-phone', '파도: 시작할 자리와 초록 틈');
+    if (pc) {
+      await game.wait(1200);
+      await game.shot('forces-wave-run', '파도: 벽이 아레나를 가로지른다');
+      await game.wait(3000);
+      await game.send('heal; clear; boss tide_serpent use dive');
+      await game.wait(700);
+      s = await game.state();
+      check(s.bossChasing, `잠수 덮치기: 물속에서 쫓아온다 (${s.bossChasing})`);
+      await game.shot('forces-dive', '잠수 덮치기: 물결이 쫓아온다');
+      await game.wait(2500);
+      await game.send('heal; clear; boss tide_serpent hurt 0.33');
+      await game.until(t => t.bossPhase === 3, 4000);
+      await game.wait(3500);
+      s = await game.state();
+      check(Math.abs(s.floor - 8) < 0.01 && s.edgeShown, `3페이즈: 가장자리 2칸 얕은 물, 남은 바닥 8 (${s.floor}, 그림 ${s.edgeShown})`);
+      await game.shot('forces-water-edge', '3페이즈: 가장자리 얕은 물');
+      await game.send('heal; clear; boss tide_serpent use squeeze');
+      await game.wait(450);
+      s = await game.state();
+      check(s.waves === 2 && s.shadesShown >= 1, `조이는 물살: 양옆의 벽 둘, 가운데 초록 (벽 ${s.waves}, 초록 ${s.shadesShown})`);
+      await game.shot('forces-squeeze', '조이는 물살: 가운데 틈만 남는다');
+      await game.wait(1300);
+      await game.shot('forces-squeeze-run', '조이는 물살: 양옆에서 좁혀 온다');
+      await game.wait(2500);
+      await game.send('heal; clear; boss tide_serpent use tsunami');
+      await game.wait(550);
+      s = await game.state();
+      check(s.warningSign, `해일: 경고 표지 (${s.warningSign})`);
+      await game.shot('forces-tsunami', '필살 「해일」: 고개를 든 쪽 반이 덮인다');
+      await game.wait(2000);
+
+      await game.send('heal; clear; goto boss silk_mother');
+      await game.until(t => has(t.banner, '아라네') || has(t.entrance, '아라네'), 8000, game.texts);
+      await game.wait(4500);
+      await game.send('heal; clear; boss silk_mother hurt 0.36');
+      await game.until(t => t.bossPhase === 2, 4000);
+      await game.wait(2500);
+      await game.send('heal; clear; boss silk_mother use thread');
+      await game.wait(1200);
+      s = await game.state();
+      check(s.threads >= 1 && s.threadsShown >= 1, `실 잇기: 실이 보스와 이어진다 (실 ${s.threads}, 그림 ${s.threadsShown})`);
+      await game.shot('forces-thread', '실 잇기: 6칸보다 멀어지면 끌려간다, 세 대 베면 끊긴다');
     }
     await game.context.close();
   }
@@ -3586,14 +3707,14 @@ const BossBlows = {
     'ring 6 1 3.6 1.2 0 F mad_general ember_wake', 'line -8 -3.6 9 1.2 0 F mad_general dark_cross'],
   stone: ['circle -6 2.6 2.5 0 0 F cave_warden slam', 'cone -1.5 1.6 4 120 30 F cave_warden sweep', 'circle 6.6 3.2 1.6 0 0 F cave_warden meteor',
     'ring 5 -2 3.6 1.6 0 F cave_warden shockwave', 'circle -7 -3.4 1.1 0 0 F cave_warden rock_trail', 'circle -3.6 -3.4 1.1 0 0 F cave_warden rock_trail'],
-  antlion: ['cone -8 2.6 3.2 90 0 F antlion bite', 'circle -2.2 3 2.2 0 0 F antlion pit', 'share 3 3.2 1.8 0 0 F antlion sandstorm',
+  antlion: ['cone -8 2.6 3.2 90 0 F antlion bite', 'circle -2.2 3 2.2 0 0 F antlion pit', 'circle 3 3.2 1.6 0 0 F antlion mound',
     'circle 7 3.2 1.1 0 0 F antlion sand_trail', 'line -8 -3.4 8 1.4 0 F antlion sand_jet', 'ring 5 -2.4 3.4 1.4 0 F antlion quicksand'],
   elements: ['circle -7 3 2 0 0 F lava_titan slam', 'cone -4 2.6 3.6 80 0 F lava_titan fire_wave', 'circle 3 3.2 1.8 0 0 F void_lord star_fall', 'line 4.5 0.8 5 1.4 0 F void_lord beam',
-    'circle -7 -3 1.6 0 0 F tide_serpent spray_rain', 'cone -4.6 -3.4 3.4 80 0 F tide_serpent tail_sweep', 'circle 1.4 -3.2 1.5 0 0 F crown_wraith lightning_fall',
+    'circle -7 -3 1.6 0 0 F tide_serpent dive', 'cone -4.6 -3.4 3.4 80 0 F tide_serpent tail_sweep', 'circle 1.4 -3.2 1.5 0 0 F crown_wraith lightning_fall',
     'cone 3.6 -3.4 3.2 80 0 F crown_wraith grasp'],
   // The tide serpent's own water (2026-11-28): the wave, the jet, the whirl and the columns.
-  serpent: ['cone -8 2.6 3.6 120 0 F tide_serpent tail_sweep', 'circle -2.2 3 1.2 0 0 F tide_serpent tidal_trail', 'share 3 3.2 1.8 0 0 F tide_serpent deep_share',
-    'circle 7 3.2 1.4 0 0 F tide_serpent spray_rain', 'line -8 -3.4 8 1.4 0 F tide_serpent water_jet', 'ring 5 -2.4 3.4 1.4 0 F tide_serpent whirlpool'],
+  serpent: ['cone -8 2.6 3.6 120 0 F tide_serpent tail_sweep', 'circle -2.2 3 1.2 0 0 F tide_serpent tidal_trail', 'circle 3 3.2 1.6 0 0 F tide_serpent dive',
+    'circle 7 3.2 1.4 0 0 F tide_serpent bubble_burst', 'line -8 -3.4 8 1.4 0 F tide_serpent water_jet', 'ring 5 -2.4 3.4 1.4 0 F tide_serpent whirlpool'],
   // The void lord's own void and frost (2026-11-28): claws, a star, a rift, a lance, the floor drawn in, a horizon.
   voidlord: ['cone -8 2.6 3.8 110 0 F void_lord grasp', 'circle -2.2 3 1.8 0 0 F void_lord star_fall', 'share 3 3.2 2 0 0 F void_lord gravity_share',
     'circle 7 3.2 2.6 0 0 F void_lord collapse', 'line -8 -3.4 8 1.6 0 F void_lord beam', 'ring 5 -2.4 4 1.2 0 F void_lord void_ripple'],
@@ -9571,7 +9692,7 @@ async function towns(browser) {
   }
 }
 
-const Sections = { menu, title, testground, hunt, harvest, zones, towns, time, basics, first, firstphone, hour, bag, combat, hero, roll, weapons, arts, bosses, patterns, tempo, ground, props, veineater, samurai, knight, warden, antlion, serpent, titan, voidlord, wraith, queen, general, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, layers, monsterfx, hazards, bossfx, hits, shots, blast, mobwarn, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
+const Sections = { menu, title, testground, hunt, harvest, zones, towns, time, basics, first, firstphone, hour, bag, combat, hero, roll, weapons, arts, bosses, patterns, tempo, ground, props, forces, veineater, samurai, knight, warden, antlion, serpent, titan, voidlord, wraith, queen, general, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, layers, monsterfx, hazards, bossfx, hits, shots, blast, mobwarn, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

@@ -908,6 +908,16 @@ namespace Game.Core
         Water,
         Crack,
         Rock,
+        // R3 (2026-11-28, Docs/BossRedesign.md 7.1 T4·T7): a boss's sand pit, ground that drags whoever is in it toward
+        // its middle at World.PitPull and bites at its very middle (World.PitCore); a circle that pushes whoever is in
+        // it out from its middle at Width tiles a second until it lands (the opposite of Pull); a thread from Position
+        // (the boss, or a player) along Direction for Size to the player it holds, Width the cuts it has left
+        // (World.Threads); a wall of water that runs Size along Direction from StartTick to ResolveTick across the
+        // whole arena, with a gap Width wide where Position's line crosses it (World.Waves).
+        Pit,
+        Push,
+        Tether,
+        Wave,
     }
 
     // A marked area that hurts every player inside it when ResolveTick comes. Zero damage marks a charge's path.
@@ -934,11 +944,17 @@ namespace Game.Core
         public HazardShape Shape { get; }
         // Centre of a circle, or where a cone or line starts.
         public Vec2 Position { get; internal set; }
-        public Vec2 Direction { get; }
+        public Vec2 Direction { get; internal set; }
         // Circle radius, a ring's outer radius, or cone and line length.
-        public float Size { get; }
+        public float Size { get; internal set; }
         // Cone angle in degrees, line width, or a ring's inner (safe) radius.
-        public float Width { get; }
+        public float Width { get; internal set; }
+        // A thread's (HazardShape.Tether, R3): the player it holds, the player at its other end (0: the boss, Source),
+        // and from when it may snap. A wall's (Wave): the players it has struck on its way.
+        internal int BoundId { get; set; }
+        internal int AnchorId { get; set; }
+        internal long SnapsFrom { get; set; }
+        internal HashSet<int> Struck { get; } = new HashSet<int>();
         public int Damage { get; internal set; }
         public long StartTick { get; }
         public long ResolveTick { get; internal set; }
@@ -970,10 +986,10 @@ namespace Game.Core
         public int Plucks { get; internal set; }
         // A web or a pool of venom: it does its work while it lies there, and nothing when its time is up.
         public bool Lingers => Shape == HazardShape.Web || Shape == HazardShape.Venom || Shape == HazardShape.Fire || Shape == HazardShape.Ice
-            || Shape == HazardShape.Spore || Shape == HazardShape.Sand || Shape == HazardShape.Balm || IsGround;
+            || Shape == HazardShape.Spore || Shape == HazardShape.Sand || Shape == HazardShape.Balm || Shape == HazardShape.Tether || IsGround;
 
         // A boss's lava, water, crack or cooled rock (R2).
-        public bool IsGround => Shape == HazardShape.Lava || Shape == HazardShape.Water || Shape == HazardShape.Crack || Shape == HazardShape.Rock;
+        public bool IsGround => Shape == HazardShape.Lava || Shape == HazardShape.Water || Shape == HazardShape.Crack || Shape == HazardShape.Rock || Shape == HazardShape.Pit;
 
         // The last blast of a trail that leaves ground: the strip runs from here to where it lands (World.LeavePool).
         internal Vec2? StripFrom { get; set; }
@@ -992,8 +1008,13 @@ namespace Game.Core
                 case HazardShape.Circle:
                 case HazardShape.Share:
                 case HazardShape.Pull:
+                case HazardShape.Push:
                 case HazardShape.Mine:
                     return distance <= Size + radius;
+                // A thread is in no one's way, and a wall is only where it has got to (World.WaveFront).
+                case HazardShape.Tether:
+                case HazardShape.Wave:
+                    return false;
                 case HazardShape.Web:
                 case HazardShape.Venom:
                 case HazardShape.Fire:
@@ -1007,6 +1028,7 @@ namespace Game.Core
                 case HazardShape.Water:
                 case HazardShape.Crack:
                 case HazardShape.Rock:
+                case HazardShape.Pit:
                     if (Width <= 0) return distance <= Size;
                     float run = Vec2.Dot(offset, Direction);
                     return run >= 0 && run <= Size && MathF.Abs(offset.X * Direction.Y - offset.Y * Direction.X) <= Width / 2;

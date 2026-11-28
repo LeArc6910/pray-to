@@ -64,7 +64,7 @@ namespace Game.Core
         }
 
         // Whether a spot is somewhere the bot should not stand: a boss's edge that hurts or snares.
-        public bool BadGround(Vec2 at) => _bosses.Any(b => !b.IsDead && InEdge(b, at) && EdgeBites(b));
+        public bool BadGround(Vec2 at) => _bosses.Any(b => !b.IsDead && InEdge(b, at) && b.Definition.Edge.Kind != EdgeKind.Water && EdgeBites(b));
 
         bool EdgeBites(Boss boss) => boss.EdgeTick >= 0 && Tick >= boss.EdgeTick + Ticks(EdgeGraceSeconds);
 
@@ -79,12 +79,12 @@ namespace Game.Core
         {
             if (!EdgeUp(boss) || !EdgeBites(boss)) return;
             var edge = boss.Definition.Edge;
-            bool bites = edge.Kind != EdgeKind.Web && (Tick - boss.EdgeTick) % Ticks(GroundSeconds) == 0;
+            bool bites = edge.Kind != EdgeKind.Web && edge.Kind != EdgeKind.Water && (Tick - boss.EdgeTick) % Ticks(GroundSeconds) == 0;
             int damage = Math.Max(1, (int)MathF.Round(boss.Definition.RoarDamage * GroundShare));
             foreach (var player in _players)
             {
                 if (player.IsDead || !InEdge(boss, player.Position)) continue;
-                if (edge.Kind == EdgeKind.Lava) player.Afflictions.WadeTicks = Math.Max(player.Afflictions.WadeTicks, Ticks(SnareSeconds));
+                if (edge.Kind == EdgeKind.Lava || edge.Kind == EdgeKind.Water) player.Afflictions.WadeTicks = Math.Max(player.Afflictions.WadeTicks, Ticks(SnareSeconds));
                 if (edge.Kind == EdgeKind.Web) player.Afflictions.SnareTicks = Math.Max(player.Afflictions.SnareTicks, Ticks(SnareSeconds));
                 if (bites) HurtPlayer(player, boss.Id, damage, 0);
             }
@@ -128,11 +128,11 @@ namespace Game.Core
         // first lava or crack of a fight bites no one (Docs/BossRedesign.md 4.2: a new kind is shown once unharmed).
         void LayGround(Boss boss, int cause, PoolKind kind, Vec2 at, Vec2 direction, float size, float width, float seconds, int blow)
         {
-            var pools = _hazards.Where(h => h.Lingers && h.Source == boss.Id).OrderBy(h => h.StartTick).ToList();
+            var pools = _hazards.Where(h => h.Lingers && h.Shape != HazardShape.Tether && h.Source == boss.Id).OrderBy(h => h.StartTick).ToList();
             if (pools.Count >= MaxPools) _hazards.Remove(pools[0]);
-            bool bites = kind == PoolKind.Venom || kind == PoolKind.Lava || kind == PoolKind.Crack;
+            bool bites = kind == PoolKind.Venom || kind == PoolKind.Lava || kind == PoolKind.Crack || kind == PoolKind.Pit;
             int damage = bites ? Math.Max(1, (int)MathF.Round(blow * (kind == PoolKind.Venom ? VenomShare : GroundShare))) : 0;
-            if (kind == PoolKind.Lava || kind == PoolKind.Crack)
+            if (kind == PoolKind.Lava || kind == PoolKind.Crack || kind == PoolKind.Pit)
             {
                 if (boss.TaughtTick < 0) boss.TaughtTick = Tick;
                 if (boss.TaughtTick == Tick) damage = 0;
@@ -144,6 +144,7 @@ namespace Game.Core
                 PoolKind.Lava => HazardShape.Lava,
                 PoolKind.Water => HazardShape.Water,
                 PoolKind.Crack => HazardShape.Crack,
+                PoolKind.Pit => HazardShape.Pit,
                 _ => HazardShape.Rock,
             };
             _hazards.Add(new Hazard(_nextId++, boss.Id, cause, shape, at, direction, size, width, damage, Tick, Tick + Ticks(seconds)));
@@ -153,6 +154,12 @@ namespace Game.Core
         void LingerGround(Hazard pool)
         {
             if (pool.Shape == HazardShape.Rock) return;
+            // A sand pit drags and bites at its middle (R3).
+            if (pool.Shape == HazardShape.Pit)
+            {
+                WorkPit(pool.Source, pool.Cause, pool.Position, pool.Size, pool.Damage, pool.StartTick);
+                return;
+            }
             bool bites = pool.Damage > 0 && pool.Shape != HazardShape.Water && Tick > pool.StartTick && (Tick - pool.StartTick) % Ticks(GroundSeconds) == 0;
             bool wades = pool.Shape != HazardShape.Crack;
             if (!bites && !wades) return;
@@ -198,10 +205,14 @@ namespace Game.Core
             var kinds = given.SelectMany(g => Enumerable.Repeat(g.Kind, g.Count)).ToList();
             float turn = new GameRandom(_forageSeed + (ulong)Tick, stream: 2000 + (ulong)boss.Id).NextFloat() * 2 * MathF.PI;
             float reach = FloorRadius(boss) * 0.6f;
+            // The first sand pit is the big one in the middle (R3); the rest stand round it.
+            if (kinds.Remove(PropKind.Pit))
+                _props.Add(new BossProp(_nextId++, boss.Id, PropKind.Pit, boss.Home, BigPitRadius, 0));
             for (int i = 0; i < kinds.Count; i++)
             {
-                float radius = PropRadius(kinds[i]);
-                var at = Collision.Resolve(Map, boss.Home + Vec2.FromAngle(turn + i * 2 * MathF.PI / kinds.Count) * reach, radius);
+                float radius = kinds[i] == PropKind.Pit ? SmallPitRadius : PropRadius(kinds[i]);
+                var at = kinds[i] == PropKind.Pit ? boss.Home + Vec2.FromAngle(turn + i * 2 * MathF.PI / kinds.Count) * reach
+                    : Collision.Resolve(Map, boss.Home + Vec2.FromAngle(turn + i * 2 * MathF.PI / kinds.Count) * reach, radius);
                 _props.Add(new BossProp(_nextId++, boss.Id, kinds[i], at, radius, PropHealthFor(boss, kinds[i])));
             }
         }

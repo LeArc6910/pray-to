@@ -659,9 +659,11 @@ namespace Game.Core
         // A boss's ground (R2): lava and cracks are kept out of, water and cooled rock are not; a blast that spares rock
         // is no danger on rock, nor one that spares the shaded behind a pillar (R2b); a boss's edge that bites is
         // (World.BadGround).
+        // A boss's pull or push is walked against, not kept out of; a wall of water is a danger where it will still
+        // cross outside its gap (R3: the way out of it is into the gap, or the middle closing walls leave).
         bool Danger(Vec2 at) => _world.Hazards.Any(h => h.Shape != HazardShape.Share && h.Shape != HazardShape.Web && h.Shape != HazardShape.Balm
-            && h.Shape != HazardShape.Water && h.Shape != HazardShape.Rock
-            && !Mild(h) && !h.Safe && !(h.Damage == 0 && h.Mark == (byte)MonsterAttackShape.Blink + 1) && h.Contains(at, World.PlayerRadius + 0.1f)
+            && h.Shape != HazardShape.Water && h.Shape != HazardShape.Rock && h.Shape != HazardShape.Pull && h.Shape != HazardShape.Push
+            && !Mild(h) && !h.Safe && !(h.Damage == 0 && h.Mark == (byte)MonsterAttackShape.Blink + 1) && (h.Shape == HazardShape.Wave ? _world.WaveStrikes(h, at) : h.Contains(at, World.PlayerRadius + 0.1f))
             && !(h.Spares && _world.OnRock(h.Source, at)) && !(h.Shades && _world.Shaded(h.Source, h.Position, at)))
             || _world.BadGround(at);
 
