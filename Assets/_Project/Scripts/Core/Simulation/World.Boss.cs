@@ -319,14 +319,16 @@ namespace Game.Core
 
             LayHazards(boss, attack, target, fighters, boss.Facing, resolve, cause);
             // Its follow-up (follow column) is marked now too and lands a moment after: one roll does not clear both.
-            if (attack.FollowUp != null && !again)
+            // Only in the follow-up's own phases (2026-11-28: the rings come from phase 2, so phase 1 lays one pattern).
+            bool follows = attack.FollowUp != null && !again && attack.FollowUp.InPhase(boss.Phase);
+            if (follows)
                 LayHazards(boss, attack.FollowUp, target, fighters, boss.Facing, resolve + Ticks(attack.FollowDelay), Cause(boss, attack.FollowUp));
             if (attack.Shape == AttackShape.Charge) boss.ChargeDirection = boss.Facing;
             if (attack.GoesAway) boss.LandAt = LandingFor(boss, target.Position);
 
             // A later phase sometimes lays another area attack of this phase at once, on someone (else, when there is
-            // anyone else), resolving a moment after.
-            if (attack.LaysAreas && _random.NextFloat() < DoubleChance(boss.Phase))
+            // anyone else), resolving a moment after. Not with a follow-up laid: at most two patterns at once (2026-11-28).
+            if (attack.LaysAreas && !follows && _random.NextFloat() < DoubleChance(boss.Phase))
             {
                 var others = boss.Definition.Attacks.Where(a => a != attack && a.InPhase(boss.Phase) && a.Weight > 0 && a.LaysAreas).ToList();
                 if (others.Count > 0)

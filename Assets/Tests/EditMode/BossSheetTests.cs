@@ -91,6 +91,22 @@ namespace Game.Core.Tests
             Assert.Greater(follows, 0);
         }
 
+        // 2026-11-28 (Docs/Bosses.md "페이즈 배치"): phase 1 is the plain one. No ring follows there, no finishing
+        // blow is chosen there, and a boss with phases brings something new in each later one.
+        [Test]
+        public void ShippedPhaseOneIsThePlainOne()
+        {
+            foreach (var boss in Bosses.Shipped.Bosses)
+            {
+                foreach (var attack in boss.Attacks.Where(a => a.FollowUp != null))
+                    Assert.IsFalse(attack.FollowUp.InPhase(1), $"{boss.Id}.{attack.FollowUp.Id} follows only from phase 2");
+                foreach (var attack in boss.Attacks.Where(a => a.Weight > 0 && a.InPhase(1)))
+                    Assert.AreNotEqual(AttackWarning.Strong, attack.Warning, $"{boss.Id}.{attack.Id} is a finishing blow in phase 1");
+                for (int phase = 2; phase <= boss.PhaseCount; phase++)
+                    Assert.IsTrue(boss.Attacks.Any(a => a.Weight > 0 && a.InPhase(phase) && !a.InPhase(phase - 1)), $"{boss.Id} brings something in phase {phase}");
+            }
+        }
+
         [Test]
         public void EveryPhaseNeedsAnAttack()
         {

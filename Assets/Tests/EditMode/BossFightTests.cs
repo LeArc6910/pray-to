@@ -71,6 +71,34 @@ namespace Game.Core.Tests
             Assert.Less(ring.ResolveTick - slam.ResolveTick, World.RollCooldownTicks, "before the next roll");
         }
 
+        // 2026-11-28: a follow-up comes only in its own phases, so the shipped rings (2|3) leave phase 1 one pattern.
+        static BossDefinition SlamThenLaterRing() => Bosses.Parse(
+            Bosses.BossesHeader + "dummy,허수아비,1000,50,0,2,1,50,1,3,10\n",
+            Bosses.AttacksHeader.TrimEnd('\n') + ",warn,pool,follow\n" +
+            "dummy,slam,내려찍기,,circle,nearest,1,30,2,,,,1,,,5,1,,,,ripple:0.5\n" +
+            "dummy,ripple,파문,2,ring,nearest,1,20,2,7,,,,,,1,0,,,,\n").Find("dummy");
+
+        [Test]
+        public void AFollowUpWaitsForItsPhase()
+        {
+            var world = Arena(out var boss, SlamThenLaterRing());
+            var player = world.AddPlayer("a", null);
+            Walk(world, player, Home + new Vec2(0, -5));
+            Run(world, 0.1f);
+            Assert.AreEqual(1, boss.Phase);
+            Assert.AreEqual(1, world.Hazards.Count(h => h.Shape == HazardShape.Circle));
+            Assert.AreEqual(0, world.Hazards.Count(h => h.Shape == HazardShape.Ring), "no ring in phase 1");
+
+            boss.Phase = 2;
+            bool ring = false;
+            for (int i = 0; i < World.Ticks(10) && !ring; i++)
+            {
+                world.Step();
+                ring = world.Hazards.Any(h => h.Shape == HazardShape.Ring);
+            }
+            Assert.IsTrue(ring, "the ring from phase 2");
+        }
+
         [Test]
         public void OneRollDoesNotClearASlamAndItsRing()
         {

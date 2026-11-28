@@ -873,6 +873,8 @@ async function patterns(browser) {
       woken = id;
     }
     await game.wait(1500);
+    // The rings follow only from phase 2 (2026-11-28, Docs/Bosses.md 페이즈 배치): a follow-up check hurts the boss into it first.
+    if (least >= 2) { await game.send(`heal; boss ${id} hurt 0.4`); await game.wait(2500); }
     await game.send(`heal; boss ${id} use ${attack}`);
     await game.wait(attack.endsWith('spiral') ? 1200 : 450);
     const s = await game.state();
