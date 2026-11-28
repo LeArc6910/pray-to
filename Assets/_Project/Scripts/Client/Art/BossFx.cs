@@ -92,6 +92,23 @@ namespace Game.Client
         // radius. Big: the heavier (taller, more of it).
         Geyser,
 
+        // ---- the void lord (2026-11-28, BossFx.Void.cs) ----
+        // Fingers of the void thrown across a wedge and closing like a hand, frost popping where it shuts. Size the
+        // reach, Width the wedge in degrees, Dir its middle.
+        VoidClaw,
+        // A star come down out of the dark onto a circle: a white burst, frost thrown over the floor, ice standing up and
+        // breaking. Size its radius. Big: from higher, more of it.
+        Comet,
+        // A rift torn along a line, ice left standing in it and shattering; Big: a lance of ice thrown down it instead.
+        // Size its length, Width how wide, Dir its way.
+        Rift,
+        // The floor drawn into a point (rings closing, scraps pulled in, the middle black), then thrown back out in frost
+        // and ice. Size its radius. Big: the heavier.
+        Singularity,
+        // Rings turning opposite ways round a band, stars running round it, frost thrown off the outside. Size the band's
+        // outer radius, Inner its inner (0: a whole circle).
+        Horizon,
+
         // ---- the bosses with no effects of their own (the lava titan, the void lord, the crown wraith) ----
         // What the blow is made of, laid over the shared landing at a few places in its shape (Form): fire that
         // bursts and burns on (Ramp Fire), rings and scraps drawn into the middle (Violet), water thrown up in a
@@ -125,7 +142,7 @@ namespace Game.Client
     // monsters' (MonsterFx) are, built of the same layers (FxLayers). The blow's shape itself (the warning's shape
     // burning) and its scar are the shared landing's (WorldView.Hazards.cs); these are what each boss adds over it.
     // Positions are in pixels from the effect's origin, y up. At most Most pieces at once.
-    static class BossEffects
+    static partial class BossEffects
     {
         // The most pieces one effect may lay at once (Docs/EffectsRework.md 3).
         public const int Most = 72;
@@ -198,6 +215,11 @@ namespace Game.Client
                 case BossFx.Torrent: life = Torrent(c, t, o); break;
                 case BossFx.Maelstrom: life = Maelstrom(c, t, o); break;
                 case BossFx.Geyser: life = Geyser(c, t, o); break;
+                case BossFx.VoidClaw: life = VoidClaw(c, t, o); break;
+                case BossFx.Comet: life = Comet(c, t, o); break;
+                case BossFx.Rift: life = Rift(c, t, o); break;
+                case BossFx.Singularity: life = Singularity(c, t, o); break;
+                case BossFx.Horizon: life = Horizon(c, t, o); break;
                 case BossFx.Element: life = Element(c, t, o); break;
                 default: return false;
             }

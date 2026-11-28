@@ -156,7 +156,7 @@ namespace Game.Client
         {
             // Under the floor or up in the roof it casts no shadow: asleep, and under the floor until it breaks through.
             var entrance = view.Boss.Arena?.Entrance ?? BossEntrance.Common;
-            bool hidden = entrance == BossEntrance.Burrow || entrance == BossEntrance.Thread || entrance == BossEntrance.Ambush || entrance == BossEntrance.Surface;
+            bool hidden = entrance == BossEntrance.Burrow || entrance == BossEntrance.Thread || entrance == BossEntrance.Ambush || entrance == BossEntrance.Surface || entrance == BossEntrance.Rift;
             if (view.BossState == BossState.Dormant && hidden && !view.IsDead) body.Shadow.enabled = false;
             if (view.BossState != BossState.Enter)
             {
@@ -166,6 +166,7 @@ namespace Game.Client
             if (entrance == BossEntrance.Burrow && body.EnterFrame < VeinEaterArt.EmergeBreak) body.Shadow.enabled = false;
             if (entrance == BossEntrance.Ambush && body.EnterFrame < AntlionArt.EnterBurst) body.Shadow.enabled = false;
             if (entrance == BossEntrance.Surface && body.EnterFrame < SerpentArt.EnterBurst) body.Shadow.enabled = false;
+            if (entrance == BossEntrance.Rift && body.EnterFrame < VoidLordArt.EnterBurst) body.Shadow.enabled = false;
             var feet = body.Position;
             float since = Time.time - body.BossSince;
             bool puff = Time.time >= body.DustAt;
@@ -379,6 +380,37 @@ namespace Game.Client
                     if (!body.EntersAgain && Reached(SerpentArt.EnterRoar))
                     {
                         AddFlash(feet + new Vector3(0, 2f, 0), 1.6f, TideColor, FlashKind.Ring);
+                        Hear(Sound.Roar, feet, 1);
+                    }
+                    break;
+
+                case BossEntrance.Rift:
+                    // The altar's floor tearing open: the void seeping up, the floor trembling; the crown rises out of
+                    // the rift and the eyes light; he is drawn up out of it with his cape spread and roars
+                    // (VoidLordArt.Enter).
+                    if (frame < VoidLordArt.EnterBurst && puff)
+                    {
+                        body.DustAt = Time.time + 0.12f;
+                        Chips(feet + (Vector3)(Random.insideUnitCircle * 1.1f), Vector3.up, FxRamp.Violet, 1, 14, 40);
+                        if (Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.02f + 0.04f * frame / VoidLordArt.EnterBurst);
+                    }
+                    if (Reached(2)) Hear(Sound.Door, feet, 0.6f);
+                    if (Reached(VoidLordArt.EnterCrown)) Hear(Sound.Ice, feet, 0.6f);
+                    if (Reached(VoidLordArt.EnterEyes))
+                    {
+                        AddFlash(feet + new Vector3(0, 1.2f, 0), 1f, VoidLordColor, FlashKind.Ring);
+                        Hear(Sound.Wake, feet, 0.8f);
+                    }
+                    if (Reached(VoidLordArt.EnterBurst))
+                    {
+                        AddFlash(feet, 3f, VoidLordColor, FlashKind.Burst);
+                        AddBossFx(BossFx.Horizon, feet, new BossContext { Ramp = FxRamp.Violet, Size = 2.2f * Ppu, Inner = 0.8f * Ppu, Seed = 23 });
+                        Thud(body, 0.08f, 0.6f);
+                        Hear(Sound.Nova, feet, 1);
+                    }
+                    if (!body.EntersAgain && Reached(VoidLordArt.EnterRoar))
+                    {
+                        AddFlash(feet + new Vector3(0, 2.2f, 0), 1.6f, VoidLordColor, FlashKind.Ring);
                         Hear(Sound.Roar, feet, 1);
                     }
                     break;

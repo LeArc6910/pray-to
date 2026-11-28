@@ -1876,3 +1876,32 @@ DevTools/Local/setup.sh --commit
 - 커밋한 것: 새 스크립트 셋의 `.meta`(`SerpentArt.cs`, `SerpentArt.Rows.cs`, `WorldView.Serpent.cs`). Unity가 만든 다른 `.meta` 400여 개와 `GameSheets.asset` 변경은 이 작업 밖이라 남겨 두었다(199단계)
 - **웹 점검은 하지 않았다**: 이 컴퓨터에 node·Playwright·Chromium이 없고 사람이 "클라우드에 맡김"을 골랐다. 배포 뒤 클라우드가 `sweep.js --wait <커밋> --only serpent,bossfx,arenas`
 - 사람이 볼 것: `Docs/HumanChecklist.md` "물살 뱀"
+
+### 2026-11-28 12:14 setup.ps1 (Unity 6000.6.3f1)
+
+- 프로젝트 설정: 성공
+- 패키지: com.unity.netcode.gameobjects 2.13.3, com.unity.transport 6.6.0, com.unity.render-pipelines.universal 17.6.0, com.unity.inputsystem 1.20.0, com.unity.multiplayer.playmode 3.0.0, com.unity.test-framework 1.8.0
+- EditMode 테스트: 1238개 중 1237개 통과, 1개 실패
+  - `Game.Core.Tests.BotTests.FirstHourReachesTheFirstMonsterCraftAndBoss(1UL): at the warden's arena`
+- PlayMode 테스트: 73개 중 62개 통과, 11개 실패
+  - `Game.Client.Tests.FeatureTests.ADungeonGateLeadsIntoThePocketAndOut: The gate's button starts going in.`
+  - `Game.Client.Tests.FeatureTests.ASingleShotIsLinedToItsTargetBeforeItFlies: A line to the player the shot is for.`
+  - `Game.Client.Tests.FeatureTests.ElitesWearTheirNamesAndWarnOfTheirBigAttack: A name over the leader and each champion.`
+  - `Game.Client.Tests.FeatureTests.EveryKindHasItsOwnAttacks: A blow its shell turned shows a grey number.`
+  - `Game.Client.Tests.FeatureTests.RumoursAndSlowRest: The goal list says only which way:`
+  - `Game.Client.Tests.FeatureTests.TheBagAndHudDraw: The food's buff has no icon.`
+  - `Game.Client.Tests.FeatureTests.TheEncounterWindowsDraw: Her portrait is in the talk box.`
+  - `Game.Client.Tests.LayoutTests.TheBagAndHudFit: 작은 휴대폰 가로 667×375: 배너가 [메뉴] 판에 겹친다 (x:0.00, y:301.00, width:667.00, height:64.00) (x:353.00, y:186.00, width:304.00, height:160.00)`
+  - `Game.Client.Tests.LayoutTests.TheFixedPartsKeepToTheSafeArea: 작은 휴대폰 가로(안전 영역 32 0 32 16) 667×375, 스킬 1: 겹침 - 시간·장소 줄 / 구르기`
+  - `Game.Client.Tests.LayoutTests.TheGrowthScreensFit: 작은 휴대폰 세로 360×640, 특성: 고른 점과 서랍이 하늘을 거의 다 덮는다 (84)`
+  - `Game.Client.Tests.TitleScreenTests.TheTestGroundsPanelAndHitLogDraw: The hit log is on the screen.`
+- Unity가 바꾼 스크립트: 없음(목록에 나온 것은 이 세션이 공허의 군주 작업으로 고친 파일이다, 아래 12:40)
+
+### 2026-11-28 12:40 공허의 군주: 로컬 AI 그림과 몸짓·공허 이펙트·균열 입장 (로컬 세션, 사람 허락으로 코드까지)
+
+- 사람 요청(2026-11-28): 남은 보스 셋을 각자 세션에서 물살 뱀처럼(로컬 AI 8방향 도트, 몸짓·이펙트·입장은 코드). 이 세션은 공허의 군주. 정면 시안 열다섯 장(네 갈래)과 64px 축소본을 보이고 사람이 d_235를 골랐다. 다섯 시점은 여러 각도 LoRA로 시드 둘씩 돌려 골랐다(`CLOUD_LOG.md` 2026-11-28 12:40, `Docs/Bosses.md` 공허의 군주 제 그림과 몸짓, `Docs/ArtSources.md`)
+- GPU: 헤드리스 포트 8192, `gpu-lock.json`(owner boss-void-lord)으로 11:30~11:32(정면 시안), 11:41~11:48(각도) 두 번 잡고 끝날 때마다 ComfyUI를 끄고 잠금을 지웠다. 용암 거인 세션과 번갈아 썼다. 새 모델은 받지 않았다
+- 위 12:14 setup: PlayMode 실패 11개는 02:20과 같은 목록이다(이 작업과 무관). 새 장면 `TheVoidLordRisesOutOfARiftAndWindsUp`는 통과. EditMode 새 실패 하나 `BotTests.FirstHourReachesTheFirstMonsterCraftAndBoss(1)`(봇이 1번 시드에서 수호자 아레나에 못 감, 7:43 "몬스터 없음: 탐험 (갈 곳 없음)")는 같은 시험이 `dotnet test`(1238 통과)에서는 통과하고 이 작업이 바꾼 Core는 입장 종류 하나뿐이다. 02:20 뒤 main에 들어온 보스 둘레 변경(`b5b6285`, `29f50cc`)과 Unity 쪽 차이가 의심된다(클라우드가 볼 것)
+- 커밋한 것: 새 스크립트 넷의 `.meta`(`VoidLordArt.cs`, `VoidLordArt.Rows.cs`, `BossFx.Void.cs`, `WorldView.VoidLord.cs`). Unity가 이 작업 폴더에서 새로 만든 다른 `.meta` 470여 개와 `GameSheets.asset` 변경은 이 작업 밖이라 남겼다
+- **웹 점검은 하지 않았다**: 이 컴퓨터에 node·Playwright가 없다. 배포 뒤 클라우드가 `sweep.js --wait <커밋> --only voidlord,bossfx,arenas`
+- 사람이 볼 것: `Docs/HumanChecklist.md` "공허의 군주"

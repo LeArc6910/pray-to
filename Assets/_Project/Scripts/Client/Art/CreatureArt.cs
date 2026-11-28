@@ -933,7 +933,22 @@ namespace Game.Client
             }, 1),
             // The lava titan: the warden's build in black basalt, its seams and core burning.
             "lava_titan" => Warden(Rgba.Hex("#4A3A36"), frame, view, pose, molten: true),
-            "void_lord" => VoidLord(frame, view, pose),
+            // The void lord of the abyss (2026-11-28): its own picture posed in code (VoidLordPose in WorldView).
+            "void_lord" => VoidLordArt.Draw(view, pose switch
+            {
+                BossPose.Windup => VoidLordPose.Gather,
+                BossPose.Strike => VoidLordPose.Cast,
+                BossPose.Charge => VoidLordPose.Blink,
+                BossPose.Roar => VoidLordPose.Roar,
+                _ => VoidLordPose.Idle,
+            }, pose switch
+            {
+                BossPose.Windup => VoidLordArt.FramesOf(VoidLordPose.Gather) - 1,
+                BossPose.Strike => VoidLordArt.StrikeFrame(VoidLordPose.Cast),
+                BossPose.Charge => VoidLordArt.StrikeFrame(VoidLordPose.Blink) + 1,
+                BossPose.Roar => VoidLordArt.RoarRise + frame % 4,
+                _ => frame,
+            }, 1),
             // The mad general of the demon nest (2026-11-10): the void lord's robed build in crimson and ember, a ball
             // of fire for the orb, horns through the hood.
             // The tide serpent of the underground lake (2026-11-28): its own picture posed in code (SerpentPose in

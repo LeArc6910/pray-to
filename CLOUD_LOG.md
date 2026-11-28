@@ -12,6 +12,15 @@
 - **로컬 확인**: 로컬 세션이 읽고 체크한다
 
 
+## 2026-11-28 12:40 공허의 군주: 로컬 AI 그림과 제 몸짓·공허 이펙트·균열 입장 (로컬 세션이 코드까지)
+
+- **바뀐 것**: 사람 요청 "남은 보스 셋을 각자 세션에서 물살 뱀처럼 로컬 AI로" 중 공허의 군주(최종 보스). 그림은 이 컴퓨터의 ComfyUI(Z-Image-Turbo + 도트 LoRA → Qwen-Image-Edit-2511 + 여러 각도 LoRA, 모두 Apache-2.0)로 만들어 다섯 시점을 64×64·22색 행과 부위 지도(왕관·머리·눈·몸·구슬 팔·빈손·망토 자락)로 옮겼다(`Art/VoidLordArt.Rows.cs`, 도구 `DevTools/ArtImport/LocalAi/void_lord_rows.py`·`void_lord_prompt.txt`). 몸짓은 `Art/VoidLordArt.cs`(떠서 기울고, 팔이 어깨에서 따라오고, 자락이 펼쳐지며 공허로 풀리고, 흩어졌다 모이고, 균열에 잠기는 자세 열여덟, 구슬·별·눈·왕관의 빛은 코드), 화면은 `WorldView.VoidLord.cs`(공격 열다섯 모두 id마다 전조 자세, 예고 중 공허·서리 티끌, 착지 이펙트), 공허·냉기 이펙트 다섯(`Art/BossFx.Void.cs`: `VoidClaw`·`Comet`·`Rift`·`Singularity`·`Horizon`), 새 입장 `Rift`(제단 균열에서 떠오르기, `arenas.csv` 3.8초·1.2초). 2·3페이즈는 구슬 빛 고리·밝기·별 다섯으로 달라 보인다("페이즈 배치" 규칙 그대로). 왕관의 망령이 쓰는 공용 두건 몸(`CreatureArt.VoidLord`)은 건드리지 않았다. 피해·체력·예고·페이즈는 그대로
+- **확인**: `dotnet test` 1238 통과, Unity 쪽 컴파일(로컬 Unity DLL, 에디터·WebGL) 오류 0, `--only voidlord` 연속성 튀는 곳 0, 몸의 틈 104/1450장(일부러 흩어지는 돌진 67·균열 입장 11 빼면 26), `--only bossfx` 공허의 군주 아홉 줄 15~35조각(한도 72), Unity setup EditMode 1237/1238(봇 시드 1, 아래)·PlayMode 새 장면 통과
+- **요청 대조**: 로컬 AI 8방향 ○(시안 열다섯 → 사람이 d_235 → 시점 시드 둘씩) · 모션 ○(공격 열다섯·포효·입장, 빈틈) · 이펙트 ○(다섯) · 입장 ○(`Rift`) · 페이즈 차이 ○ · 망령 공용 몸 보존 ○ · 전체 패턴 GIF ○(`anim/void_lord_patterns.gif`) · PlayMode 장면 ○(`TheVoidLordRisesOutOfARiftAndWindsUp`) · 웹 점검 구역 ○(`sweep.js --only voidlord`, `bossfx`에 `voidlord` 줄, `arenas`의 입장 표) · 문서 ○(`Docs/Bosses.md`, `ArtSources.md`, `Commands.md`, `Codebase.md`, `HumanChecklist.md`) · 쓰러짐 연출 ✗(요청 없음, 다른 보스처럼 터진다) · 웹 점검 실행 ✗(이 컴퓨터에 node가 없다) · 도트 작업을 Fable 모델로(`104b900`, 사람 결정) ✗: 이 세션은 다른 모델로 시작돼 그림 고르기·부위 지도·몸짓까지 그대로 했다. Fable로 다시 다듬을지는 사람이 정한다
+- **클라우드에 부탁**: 배포 뒤 `node DevTools/WebPlaytest/sweep.js --wait <커밋> --only voidlord,bossfx,arenas`를 돌리고 사진을 본다(이 컴퓨터에 node가 없어 `sweep.js` 문법 확인도 못 했다). Unity EditMode `BotTests.FirstHourReachesTheFirstMonsterCraftAndBoss(1)`가 Unity에서만 실패했다(`dotnet test`는 통과, `LOCAL_TASKS.md` 12:40)
+- **로컬에서 할 일**: 없음(새 스크립트 넷의 `.meta`는 같은 푸시에 커밋했다)
+- **로컬 확인**: [x] 로컬 세션이 직접 한 일
+
 ## 2026-11-28 12:40 완드 탄막 70%, 기술 이펙트 다듬기는 Fable 세션으로
 
 - **바뀐 것**: 사람이 C 결과를 보고 "그대로 해줘": 완드 고유 기술 탄막의 한 발 피해를 45% → 70%(`weapon_kinds.csv`의 `art_power`, `Docs/Weapons.md`). 흐린 이펙트(완드 탄막·부메랑 회오리·활 뒤로 뛰며 쏘기·석궁 광선·검 막기 자세)는 CLAUDE.md 규칙대로 Fable 하위 세션이 다듬는다

@@ -83,6 +83,16 @@ namespace Game.Client
             Add("tide_serpent", "tidal_trail", BossFx.Geyser, HazardForm.Circle, 1.2f, 0, 0, water, r => { r.Tall = 128; r.AtY = 0.75f; });
             Add("tide_serpent", "spray_rain", BossFx.Geyser, HazardForm.Circle, 1.4f, 0, 0, water, r => { r.Context.Big = true; r.Tall = 144; r.AtY = 0.78f; });
             Add("tide_serpent", "deep_share", BossFx.Geyser, HazardForm.Circle, 1.8f, 0, 0, null, r => { r.Tone = WarnTone.Gather; r.Context.Ramp = water; r.Context.Big = true; r.Tall = 160; r.AtY = 0.78f; });
+            var voidRamp = FxRamp.Violet;
+            Add("void_lord", "grasp", BossFx.VoidClaw, HazardForm.Cone, 3.8f, 110, 0, voidRamp, r => { r.Context.Width = 110; r.AtX = 0.2f; r.AtY = 0.5f; r.Tall = 144; });
+            Add("void_lord", "beam", BossFx.Rift, HazardForm.Band, 12f, 1.6f, 0, voidRamp, r => { r.Wide = 216; r.Tall = 72; r.AtX = 0.06f; r.AtY = 0.5f; });
+            Add("void_lord", "void_lance", BossFx.Rift, HazardForm.Band, 12f, 1.6f, 0, voidRamp, r => { r.Context.Big = true; r.Wide = 216; r.Tall = 72; r.AtX = 0.06f; r.AtY = 0.5f; });
+            Add("void_lord", "star_fall", BossFx.Comet, HazardForm.Circle, 1.8f, 0, 0, voidRamp, r => { r.Tall = 144; r.AtY = 0.78f; });
+            Add("void_lord", "collapse", BossFx.Singularity, HazardForm.Circle, 2.6f, 0, 0, voidRamp, r => r.Tall = 128);
+            Add("void_lord", "black_holes", BossFx.Singularity, HazardForm.Circle, 1.6f, 0, 0, voidRamp, r => r.Context.Big = true);
+            Add("void_lord", "gravity_share", BossFx.Singularity, HazardForm.Circle, 2f, 0, 0, null, r => { r.Tone = WarnTone.Gather; r.Context.Ramp = voidRamp; r.Context.Big = true; r.Tall = 128; });
+            Add("void_lord", "event_horizon", BossFx.Horizon, HazardForm.Donut, 9f, 3f, 0, voidRamp, r => { r.Context.Inner = 3f * T; (r.Wide, r.Tall, r.AtY) = (304, 304, 0.5f); });
+            Add("void_lord", "void_ripple", BossFx.Horizon, HazardForm.Donut, 7.5f, 1.2f, 0, voidRamp, r => { r.Context.Inner = 1.2f * T; (r.Wide, r.Tall, r.AtY) = (256, 256, 0.5f); });
             var dust = FxRamp.Dust;
             Add("stone", "slam", BossFx.Slam, HazardForm.Circle, 2.5f, 0, 0, dust, r => r.Tall = 112);
             Add("stone", "slam over cracks", BossFx.Slam, HazardForm.Circle, 2f, 0, 0, dust, r => r.Context.Plain = true);

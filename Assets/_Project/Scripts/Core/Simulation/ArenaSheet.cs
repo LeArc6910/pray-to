@@ -78,6 +78,9 @@ namespace Game.Core
         // Under the water of its flooded hall with only ripples showing: bubbles rising, the head breaking the
         // surface, then up out of the water with the frills flared and a roar (the tide serpent).
         Surface,
+        // A rift opening in the altar's floor: the crown rising out of it, the eyes lit, the whole of him drawn up out
+        // of it with the cape spread and a roar (the void lord).
+        Rift,
     }
 
     public sealed class ArenaDefinition

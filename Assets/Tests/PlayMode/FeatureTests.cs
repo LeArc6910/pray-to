@@ -807,6 +807,37 @@ namespace Game.Client.Tests
             Assert.IsTrue(_root.Playing);
         }
 
+        // The void lord (Docs/Bosses.md 공허의 군주, 2026-11-28): under the altar's floor before he wakes, rising out of a rift
+        // in it, then mid wind-up of his beam (the orb held out swelling) and of his black holes (the hand raised and
+        // clenching, the warning sign).
+        [UnityTest, Category(Screens.Category)]
+        public IEnumerator TheVoidLordRisesOutOfARiftAndWindsUp()
+        {
+            yield return Start();
+            Toughen();
+            var boss = World.Bosses.FirstOrDefault(b => b.Definition.Id == "void_lord");
+            Assert.IsNotNull(boss, "No void lord.");
+            Assert.AreEqual(BossEntrance.Rift, boss.Definition.Arena.Entrance, "arenas.csv gives the void lord his own entrance.");
+            World.BossesHold = true;
+            Player.Position = boss.Home + new Vec2(0, -4);
+            Player.Corrections++;
+            yield return new WaitForSecondsRealtime(SceneSeconds);
+            yield return Screens.Take("voidlord-under");
+            World.BossesHold = false;
+            yield return new WaitForSecondsRealtime(2.6f);
+            Assert.AreEqual(BossState.Enter, boss.State, "Woken, the void lord comes in first.");
+            yield return Screens.Take("entrance-voidlord");
+            yield return new WaitForSecondsRealtime(4f);
+            Assert.IsTrue(World.ForceAttack(boss, "beam"), "The beam can be forced once he fights.");
+            yield return new WaitForSecondsRealtime(0.6f);
+            yield return Screens.Take("voidlord-beam-windup");
+            yield return new WaitForSecondsRealtime(2.5f);
+            Assert.IsTrue(World.ForceAttack(boss, "black_holes"));
+            yield return new WaitForSecondsRealtime(1.0f);
+            yield return Screens.Take("voidlord-blackholes-windup");
+            Assert.IsTrue(_root.Playing);
+        }
+
         // The tide serpent (Docs/Bosses.md 물살 뱀, 2026-11-28): under the water of its hall with only ripples showing,
         // rising out of it, then mid wind-up of its water jet (the head reared, the throat swelling) and of its spray
         // rain (rearing as high as it goes, the warning sign).
