@@ -156,32 +156,23 @@ namespace Game.Client
             var face = new char[rows.Length][];
             for (int y = 0; y < rows.Length; y++) face[y] = rows[y].ToCharArray();
             bool Skin(char c) => c == 's' || c == 'S' || c == 'r';
-            void Chin(int y, int x, int outward)
-            {
-                if (y >= face.Length || !Skin(face[y][x])) return;
-                char beside = face[y][x + outward];
-                face[y][x] = beside == 'H' || beside == 'h' ? beside : '.';
-            }
             void Flush(int y, int x)
             {
                 if (y < face.Length && Skin(face[y][x])) face[y][x] = 'k';
             }
-            // The head's own rows start at top: the eyes are on its rows 5 and 6, the chin is its row 7.
-            int eyes = top + 6, chin = top + 7;
+            // The head's own rows start at top: the eyes are on its rows 5 and 6. The chin is the man's (2026-11-28, the
+            // owner: fill the woman's chin back in like the man's).
+            int eyes = top + 6;
             switch (look)
             {
                 case Look.Down:
-                    // The chin under the eyes stays as the man's: narrowed, the outline would touch the eyes.
                     Flush(eyes, 2);
                     Flush(eyes, 9);
                     break;
                 case Look.DownSide:
-                    // The far cheek's corner, not the one under the near eye (there the outline met the eye).
-                    Chin(chin, 3, -1);
                     Flush(eyes, 9);
                     break;
                 case Look.Side:
-                    Chin(chin, 9, 1);
                     Flush(eyes, 7);
                     break;
             }
