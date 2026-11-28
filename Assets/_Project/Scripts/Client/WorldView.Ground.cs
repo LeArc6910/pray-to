@@ -158,7 +158,6 @@ namespace Game.Client
             var bosses = _client.Others().Where(e => e.Kind == EntityKind.Boss && !e.IsDead).ToList();
             DrawEdge(bosses);
             DrawProps();
-            DrawShades();
             DrawRage(bosses);
         }
 
@@ -271,105 +270,14 @@ namespace Game.Client
             }
         }
 
-        // ---- The cave warden's core overload (AttackShape.Cover, R2b): while it winds up, the shadow behind each of
-        // its pillars (from where the blast comes) is lit pale as the only safe ground. ----
+        // ---- The cave warden's core overload (AttackShape.Cover, R2b): the shadow behind each pillar is marked on the
+        // ground in green, as a warning is, as the only safe ground (World.LayHazards lays it, AttackWarning.Safe).
+        // 2026-11-28: shadows drawn by hand as sprites here stood in the right place, size and order and still never
+        // showed in the web build; the person: "mark the safe room in green where the shadow is, like an attack's
+        // warning". ----
 
-        // Each shadow is a dark band cut out of the red warning (drawn over it: the warning lies at DarkOrder + 10,
-        // so a shadow under it was hard to see, 2026-11-28 the person: "draw the safe room behind the pillars plainly,
-        // in a colour or shadow of its own") with a bright cyan line along each long edge and across its far end.
-        // Built like a strip of ground (MakeGround): a root placed and turned along the shadow, its pieces scaled under it.
-        sealed class Shade
-        {
-            public Transform Root;
-            public SpriteRenderer Fill, EdgeA, EdgeB, End;
-        }
-
-        readonly List<Shade> _shades = new List<Shade>();
-        Vec2 _shadeFrom;
-        static readonly Color ShadeColor = new Color(0.03f, 0.07f, 0.16f, 0.62f);
-        static readonly Color ShadeEdgeColor = new Color(0.45f, 1f, 1f, 1f);
-        const float ShadeEdge = 0.12f;
-
-        // Shadows shown now, for the playtests.
-        public int ShadesShown => _shades.Count(s => s.Fill.enabled);
-        // Where each shown shadow is and how big and clear, for the playtests (2026-11-28: the shadows counted as shown
-        // but none could be seen in the picture).
-        public string ShadeTrace => $"from {_shadeFrom.X:0.0},{_shadeFrom.Y:0.0} cam {_camera.transform.position.x:0.0},{_camera.transform.position.y:0.0} root {_root.transform.position.x:0.0},{_root.transform.position.y:0.0} pillars "
-            + string.Join(" ", _client.Props().Where(p => p.Kind == PropKind.Pillar).Select(p => $"{p.Position.X:0.0},{p.Position.Y:0.0}r{p.Radius:0.00}")) + " shades "
-            + string.Join(" ", _shades.Where(s => s.Fill.enabled).Select(s =>
-            $"{s.Fill.transform.position.x:0.0},{s.Fill.transform.position.y:0.0}:{s.Fill.transform.lossyScale.x:0.0}x{s.Fill.transform.lossyScale.y:0.00}:a{s.Fill.color.a:0.00}:o{s.Fill.sortingOrder}:{s.Fill.sortingLayerName}:{(s.Fill.sprite == null ? "nosprite" : s.Fill.sprite.rect.width + "px/" + s.Fill.sprite.pixelsPerUnit)}"));
-
-        static SpriteRenderer ShadePiece(Transform root, string name, Color color, int order)
-        {
-            var made = Renderer(root, name, Shapes.Square, color);
-            made.sortingOrder = order;
-            return made;
-        }
-
-        // A piece at (along, across) from the shadow's middle, length by width, in the root's turned frame.
-        static void Lay(SpriteRenderer piece, float along, float across, float length, float width, Color color)
-        {
-            piece.enabled = true;
-            piece.transform.localPosition = new Vector3(along, across, 0);
-            piece.transform.localScale = new Vector3(length, width, 1);
-            piece.color = color;
-        }
-
-        void DrawShades()
-        {
-            HazardState? blast = null;
-            foreach (var mark in _marks.Values)
-            {
-                if (mark.State.Shape == HazardShape.Circle && AttackOf(mark.State)?.Shape == AttackShape.Cover)
-                {
-                    blast = mark.State;
-                    break;
-                }
-            }
-            int used = 0;
-            if (blast != null)
-            {
-                var from = blast.Value.Position;
-                _shadeFrom = from;
-                float pulse = 0.5f + 0.5f * Mathf.Sin(Time.time * 6);
-                foreach (var prop in _client.Props())
-                {
-                    if (prop.Kind != PropKind.Pillar) continue;
-                    var way = prop.Position - from;
-                    if (way.LengthSquared < 1e-4f) continue;
-                    var along = way.Normalized;
-                                        float width = 2 * (prop.Radius - World.ShadeMargin), length = blast.Value.Size;
-                    if (used == _shades.Count)
-                    {
-                        var root = new GameObject("Shade").transform;
-                        root.SetParent(_root.transform, false);
-                        _shades.Add(new Shade
-                        {
-                            Root = root,
-                            Fill = ShadePiece(root, "Fill", ShadeColor, DarkOrder + 11),
-                            EdgeA = ShadePiece(root, "Edge", ShadeEdgeColor, DarkOrder + 12),
-                            EdgeB = ShadePiece(root, "Edge", ShadeEdgeColor, DarkOrder + 12),
-                            End = ShadePiece(root, "Edge", ShadeEdgeColor, DarkOrder + 12),
-                        });
-                    }
-                    var shade = _shades[used++];
-                    var middle = prop.Position + along * (length / 2);
-                    shade.Root.gameObject.SetActive(true);
-                    shade.Root.localPosition = new Vector3(middle.X, middle.Y, 0);
-                    shade.Root.localRotation = Quaternion.Euler(0, 0, Mathf.Atan2(along.Y, along.X) * Mathf.Rad2Deg);
-                    Lay(shade.Fill, 0, 0, length, width, new Color(ShadeColor.r, ShadeColor.g, ShadeColor.b, ShadeColor.a * (0.85f + 0.15f * pulse)));
-                    var edge = new Color(ShadeEdgeColor.r, ShadeEdgeColor.g, ShadeEdgeColor.b, 0.65f + 0.35f * pulse);
-                    Lay(shade.EdgeA, 0, width / 2, length, ShadeEdge, edge);
-                    Lay(shade.EdgeB, 0, -width / 2, length, ShadeEdge, edge);
-                    Lay(shade.End, length / 2, 0, ShadeEdge, width + ShadeEdge, edge);
-                }
-            }
-            for (int i = used; i < _shades.Count; i++)
-            {
-                _shades[i].Fill.enabled = _shades[i].EdgeA.enabled = _shades[i].EdgeB.enabled = _shades[i].End.enabled = false;
-                _shades[i].Root.gameObject.SetActive(false);
-            }
-        }
+        // Safe ground shown now, for the playtests.
+        public int ShadesShown => _marks.Values.Count(m => m.State.Warning == AttackWarning.Safe);
 
         // A raging boss glows white-hot under itself, pulsing; the moment it starts it flares (SimEventType.Rage).
         void DrawRage(List<EntityView> bosses)

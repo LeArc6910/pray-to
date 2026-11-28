@@ -119,6 +119,12 @@ namespace Game.Core.Tests
             Assert.IsFalse(world.Shaded(boss.Id, boss.Position, other.Position));
             float hid = player.Health, stood = other.Health;
             Assert.IsTrue(world.ForceAttack(boss, "core"));
+            // The shadow is marked green as the place to stand (AttackWarning.Safe): harmless, and covering whoever hides.
+            var safe = world.Hazards.Single(h => h.Safe);
+            Assert.AreEqual(HazardShape.Line, safe.Shape);
+            Assert.AreEqual(0, safe.Damage);
+            Assert.IsTrue(safe.Contains(player.Position, 0), "the one hiding stands on it");
+            Assert.IsFalse(safe.Contains(other.Position, 0));
             Run(world, 1.6f);
             Assert.AreEqual(hid, player.Health, "behind the pillar: spared");
             Assert.Less(other.Health, stood, "in the open: struck");

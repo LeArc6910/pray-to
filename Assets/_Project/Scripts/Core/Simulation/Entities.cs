@@ -954,6 +954,8 @@ namespace Game.Core
         // A boss's blow that hurts by how near one stands (AttackWarning.Near or Far, World.FalloffShare); Marked for
         // the rest.
         internal AttackWarning Falloff { get; set; }
+        // Ground marked as the place to stand, not to leave (AttackWarning.Safe): harmless.
+        public bool Safe { get; internal set; }
         // 0 for a boss's; for a monster's, the attack shape that laid it plus one, or DeathFlash (what the wire
         // carries in place of the cause, HazardState.MonsterShape).
         public byte Mark { get; internal set; }

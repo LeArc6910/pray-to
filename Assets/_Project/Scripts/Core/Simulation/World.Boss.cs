@@ -600,6 +600,14 @@ namespace Game.Core
                     break;
                 case AttackShape.Cover:
                     AddHazard(boss, cause, HazardShape.Circle, boss.Position, facing, boss.ArenaRadius * 2 + ArenaMargin, 0, attack.Damage, resolve).Shades = true;
+                    // The shadow behind each pillar, marked green as the place to stand (Shaded is the rule; this shows it).
+                    foreach (var pillar in PropsOf(boss, PropKind.Pillar).ToList())
+                    {
+                        var way = pillar.Position - boss.Position;
+                        if (way.LengthSquared < 1e-4f) continue;
+                        AddHazard(boss, cause, HazardShape.Line, pillar.Position, way.Normalized, boss.ArenaRadius * 2,
+                            2 * (pillar.Radius - ShadeMargin), 0, resolve).Safe = true;
+                    }
                     break;
                 case AttackShape.Share:
                     AddHazard(boss, cause, HazardShape.Share, target.Position, facing, attack.Radius, 0, attack.Damage, resolve);

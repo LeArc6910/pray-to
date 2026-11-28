@@ -1353,7 +1353,7 @@ namespace Game.Client
                     // What a blow left on the floor (a web, a pool of venom) is no warning: it is drawn as itself.
                     mark = IsPool(hazard) ? MakePool(hazard) : MakeWarn(hazard);
                     _marks[hazard.Id] = mark;
-                    if (hazard.Warning != AttackWarning.Hidden && !IsPool(hazard)) HearWarning(new Vector3(hazard.Position.X, hazard.Position.Y, 0));
+                    if (hazard.Warning != AttackWarning.Hidden && hazard.Warning != AttackWarning.Safe && !IsPool(hazard)) HearWarning(new Vector3(hazard.Position.X, hazard.Position.Y, 0));
                 }
                 if (IsPool(hazard))
                 {

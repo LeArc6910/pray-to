@@ -85,7 +85,7 @@ namespace Game.Client
         };
 
         static WarnTone ToneOf(HazardState hazard) =>
-            hazard.Shape == HazardShape.Share ? WarnTone.Gather : hazard.Warning == AttackWarning.Far ? WarnTone.Cold
+            hazard.Warning == AttackWarning.Safe ? WarnTone.Safe : hazard.Shape == HazardShape.Share ? WarnTone.Gather : hazard.Warning == AttackWarning.Far ? WarnTone.Cold
             : hazard.Harmful ? WarnTone.Danger : WarnTone.Rush;
 
         ShapeLayer MakeLayer(Transform parent, string name, HazardField field, int order)

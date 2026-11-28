@@ -1040,6 +1040,7 @@ namespace Game.Core
         // How plainly the attack that laid a hazard is announced (a roar's blast, cause 0, is marked).
         AttackWarning WarningOf(Hazard hazard)
         {
+            if (hazard.Safe) return AttackWarning.Safe;
             // A monster's: as its sheet says, or strong for an elite leader's big attack (World.WarningOf).
             var enemy = hazard.Mark != 0 ? World.FindEnemy(hazard.Source) : null;
             var monster = enemy?.Definition.Attacks;

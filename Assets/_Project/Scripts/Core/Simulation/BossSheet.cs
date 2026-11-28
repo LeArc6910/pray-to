@@ -78,6 +78,9 @@ namespace Game.Core
         // Its area is marked on the ground in that colour (World.Falloff).
         Near,
         Far,
+        // Not an attack's: ground marked green as the place to stand (2026-11-28, the shadows behind the cave warden's
+        // pillars from its core overload). Harmless, unheard, no blast.
+        Safe,
     }
 
     // How a boss shows what is coming while it winds up (Docs/Bosses.md 전조 말, 2026-11-11, the research report's

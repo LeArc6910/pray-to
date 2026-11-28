@@ -11,6 +11,8 @@ namespace Game.Client
         Gather,
         // Blue (R1b, AttackWarning.Far): the black knight's blow that is worst close in.
         Cold,
+        // Green (2026-11-28, AttackWarning.Safe): where to stand, the shadow behind the cave warden's pillars.
+        Safe,
     }
 
     enum HazardForm : byte
@@ -73,6 +75,7 @@ namespace Game.Client
             Ramp("#FFF8D0", "#FFE880", "#FFD94D", "#C89A20", "#6A4A10"),
             Ramp("#FFF6D8", "#FFD060", "#FFB21E", "#C07A10", "#5E3A08"),
             Ramp("#E0F4FF", "#8AD0FF", "#3A8CFF", "#1E4AB8", "#101E5A"),
+            Ramp("#E8FFE0", "#9CFF8A", "#3FE05A", "#1E9A3A", "#0E4A1E"),
         };
 
         // Light, middle and dark of what flies up, then the soot or frost left behind.

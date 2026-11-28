@@ -1757,8 +1757,7 @@ async function props(browser) {
       await game.send('heal; clear; boss cave_warden use core_burst');
       await game.wait(900);
       s = await game.state();
-      check(s.pillars >= 1 && s.shadesShown >= 1, `핵 폭주: 기둥 그늘이 밝게 보인다 (기둥 ${s.pillars}, 그늘 ${s.shadesShown})`);
-      note(`- 그늘 조각: ${s.shadeTrace || '없음'}`);
+      check(s.pillars >= 1 && s.shadesShown >= 1, `핵 폭주: 기둥 그늘에 초록 안전 표시 (기둥 ${s.pillars}, 안전 ${s.shadesShown})`);
       await game.shot('props-cover', '핵 폭주(필살기): 기둥 뒤 그늘만 안전');
 
       await game.send('heal; clear; goto boss vein_eater');

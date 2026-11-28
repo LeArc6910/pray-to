@@ -661,7 +661,7 @@ namespace Game.Core
         // (World.BadGround).
         bool Danger(Vec2 at) => _world.Hazards.Any(h => h.Shape != HazardShape.Share && h.Shape != HazardShape.Web && h.Shape != HazardShape.Balm
             && h.Shape != HazardShape.Water && h.Shape != HazardShape.Rock
-            && !Mild(h) && !(h.Damage == 0 && h.Mark == (byte)MonsterAttackShape.Blink + 1) && h.Contains(at, World.PlayerRadius + 0.1f)
+            && !Mild(h) && !h.Safe && !(h.Damage == 0 && h.Mark == (byte)MonsterAttackShape.Blink + 1) && h.Contains(at, World.PlayerRadius + 0.1f)
             && !(h.Spares && _world.OnRock(h.Source, at)) && !(h.Shades && _world.Shaded(h.Source, h.Position, at)))
             || _world.BadGround(at);
 
