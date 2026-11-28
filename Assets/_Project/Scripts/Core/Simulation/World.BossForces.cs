@@ -270,16 +270,64 @@ namespace Game.Core
         }
 
         // Two walls from either side across the boss's facing, stopping width apart over the middle (marked green).
-        void LayClose(Boss boss, BossAttack attack, long resolve, int cause)
+        // Then count jets of water across the gap (radius wide), the first where the target stands along it and the
+        // rest JetStep either side, one after another once the walls have met (R3 left over, Docs/BossRedesign.md 5.4:
+        // "그 틈으로 물줄기"): the way out is along the gap, not out of it.
+        void LayClose(Boss boss, BossAttack attack, Player target, long resolve, int cause)
         {
             var axis = boss.Facing;
             var side = new Vec2(-axis.Y, axis.X);
             float reach = boss.ArenaRadius + 1;
             float travel = reach - attack.Width / 2 - WaveThick / 2;
+            long closed = resolve + Ticks(travel / attack.Speed);
             foreach (int sign in new[] { -1, 1 })
-                AddWave(boss, cause, boss.Home + side * (sign * reach), side * -sign, travel, 0, attack.Damage, resolve, resolve + Ticks(travel / attack.Speed));
+                AddWave(boss, cause, boss.Home + side * (sign * reach), side * -sign, travel, 0, attack.Damage, resolve, closed);
             AddHazard(boss, cause, HazardShape.Line, boss.Home - axis * reach, axis, reach * 2, attack.Width, 0, resolve).Safe = true;
+            float room = Math.Max(0, FloorRadius(boss) - attack.Radius);
+            float first = Math.Clamp(Vec2.Dot(target.Position - boss.Home, axis), -room, room);
+            for (int i = 0; i < attack.Count; i++)
+            {
+                float along = first + (i == 0 ? 0 : (i % 2 == 1 ? 1 : -1) * JetStep * ((i + 1) / 2));
+                if (MathF.Abs(along) > room) along = first - (along - first);
+                var at = boss.Home + axis * Math.Clamp(along, -room, room);
+                AddHazard(boss, cause, HazardShape.Line, at - side * reach, side, reach * 2, attack.Radius, Math.Max(1, (int)MathF.Round(attack.Damage * JetShare)), closed + Ticks(JetAfter + JetGap * i));
+            }
         }
+
+        // The jets across a closed gap: how long after the walls meet the first lands, the time between them, and how
+        // far apart along the gap.
+        public const float JetAfter = 0.8f;
+        public const float JetGap = 0.45f;
+        public const float JetStep = 2.5f;
+        // A jet hits this much of the walls' (2026-11-28: as hard as a wall, the bot fell in every last phase).
+        public const float JetShare = 0.5f;
+
+        // ---- The sand fountain (AttackTarget.Pits, R3 left over) ----
+
+        // Most circles a fountain throws at once, all its pits together (the snapshot carries 16 marks).
+        public const int MostFountains = 12;
+
+        // Round every pit of the boss's (a prop, or one laid on the ground), count circles each evenly round its rim
+        // and up to spread past it, one after another as the sand goes up; round the target with no pit.
+        void LayFountains(Boss boss, BossAttack attack, Player target, Vec2 facing, long resolve, int cause)
+        {
+            var pits = _props.Where(p => p.Owner == boss.Id && p.Kind == PropKind.Pit).Select(p => (p.Position, p.Radius))
+                .Concat(_hazards.Where(h => h.Source == boss.Id && h.Shape == HazardShape.Pit).Select(h => (h.Position, h.Size))).ToList();
+            if (pits.Count == 0) pits.Add((target.Position, 0f));
+            int each = Math.Max(1, Math.Min(attack.Count, MostFountains / Math.Min(pits.Count, MostFountains)));
+            foreach (var (at, radius) in pits.Take(MostFountains))
+            {
+                float turn = _random.NextFloat() * 2 * MathF.PI;
+                for (int i = 0; i < each; i++)
+                {
+                    float reach = radius + attack.Radius * 0.5f + _random.NextFloat() * attack.Spread;
+                    var spot = at + Vec2.FromAngle(turn + i * 2 * MathF.PI / each) * reach;
+                    AddHazard(boss, cause, HazardShape.Circle, spot, facing, attack.Radius, 0, attack.Damage, resolve + Ticks(FountainGap * i));
+                }
+            }
+        }
+
+        public const float FountainGap = 0.15f;
 
         void AddWave(Boss boss, int cause, Vec2 start, Vec2 way, float travel, float gap, int damage, long from, long to) =>
             _hazards.Add(new Hazard(_nextId++, boss.Id, cause, HazardShape.Wave, start, way, travel, gap, damage, from, to));

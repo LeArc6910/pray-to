@@ -180,6 +180,9 @@ namespace Game.Core
         // Centred on its nearest standing banner (R4a, Morg's hellfire falls round its banner), or on someone at random
         // with none standing.
         Banner,
+        // Round every sand pit of the boss's standing (R3 left over, the antlion's sand fountain: a pit's prop or a pit
+        // laid on the ground), count circles each; round the target with none.
+        Pits,
     }
 
     public sealed class BossAttack
@@ -275,6 +278,15 @@ namespace Game.Core
         // behind=1): it vanishes and comes out behind its target before it winds up (the crown wraith's grasp).
         public bool Mimic { get; private set; }
         public bool Behind { get; private set; }
+
+        // R3·R4 left over (2026-11-28, Docs/BossRedesign.md 8): (boost back=seconds, a burst) its shots stop after this
+        // long and come back to the boss (the void lord's ring); (boost cross=n, a charge) n of its images run through
+        // the target too, crossing the boss's run, each World.CloneLag later and World.CloneShare as hard (the crown
+        // wraith's phantom rush); (boost bend=tiles, a circle) where each lands is drawn this far toward the boss, as
+        // its gravity bends them (the void lord's falling stars).
+        public float Back { get; private set; }
+        public int Cross { get; private set; }
+        public float Bend { get; private set; }
 
         // A burrow that chases (R3, T5, length its speed): the boss goes under and a mound (the antlion's sand, the
         // serpent's V of ripples) comes after the target at length tiles a second, stops World.MoundStop before the
@@ -419,7 +431,7 @@ namespace Game.Core
             public char Op { get; }
             public float Value { get; }
 
-            public static readonly string[] Fields = { "count", "repeat", "tele", "again", "radius", "length", "angle", "width", "spread", "speed", "cooldown", "hold", "linger", "pull", "mimic", "behind" };
+            public static readonly string[] Fields = { "count", "repeat", "tele", "again", "radius", "length", "angle", "width", "spread", "speed", "cooldown", "hold", "linger", "pull", "mimic", "behind", "back", "cross", "bend" };
 
             float On(float now) => Op == '+' ? now + Value : Op == '*' ? now * Value : Value;
 
@@ -443,6 +455,9 @@ namespace Game.Core
                     case "pull": a.Pull = On(a.Pull); break;
                     case "mimic": a.Mimic = On(a.Mimic ? 1 : 0) > 0; break;
                     case "behind": a.Behind = On(a.Behind ? 1 : 0) > 0; break;
+                    case "back": a.Back = Math.Max(0, On(a.Back)); break;
+                    case "cross": a.Cross = Math.Max(0, (int)MathF.Round(On(a.Cross))); break;
+                    case "bend": a.Bend = Math.Max(0, On(a.Bend)); break;
                 }
             }
         }
@@ -835,6 +850,9 @@ namespace Game.Core
                         throw new FormatException("mimic은 circle, cone, line, ring에만 씁니다.");
                     if (field == "behind" && !(shape == AttackShape.Cone || shape == AttackShape.Line))
                         throw new FormatException("behind는 cone, line에만 씁니다.");
+                    if (field == "back" && shape != AttackShape.Burst) throw new FormatException("back은 burst에만 씁니다.");
+                    if (field == "cross" && shape != AttackShape.Charge) throw new FormatException("cross는 charge에만 씁니다.");
+                    if (field == "bend" && shape != AttackShape.Circle) throw new FormatException("bend는 circle에만 씁니다.");
                     if (field == "repeat" && (shape == AttackShape.Charge || shape == AttackShape.Spiral || shape == AttackShape.Summon))
                         throw new FormatException("repeat는 돌진(count로), 나선, 부르기에는 쓰지 않습니다.");
                     // A pull may turn into a push (R4b, the void lord's gravity turned over): pull=-2.4.

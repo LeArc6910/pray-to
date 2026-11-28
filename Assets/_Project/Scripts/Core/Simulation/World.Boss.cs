@@ -420,7 +420,7 @@ namespace Game.Core
             int cause = Cause(boss, attack);
             if (AimsRound(attack)) boss.AimStep = (int)(new GameRandom(_forageSeed + (ulong)Tick, stream: 40 + (ulong)boss.Id).NextUInt() % AimSteps);
 
-            Shelters(boss, attack);
+            Shelters(boss, attack, resolve);
             if (attack.Shape == AttackShape.Eat) StartEating(boss, attack, resolve, cause);
             int laid = _hazards.Count;
             LayHazards(boss, attack, target, fighters, boss.Facing, resolve, cause);
@@ -556,6 +556,9 @@ namespace Game.Core
         {
             switch (attack.Shape)
             {
+                case AttackShape.Circle when attack.Target == AttackTarget.Pits:
+                    LayFountains(boss, attack, target, facing, resolve, cause);
+                    break;
                 case AttackShape.Circle:
                     var centres = attack.Target == AttackTarget.Self ? new[] { boss.Position }
                         : attack.Target == AttackTarget.Middle ? new[] { boss.Home }
@@ -569,18 +572,28 @@ namespace Game.Core
                             var offset = attack.Spread > 0
                                 ? Vec2.FromAngle(_random.NextFloat() * 2 * MathF.PI) * (MathF.Sqrt(_random.NextFloat()) * attack.Spread)
                                 : Vec2.Zero;
-                            AddHazard(boss, cause, HazardShape.Circle, centre + offset, facing, attack.Radius, 0, attack.Damage, resolve);
+                            AddHazard(boss, cause, HazardShape.Circle, Bent(boss, attack, centre + offset), facing, attack.Radius, 0, attack.Damage, resolve);
                         }
                     }
                     break;
                 case AttackShape.Cone:
                     AddHazard(boss, cause, HazardShape.Cone, boss.Position, facing, attack.Length, attack.Angle, attack.Damage, resolve);
                     break;
+                case AttackShape.Line when attack.Count > 1:
+                    // A fan of count lines angle degrees apart, the middle one at the target (R4b left over, the crown
+                    // wraith's soul lances).
+                    for (int i = 0; i < attack.Count; i++)
+                    {
+                        float off = (i - (attack.Count - 1) / 2f) * attack.Angle * MathF.PI / 180f;
+                        AddHazard(boss, cause, HazardShape.Line, boss.Position, Vec2.FromAngle(facing.Angle + off), attack.Length, attack.Width, attack.Damage, resolve);
+                    }
+                    break;
                 case AttackShape.Line:
                     AddHazard(boss, cause, HazardShape.Line, boss.Position, facing, attack.Length, attack.Width, attack.Damage, resolve);
                     break;
                 case AttackShape.Charge:
                     AddHazard(boss, cause, HazardShape.Line, boss.Position, facing, attack.Length, attack.Width, 0, resolve);
+                    if (attack.Cross > 0) LayCrossing(boss, attack, target, facing, resolve, cause);
                     break;
                 case AttackShape.Ring:
                     var middle = attack.Target == AttackTarget.Self ? boss.Position : target.Position;
@@ -648,7 +661,7 @@ namespace Game.Core
                     LayWaves(boss, attack, target, resolve, cause);
                     break;
                 case AttackShape.Close:
-                    LayClose(boss, attack, resolve, cause);
+                    LayClose(boss, attack, target, resolve, cause);
                     break;
                 case AttackShape.Half:
                     LayHalf(boss, attack, resolve, cause);
@@ -808,7 +821,11 @@ namespace Game.Core
                     direction * attack.Speed,
                     rockRadius > 0 ? rockRadius : attack.Radius,
                     rockRadius > 0 ? Math.Max(1, attack.Damage / 3) : attack.Damage,
-                    Ticks(ProjectileSeconds)));
+                    Ticks(ProjectileSeconds + (rockRadius > 0 || attack.Back <= 0 ? 0 : attack.Back * 2 + TurnPause)))
+                {
+                    // Out for back seconds, a pause, then home to the boss (boost back, the void lord's ring).
+                    TurnTicks = rockRadius > 0 || attack.Back <= 0 ? 0 : Math.Max(1, Ticks(attack.Back)),
+                });
             }
         }
 

@@ -163,6 +163,8 @@ dotnet run --project DevTools/CoreSandbox -- --boss 600 1 --boss-id crown_wraith
 dotnet run --project DevTools/CoreSandbox -- --boss 600 1 --boss-id void_lord --gear obsidian_sword,obsidian_armor,obsidian_helmet,obsidian_boots,obsidian_ring,obsidian_amulet --classes warrior,fire_mage --reaction 0.5 --level 34 --build
 # 웹 점검 구역 mirror(PC·휴대폰): 안개 막간·웅덩이·분신·따라 하기·가라앉은 손·때려서 흩기, 공간 문·되감기·별 미로·중력 반전 테두리. Playtest 명령 `boss <id> clones [n]`
 node DevTools/WebPlaytest/sweep.js --wait <커밋> --only mirror
+# R3·R4 남은 패턴(Docs/BossLeftovers.md): 모래 분수, 물살 뱀 웅덩이·물줄기, 망령 교차 돌진·창 부채, 군주 되돌아오는 고리·휘는 별
+node DevTools/WebPlaytest/sweep.js --wait <커밋> --only leftover
 node DevTools/WebPlaytest/sweep.js --wait <커밋> --only forces
 ```
 

@@ -30,14 +30,28 @@ namespace Game.Core
 
         // ---- Pillars ----
 
+        // How long past a blast that spares the shaded its pillars stand at least (ticks).
+        const int ShelterLinger = TicksPerSecond;
+
         IEnumerable<BossProp> PropsOf(Boss boss, PropKind kind) => _props.Where(p => p.Owner == boss.Id && p.Kind == kind);
 
         // A pillar rises at a spot for seconds (an attack's pool), unless the boss or another pillar is in the way. Too
         // many of the boss's things standing and its oldest raised pillar crumbles first.
         void RaisePillar(Boss boss, Vec2 at, float seconds) => RaiseProp(boss, PropKind.Pillar, at, seconds);
 
-        // Every tick of a fight: raised pillars whose time is up crumble.
-        void WorkProps(Boss boss) => _props.RemoveAll(p => p.Owner == boss.Id && p.Until >= 0 && Tick >= p.Until);
+        // Every tick of a fight: raised pillars whose time is up crumble; whoever stands in a puddle wades (R3 left over:
+        // the tide serpent's two pools in its second phase, the crown wraith's sea water too).
+        void WorkProps(Boss boss)
+        {
+            _props.RemoveAll(p => p.Owner == boss.Id && p.Until >= 0 && Tick >= p.Until);
+            foreach (var puddle in _props)
+            {
+                if (puddle.Owner != boss.Id || puddle.Kind != PropKind.Puddle) continue;
+                foreach (var player in _players)
+                    if (!player.IsDead && Vec2.Distance(player.Position, puddle.Position) <= puddle.Radius)
+                        player.Afflictions.WadeTicks = Math.Max(player.Afflictions.WadeTicks, Ticks(SnareSeconds));
+            }
+        }
 
         // The pillar of its own a charging boss has run into, if any.
         BossProp PillarHit(Boss boss) => PropsOf(boss, PropKind.Pillar)
@@ -58,9 +72,14 @@ namespace Game.Core
 
         // Its strong blast all round with nothing standing to hide behind: two pillars rise first, evenly round the
         // middle as its props stand (Docs/BossRedesign.md 5.1 핵 폭주: only behind a pillar is safe).
-        void Shelters(Boss boss, BossAttack attack)
+        // A pillar standing already lasts past the blast (2026-11-28: seed 6's first-hour bot hid behind a raised pillar
+        // whose time ran out in the wind-up and fell to the blast twice — a person hiding there would have too).
+        void Shelters(Boss boss, BossAttack attack, long resolve)
         {
-            if (attack.Shape != AttackShape.Cover || PropsOf(boss, PropKind.Pillar).Any()) return;
+            if (attack.Shape != AttackShape.Cover) return;
+            foreach (var pillar in PropsOf(boss, PropKind.Pillar))
+                if (pillar.Until >= 0 && pillar.Until < resolve + ShelterLinger) pillar.Until = resolve + ShelterLinger;
+            if (PropsOf(boss, PropKind.Pillar).Any()) return;
             float turn = (boss.Position - boss.Home).LengthSquared > 1e-4f ? (boss.Position - boss.Home).Angle + MathF.PI / 2 : 0;
             for (int i = 0; i < 2; i++)
                 RaisePillar(boss, boss.Home + Vec2.FromAngle(turn + i * MathF.PI) * (FloorRadius(boss) * 0.6f), attack.Telegraph + 6);

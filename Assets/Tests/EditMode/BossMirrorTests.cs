@@ -310,5 +310,132 @@ namespace Game.Core.Tests
             foreach (var gone in new[] { "collapse", "void_storm", "call_wisps", "void_cross", "void_spiral", "void_lance", "void_ripple" })
                 Assert.IsFalse(lord.Attacks.Any(a => a.Id == gone), gone);
         }
-    }
+    
+        // ---- R3·R4 left over (2026-11-28, Docs/BossRedesign.md 8) ----
+
+        [Test]
+        public void ImagesRunThroughTheTargetAcrossThePhantomRush()
+        {
+            var definition = Dummy(100000, "", "", "", Row("rush", "charge", "farthest", "0.8", "400", length: "11", width: "2", speed: "18", boost: "2:cross=2"), Idle);
+            var (world, boss, player) = Awake(definition, Home + new Vec2(0, -6));
+            ToPhaseTwo(world, boss, player);
+            Assert.IsTrue(world.ForceAttack(boss, "rush"));
+            var runs = world.Hazards.Where(h => h.Shape == HazardShape.Line && h.Damage > 0).ToList();
+            Assert.AreEqual(2, runs.Count, "two images cross the boss's own run");
+            Assert.IsTrue(runs.All(r => r.Damage == (int)MathF.Round(400 * World.CloneShare)));
+            Assert.IsTrue(runs.All(r => r.Contains(player.Position, 0)), "through where the target stood");
+            Assert.AreEqual(2 * World.CloneLag, (runs.Max(r => r.ResolveTick) - runs.Min(r => r.ResolveTick)) / (float)World.TicksPerSecond * 2, 0.05f);
+            var own = world.Hazards.Single(h => h.Shape == HazardShape.Line && h.Damage == 0);
+            Assert.IsTrue(runs.All(r => MathF.Abs(Vec2.Dot(r.Direction, own.Direction)) < 0.6f), "turned well off the boss's run");
+        }
+
+        [Test]
+        public void ALineWithACountComesAsAFan()
+        {
+            var definition = Dummy(100000, "", "", "", Row("lance", "line", "nearest", "0.7", "400", length: "11", angle: "25", width: "1.2", count: "3"), Idle);
+            var (world, boss, player) = Awake(definition, Home + new Vec2(0, -6));
+            Assert.IsTrue(world.ForceAttack(boss, "lance"));
+            var lances = world.Hazards.Where(h => h.Shape == HazardShape.Line && h.Damage > 0).OrderBy(h => h.Direction.Angle).ToList();
+            Assert.AreEqual(3, lances.Count);
+            Assert.AreEqual(25, (lances[1].Direction.Angle - lances[0].Direction.Angle) * 180 / MathF.PI, 0.5f);
+            Assert.IsTrue(lances[1].Contains(player.Position, 0), "the middle one at the target");
+        }
+
+        [Test]
+        public void TheRingStopsAndComesBackToTheBoss()
+        {
+            var definition = Dummy(100000, "", "", "", Row("ring", "burst", "self", "0.6", "100", radius: "0.3", count: "8", speed: "8", cooldown: "20", boost: "2:back=0.4"), Idle);
+            var (world, boss, player) = Awake(definition, Home + new Vec2(0, -9));
+            ToPhaseTwo(world, boss, player);
+            Assert.IsTrue(world.ForceAttack(boss, "ring"));
+            Run(world, 0.65f);
+            Assert.AreEqual(8, world.Projectiles.Count);
+            float outward = world.Projectiles.Min(p => Vec2.Distance(p.Position, boss.Position));
+            Run(world, 0.4f + World.TurnPause + 0.15f);
+            var shot = world.Projectiles.First();
+            Assert.Less(Vec2.Dot(shot.Velocity, shot.Position - boss.Position), 0, "on its way home");
+            Run(world, 1.5f);
+            Assert.AreEqual(0, world.Projectiles.Count, "home at the boss");
+            Assert.Greater(outward, 0);
+        }
+
+        [Test]
+        public void FallingStarsBendTowardTheBoss()
+        {
+            var definition = Dummy(100000, "", "", "", Row("stars", "circle", "nearest", "1.2", "1", radius: "1", count: "1", boost: "2:bend=1.5"), Idle);
+            var (world, boss, player) = Awake(definition, Home + new Vec2(0, -7));
+            Assert.IsTrue(world.ForceAttack(boss, "stars"));
+            var plain = world.Hazards.Single(h => h.Damage > 0);
+            Assert.AreEqual(0, Vec2.Distance(plain.Position, player.Position), 0.01f, "phase 1 lands on the target");
+            Run(world, 1.5f);
+            ToPhaseTwo(world, boss, player);
+            Assert.IsTrue(world.ForceAttack(boss, "stars"));
+            var bent = world.Hazards.Single(h => h.Damage > 0 && h.Shape == HazardShape.Circle && h.Cause == 1);
+            Assert.AreEqual(Vec2.Distance(player.Position, boss.Position) - 1.5f, Vec2.Distance(bent.Position, boss.Position), 0.05f);
+        }
+
+        [Test]
+        public void TheSandFountainFallsRoundEveryPit()
+        {
+            var definition = Dummy(100000, "", "2:pit", "", Row("fountain", "circle", "pits", "0.9", "1", radius: "1.1", count: "3", spread: "1.2"), Idle);
+            var (world, boss, player) = Awake(definition, Home + new Vec2(0, -7));
+            Assert.IsTrue(world.ForceAttack(boss, "fountain"));
+            Assert.IsTrue(world.Hazards.Where(h => h.Damage > 0).All(h => Vec2.Distance(h.Position, player.Position) < 3), "no pit: round the target");
+            Run(world, 1.5f);
+            ToPhaseTwo(world, boss, player);
+            var pit = world.Props.Single(p => p.Kind == PropKind.Pit);
+            Assert.IsTrue(world.ForceAttack(boss, "fountain"));
+            var sand = world.Hazards.Where(h => h.Damage > 0 && h.Shape == HazardShape.Circle && h.Cause == 1).ToList();
+            Assert.AreEqual(3, sand.Count);
+            Assert.IsTrue(sand.All(h => Vec2.Distance(h.Position, pit.Position) > pit.Radius && Vec2.Distance(h.Position, pit.Position) <= pit.Radius + 0.55f + 1.2f + 0.01f), "round its rim");
+            Assert.AreEqual(3, sand.Select(h => h.ResolveTick).Distinct().Count(), "one after another");
+        }
+
+        [Test]
+        public void JetsCrossTheGapOnceTheClosingWallsMeet()
+        {
+            var definition = Dummy(100000, "", "", "", Row("squeeze", "close", "self", "1", "400", radius: "1.2", width: "1.5", count: "2", speed: "4"), Idle);
+            var (world, boss, player) = Awake(definition, Home + new Vec2(0, -5));
+            Assert.IsTrue(world.ForceAttack(boss, "squeeze"));
+            var walls = world.Hazards.Where(h => h.Shape == HazardShape.Wave).ToList();
+            var jets = world.Hazards.Where(h => h.Shape == HazardShape.Line && h.Damage > 0).OrderBy(h => h.ResolveTick).ToList();
+            Assert.AreEqual(2, jets.Count);
+            Assert.IsTrue(jets.All(j => j.ResolveTick > walls.Max(w => w.ResolveTick)), "after the walls have met");
+            Assert.IsTrue(jets.All(j => MathF.Abs(Vec2.Dot(j.Direction, boss.Facing)) < 0.01f), "across the gap");
+            Assert.IsTrue(jets[0].Contains(player.Position, 0), "the first where the target stands along it");
+            Assert.IsFalse(jets[1].Contains(player.Position, 0));
+            Assert.IsTrue(jets.All(j => j.Damage == (int)MathF.Round(400 * World.JetShare)), "softer than the walls");
+        }
+
+        [Test]
+        public void APuddleSlowsWhoeverWadesIn()
+        {
+            var definition = Dummy(100000, "", "2:puddle*2", "", Idle);
+            var (world, boss, player) = Awake(definition, Home + new Vec2(0, -7));
+            ToPhaseTwo(world, boss, player);
+            var puddle = world.Props.First(p => p.Kind == PropKind.Puddle);
+            Assert.IsFalse(player.Afflictions.Wading);
+            Walk(world, player, puddle.Position);
+            world.Step();
+            Assert.IsTrue(player.Afflictions.Wading);
+        }
+
+        [Test]
+        public void TheLeftOverPatternsAreInTheSheets()
+        {
+            var bosses = Bosses.Shipped;
+            var antlion = bosses.Find("antlion");
+            Assert.AreEqual(AttackTarget.Pits, antlion.Attacks.Single(a => a.Id == "sand_fountain").Target);
+            Assert.IsFalse(antlion.Attacks.Any(a => a.Id == "sand_spiral"), "the fountain stands for the spiral");
+            var serpent = bosses.Find("tide_serpent");
+            Assert.Greater(serpent.Attacks.Single(a => a.Id == "squeeze").Count, 0, "jets after the closing walls");
+            Assert.AreEqual(2, serpent.PropsByPhase[2].Where(p => p.Kind == PropKind.Puddle).Sum(p => p.Count), "two pools in phase 2");
+            var wraith = bosses.Find("crown_wraith");
+            Assert.AreEqual(2, wraith.Attacks.Single(a => a.Id == "phantom_rush").ForPhase(2).Cross);
+            Assert.AreEqual(3, wraith.Attacks.Single(a => a.Id == "soul_lance").ForPhase(2).Count);
+            var lord = bosses.Find("void_lord");
+            Assert.Greater(lord.Attacks.Single(a => a.Id == "void_ring").ForPhase(2).Back, 0);
+            Assert.Greater(lord.Attacks.Single(a => a.Id == "star_fall").ForPhase(3).Bend, 0);
+        }
+}
 }

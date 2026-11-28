@@ -917,7 +917,7 @@ namespace Game.Core
         public float MaxHealth { get; }
         public bool Breakable => MaxHealth > 0;
         // The tick it crumbles at (a pillar an attack raised, PoolKind.Pillar); -1 while it stands for the phase.
-        public long Until { get; }
+        public long Until { get; internal set; }
         // An interlude's (R4a: an egg to break, the banner that ends it), taken away when the interlude ends.
         public bool Interlude { get; internal set; }
     }

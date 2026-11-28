@@ -25,7 +25,7 @@ namespace Game.Client
             "sand_jet" => AntlionPose.Flick,
             "pit" => AntlionPose.Toss,
             "sand_trail" => AntlionPose.Gouge,
-            "quicksand" or "sand_spiral" => AntlionPose.Churn,
+            "quicksand" or "sand_fountain" => AntlionPose.Churn,
             "sandstorm" => AntlionPose.Crash,
             "sand_cross" => AntlionPose.Clap,
             "sinkholes" or "maw" => AntlionPose.Erupt,

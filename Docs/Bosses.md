@@ -1236,6 +1236,10 @@ M3에서 만든 보스전 규칙과 시트 작성법이다. 코드는 `Assets/_P
 - 화면: Playtest 명령 `boss <id> clones [n]`, 상태 `clones`·`clonesShown`·`clonesBroken`·`puddles`·`puddlesShown`·`puddleFlashes`·`gates`·`gatesShown`·`hands`·`handsShown`·`echoes`·`echoesShown`·`mazeRings`·`mazeRingsShown`·`hourglassShown`·`mistShown`·`gravityTurned`·`gravityRimShown`. 웹 점검 구역 `sweep.js --only mirror`, PlayMode 장면 `TheWraithSplitsAndTheVoidLordRewinds`(사진 `wraith-clones`·`void-rewind`·`void-maze`)
 - **안 한 것**: 유령 돌진 분신 둘 교차, 넋의 창 부채 셋, 벼락을 분신도 떨어뜨리기(분신 셋 × 벼락 여섯이면 한 스냅숏 장판 16개를 넘는다), 2페이즈 안개로 흩어졌다 "셋으로" 모이는 것은 막간 뒤 분신 둘로, 공허 고리 되돌아옴, 별똥별이 끌림 쪽으로 휨, 되감기 3페이즈 두 번
 
+## 보스 재설계 마무리 (2026-11-28)
+
+R3·R4에서 빠진 패턴, 핵 폭주 예고 동안 기둥이 버티기, 평타 전조: `Docs/BossLeftovers.md`.
+
 ## 보스 둘레 (2026-11-28)
 
 사람 요청: "보스 아레나 주변에는 일반 몬스터가 스폰되지 않게 해줘 (보스가 소환하는 몬스터는 제외)". 아레나(반지름 10칸, `WorldGenerator.ArenaRadius`)와 둘레 **6칸**(`World.BossGroundMargin`), 곧 보스 자리에서 16칸 안이 보스의 땅이다(`World.BossGround.cs`).

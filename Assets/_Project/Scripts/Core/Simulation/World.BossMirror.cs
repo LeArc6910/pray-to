@@ -124,6 +124,31 @@ namespace Game.Core
             (boss.Position, boss.Facing) = (position, facing);
         }
 
+        // Images running through the target across the boss's own run (boost cross, the crown wraith's phantom rush in
+        // its second phase): turned CrossAngle either way, each CloneLag after the last and CloneShare as hard.
+        void LayCrossing(Boss boss, BossAttack attack, Player target, Vec2 facing, long resolve, int cause)
+        {
+            for (int i = 0; i < attack.Cross; i++)
+            {
+                float turn = (i % 2 == 0 ? 1 : -1) * CrossAngle * (1 + i / 2);
+                var way = Vec2.FromAngle(facing.Angle + turn);
+                AddHazard(boss, cause, HazardShape.Line, target.Position - way * (attack.Length / 2), way, attack.Length, attack.Width,
+                    Math.Max(1, (int)MathF.Round(attack.Damage * CloneShare)), resolve + Ticks(CloneLag * (i + 1)));
+            }
+        }
+
+        public const float CrossAngle = MathF.PI / 3;
+
+        // Where a falling star lands, drawn toward the boss (boost bend): up to bend tiles, never onto the boss.
+        Vec2 Bent(Boss boss, BossAttack attack, Vec2 spot)
+        {
+            if (attack.Bend <= 0) return spot;
+            var toward = boss.Position - spot;
+            float distance = toward.Length;
+            if (distance < 1e-3f) return spot;
+            return spot + toward / distance * Math.Min(attack.Bend, Math.Max(0, distance - boss.Definition.Radius - attack.Radius));
+        }
+
         // Its blow from behind (boost behind): it comes out behind its target, facing them.
         void ComeBehind(Boss boss, Player target)
         {

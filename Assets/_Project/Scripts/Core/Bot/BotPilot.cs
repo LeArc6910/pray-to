@@ -667,16 +667,30 @@ namespace Game.Core
             && !(h.Spares && _world.OnRock(h.Source, at)) && !(h.Shades && _world.Shaded(h.Source, h.Position, at)))
             || _world.BadGround(at);
 
-        // The way to just behind the nearest pillar from a blast that spares the shaded, while one is coming and the bot
-        // is not shaded yet; null otherwise.
+        // The way to well behind the nearest pillar from a blast that spares the shaded, while one is coming; there it
+        // stands still (Vec2.Zero) until the blast is over. Null with no such blast. (2026-11-28: shaded at the very
+        // edge of the shadow, the bot went back to the fight, stepped out, was knocked about by slimes and fell to
+        // the blast twice in seed 6's first hour.)
         Vec2? ShadeFrom()
         {
             var blast = _world.Hazards.FirstOrDefault(h => h.Shades && h.Contains(_player.Position, 0));
-            if (blast == null || _world.Shaded(blast.Source, blast.Position, _player.Position)) return null;
-            var spots = _world.Props.Where(p => p.Owner == blast.Source && p.Kind == PropKind.Pillar)
-                .Select(p => p.Position + (p.Position - blast.Position).Normalized * (p.Radius + World.PlayerRadius + 0.2f)).ToList();
+            if (blast == null) return null;
+            var spots = _world.Props.Where(p => p.Owner == blast.Source && p.Kind == PropKind.Pillar && Vec2.Distance(p.Position, blast.Position) > 1e-3f)
+                .Select(p => Behind(p, blast.Position)).ToList();
             if (spots.Count == 0) return null;
-            return spots.OrderBy(at => Vec2.Distance(at, _player.Position)).First() - _player.Position;
+            var spot = spots.OrderBy(at => Vec2.Distance(at, _player.Position)).First();
+            if (Vec2.Distance(spot, _player.Position) < 0.25f && _world.Shaded(blast.Source, blast.Position, _player.Position)) return Vec2.Zero;
+            return spot - _player.Position;
+        }
+
+        // How far into a pillar's shadow past its edge the bot hides; just past the edge where that is rock.
+        const float ShadeDepth = 0.9f;
+
+        Vec2 Behind(BossProp pillar, Vec2 blast)
+        {
+            var away = (pillar.Position - blast).Normalized;
+            var deep = pillar.Position + away * (pillar.Radius + World.PlayerRadius + ShadeDepth);
+            return Nav.Walkable(TileMap.Cell(deep.X), TileMap.Cell(deep.Y)) ? deep : pillar.Position + away * (pillar.Radius + World.PlayerRadius + 0.2f);
         }
 
         // Standing in a warning on the floor (not a share marker): toward the nearest spot out of every one.
@@ -686,10 +700,11 @@ namespace Game.Core
 
         Vec2? WayOutOfDanger(BotTarget target)
         {
-            if (!Danger(_player.Position)) return null;
-            // A blast that spares the shaded (R2b, the warden's core overload): straight for the nearest pillar's shadow.
+            // A blast that spares the shaded (R2b, the warden's core overload): straight for the nearest pillar's shadow,
+            // and still there.
             var shade = ShadeFrom();
             if (shade != null) return shade;
+            if (!Danger(_player.Position)) return null;
             var boss = target.Aim == BotAim.BossFight ? BossOf(target.Id) : null;
             foreach (bool inside in new[] { true, false })
             {

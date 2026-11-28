@@ -1355,7 +1355,7 @@ async function antlion(browser) {
     ['sand_trail', '모래 물결(머리를 낮게 앞으로)', 0.6, false, true],
     ['mound', '둔덕 습격(땅속으로, 둔덕이 쫓아옴)', 2.0, false, false],
     ['quicksand', '모래늪(반쯤 가라앉음)', 1.0, false, true],
-    ['sand_spiral', '모래 나선(가라앉아 돈다)', 0.5, false, false],
+    ['sand_fountain', '모래 분수(반쯤 가라앉아 구덩이를 흔든다)', 0.9, false, true],
     ['maw', '개미지옥의 입(필살기, 경고)', 1.6, true, true],
   ];
   for (const [attack, name, telegraph, strong, marked] of uses) {
@@ -2121,6 +2121,93 @@ async function mirror(browser) {
       check(!s.interlude && s.gravityRimShown, `막간 뒤 중력이 뒤집힌다: 화면 둘레 보라 (${s.gravityRimShown})`);
       await game.shot('mirror-gravity', '중력 반전: 화면 둘레가 보라로 숨 쉰다');
     }
+    await game.context.close();
+  }
+}
+
+// ---------------------------------------------------------------- R3·R4 남은 패턴 (2026-11-28, Docs/BossRedesign.md 8)
+// The antlion's sand fountain round its pits, the tide serpent's two pools in phase 2 (wading) and the jets across the
+// closing walls' gap, the crown wraith's images crossing its phantom rush and its fan of three lances, the void lord's
+// ring coming back and its falling stars bent toward it. Pictures are taken while each is still coming.
+async function leftover(browser) {
+  for (const profile of [Profiles.pc, Profiles.phone]) {
+    const pc = profile === Profiles.pc;
+    note(`\n## R3·R4 남은 패턴 (${pc ? 'PC' : '휴대폰'})\n`);
+    const game = await open(browser, run, profile, url);
+    await game.startSolo();
+    await game.wait(1200);
+    await game.send('xp 2000000; equip void_sword void_helmet void_armor void_boots; heal');
+    let s;
+    if (pc) {
+      await game.send('heal; goto boss antlion');
+      await game.until(t => has(t.banner, '개미귀신') || has(t.entrance, '개미귀신'), 8000, game.texts);
+      await game.wait(4500);
+      await game.send('heal; clear; boss antlion hurt 0.69');
+      await game.until(t => t.bossPhase === 3, 4000);
+      await game.wait(2500);
+      await game.send('heal; clear; boss antlion use sand_fountain');
+      await game.wait(350);
+      s = await game.state();
+      check(s.circleMarks >= 3 && s.marksShown >= 3, `모래 분수: 구덩이 둘레에 모래가 떨어진다 (원 ${s.circleMarks}, 그림 ${s.marksShown})`);
+      await game.shot('leftover-fountain', '모래 분수: 구덩이 둘레, 차례로 떨어진다');
+      await game.wait(1500);
+    }
+
+    await game.send('heal; clear; goto boss tide_serpent');
+    await game.until(t => has(t.banner, '물살 뱀') || has(t.entrance, '물살 뱀'), 8000, game.texts);
+    await game.wait(4500);
+    await game.send('heal; clear; boss tide_serpent hurt 0.36');
+    await game.until(t => t.bossPhase === 2, 4000);
+    await game.wait(2500);
+    s = await game.state();
+    check(s.puddles >= 2 && s.puddlesShown >= 2, `물살 뱀 2페이즈: 웅덩이 둘 (${s.puddles}, 그림 ${s.puddlesShown})`);
+    await game.shot(pc ? 'leftover-pools' : 'leftover-pools-phone', '물살 뱀 2페이즈: 얕은 웅덩이 둘(걸음이 느려진다)');
+    await game.send('heal; clear; boss tide_serpent hurt 0.33');
+    await game.until(t => t.bossPhase === 3, 4000);
+    await game.wait(2500);
+    await game.send('heal; clear; boss tide_serpent use squeeze');
+    await game.wait(1500);
+    s = await game.state();
+    check(s.waves >= 2 && s.lineMarks >= 2, `조이는 물살: 벽이 좁혀 오고 틈을 가로지르는 물줄기 (벽 ${s.waves}, 물줄기 ${s.lineMarks})`);
+    await game.shot(pc ? 'leftover-jets' : 'leftover-jets-phone', '조이는 물살: 틈 안에서 물줄기를 앞뒤로 피한다');
+    await game.wait(3500);
+
+    await game.send('heal; clear; goto boss crown_wraith');
+    await game.until(t => has(t.banner, '왕관의 망령') || has(t.entrance, '왕관의 망령'), 8000, game.texts);
+    await game.wait(4500);
+    await game.send('heal; clear; boss crown_wraith hurt 0.36');
+    await game.until(t => t.bossPhase === 2 && !t.interlude, 12000);
+    await game.wait(1500);
+    await game.send('heal; clear; boss crown_wraith use soul_lance');
+    await game.wait(300);
+    s = await game.state();
+    check(s.lineMarks >= 3, `넋의 창: 부채 셋 (${s.lineMarks})`);
+    await game.shot(pc ? 'leftover-lances' : 'leftover-lances-phone', '넋의 창 2페이즈: 부채 셋');
+    await game.wait(1500);
+    if (pc) {
+      await game.send('heal; clear; boss crown_wraith use phantom_rush');
+      await game.wait(400);
+      s = await game.state();
+      check(s.lineMarks >= 2, `유령 돌진: 분신 둘이 교차해 달린다 (${s.lineMarks})`);
+      await game.shot('leftover-cross', '유령 돌진: 분신 둘 + 본체 교차');
+      await game.wait(3000);
+    }
+
+    await game.send('heal; clear; goto boss void_lord');
+    await game.until(t => has(t.banner, '공허의 군주') || has(t.entrance, '공허의 군주'), 8000, game.texts);
+    await game.wait(4500);
+    await game.send('heal; clear; boss void_lord hurt 0.36');
+    await game.until(t => t.bossPhase === 2, 4000);
+    await game.wait(2500);
+    await game.send('heal; clear; boss void_lord use void_ring');
+    s = (await game.until(t => t.shotsHome >= 4, 2500)) || await game.state();
+    check(s.shotsHome >= 4, `공허 고리: 탄이 멈췄다 되돌아온다 (돌아오는 탄 ${s.shotsHome})`);
+    await game.shot(pc ? 'leftover-ring' : 'leftover-ring-phone', '공허 고리: 되돌아오는 탄');
+    await game.wait(2000);
+    await game.send('heal; clear; boss void_lord use star_fall');
+    s = (await game.until(t => t.starsShown >= 1, 2500)) || await game.state();
+    check(s.starsShown >= 1, `별똥별: 군주 쪽으로 휘어 떨어진다 (별 ${s.starsShown})`);
+    await game.shot(pc ? 'leftover-stars' : 'leftover-stars-phone', '별똥별: 바깥에서 휘어 들어온다');
     await game.context.close();
   }
 }
@@ -9882,7 +9969,7 @@ async function towns(browser) {
   }
 }
 
-const Sections = { menu, title, testground, hunt, harvest, zones, towns, time, basics, first, firstphone, hour, bag, combat, hero, roll, weapons, arts, bosses, patterns, tempo, ground, props, forces, order, mirror, veineater, samurai, knight, warden, antlion, serpent, titan, voidlord, wraith, queen, general, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, layers, monsterfx, hazards, bossfx, hits, shots, blast, mobwarn, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
+const Sections = { menu, title, testground, hunt, harvest, zones, towns, time, basics, first, firstphone, hour, bag, combat, hero, roll, weapons, arts, bosses, patterns, tempo, ground, props, forces, order, mirror, leftover, veineater, samurai, knight, warden, antlion, serpent, titan, voidlord, wraith, queen, general, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, layers, monsterfx, hazards, bossfx, hits, shots, blast, mobwarn, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

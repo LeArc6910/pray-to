@@ -265,6 +265,14 @@ namespace Game.Client
                     if (Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.14f);
                     Hear(Sound.Zap, at, 1);
                     return true;
+                case "phantom_rush":
+                    // An image's run across the wraith's own (boost cross): a streak of spirit down the line.
+                    if (!hazard.Harmful) return false;
+                    BlastLanded(hazard, FxRamp.Spirit, sparks: false, chunks: false, light: false, wave: false);
+                    AddBossFx(BossFx.Rift, at, c);
+                    if (Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.1f);
+                    Hear(Sound.CloneBreak, at, 0.6f);
+                    return true;
                 case "crown_ring":
                 case "soul_ripple":
                     // Lightning running round the band (the ripple the smaller, of souls).

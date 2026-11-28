@@ -136,6 +136,23 @@ namespace Game.Core.Tests
         }
 
         [Test]
+        public void ARaisedPillarStandsPastACoverBlastThatComesBeforeItsTimeIsUp()
+        {
+            // 2026-11-28: seed 6's first-hour bot hid behind a pillar whose time ran out in the wind-up.
+            var definition = Dummy("", "", Row("trail", "trail", "nearest", "0.5", "100", radius: "1", length: "6", count: "4", speed: "30", pool: "pillar:1.5"),
+                Row("core", "cover", "self", "1.4", "400", warn: "strong"), Idle);
+            var (world, boss, _) = Awake(definition, Home + new Vec2(0, -8));
+            Assert.IsTrue(world.ForceAttack(boss, "trail"));
+            Run(world, 1.2f);
+            var pillar = world.Props.Single();
+            Assert.IsTrue(world.ForceAttack(boss, "core"));
+            long blast = world.Hazards.Single(h => h.Shades).ResolveTick;
+            Assert.GreaterOrEqual(pillar.Until, blast + World.TicksPerSecond, "it stands past the blast");
+            Run(world, 1.5f);
+            Assert.IsTrue(world.Props.Contains(pillar));
+        }
+
+        [Test]
         public void WithNoPillarTheCoverBlastRaisesTwoFirst()
         {
             var definition = Dummy("", "", Row("core", "cover", "self", "1.4", "400", warn: "strong"), Idle);

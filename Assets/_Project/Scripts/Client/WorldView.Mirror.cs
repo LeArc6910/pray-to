@@ -188,7 +188,10 @@ namespace Game.Client
         // ---- The star maze's stars: as a ring lands, stars rain down all round it but for its gap ----
 
         readonly Dictionary<int, HazardState> _mazeComing = new Dictionary<int, HazardState>();
-        readonly List<(SpriteRenderer Sprite, Vector3 To, float Born)> _stars = new List<(SpriteRenderer, Vector3, float)>();
+        readonly List<(SpriteRenderer Sprite, Vector3 To, float Born, Vector3 Drift)> _stars = new List<(SpriteRenderer, Vector3, float, Vector3)>();
+        // The void lord's falling stars already coming down (boost bend), by mark.
+        readonly HashSet<int> _starsFalling = new HashSet<int>();
+        const float StarBend = 2.2f;
         // For the playtests: stars falling now.
         public int StarsShown => _stars.Count;
         const float StarFall = 0.35f, StarHeight = 3f;
@@ -208,14 +211,37 @@ namespace Game.Client
                     var to = new Vector3(ring.Position.X + Mathf.Cos(angle) * middle, ring.Position.Y + Mathf.Sin(angle) * middle, 0);
                     var star = Renderer(_root.transform, "Star", null, Color.white);
                     star.sortingOrder = DarkOrder + 13;
-                    _stars.Add((star, to, Time.time - Random.value * 0.1f));
+                    _stars.Add((star, to, Time.time - Random.value * 0.1f, Vector3.zero));
                 }
                 if (Vec2.Distance(ring.Position, new Vec2(_self.Position.x, _self.Position.y)) < ring.Size + 6)
                     Hear(Sound.StarFall, new Vector3(ring.Position.X, ring.Position.Y, 0), 0.8f);
             }
+            // The void lord's falling stars (R4b left over, boost bend): each comes down StarFall before its mark lands,
+            // curving in from the side away from the lord as its gravity bends it.
+            var marks = _client.Hazards();
+            _starsFalling.RemoveWhere(id => marks.All(h => h.State.Id != id));
+            foreach (var mark in marks)
+            {
+                if (_starsFalling.Contains(mark.State.Id) || !mark.State.Harmful) continue;
+                var (boss, attack) = BlowOf(mark.State);
+                if (boss != "void_lord" || attack != "star_fall") continue;
+                if ((1 - mark.Progress) * mark.State.Duration / World.TicksPerSecond > StarFall) continue;
+                _starsFalling.Add(mark.State.Id);
+                var to = new Vector3(mark.State.Position.X, mark.State.Position.Y, 0);
+                var lords = _client.Others().Where(e => e.Kind == EntityKind.Boss && e.Boss?.Id == "void_lord").OrderBy(e => Vec2.Distance(e.Position, mark.State.Position)).Take(1).ToList();
+                var drift = Vector3.zero;
+                foreach (var lord in lords)
+                {
+                    var away = to - new Vector3(lord.Position.X, lord.Position.Y, 0);
+                    if (away.sqrMagnitude > 1e-4f) drift = away.normalized * StarBend;
+                }
+                var star = Renderer(_root.transform, "Star", null, Color.white);
+                star.sortingOrder = DarkOrder + 13;
+                _stars.Add((star, to, Time.time, drift));
+            }
             for (int i = _stars.Count - 1; i >= 0; i--)
             {
-                var (star, to, born) = _stars[i];
+                var (star, to, born, drift) = _stars[i];
                 float t = (Time.time - born) / StarFall;
                 if (t >= 1)
                 {
@@ -226,7 +252,8 @@ namespace Game.Client
                 }
                 int frame = Mathf.Clamp(Mathf.FloorToInt(t * ForceArt.Frames), 0, ForceArt.Frames - 1);
                 star.sprite = Sprites.Get($"fx/star/{frame}", () => ForceArt.Star(frame), new Vector2(0.5f, 0));
-                star.transform.localPosition = to + new Vector3(0, (1 - Mathf.Max(0, t)) * StarHeight, 0);
+                float high = 1 - Mathf.Max(0, t);
+                star.transform.localPosition = to + new Vector3(0, high * StarHeight, 0) + drift * (high * high);
             }
         }
 

@@ -3073,6 +3073,11 @@ namespace Game.Client
                 json.Field("gravityRimShown", GameRoot.GravityRimShown);
                 json.Field("bossChasing", fighting != null && fighting.State == BossState.Telegraph && fighting.Attack != null && fighting.Attack.Chases);
                 json.Field("wading", player.Afflictions.Wading);
+                // R3·R4 left over (Docs/BossRedesign.md 8): harmful lines laid (a fan of lances, images' runs, jets across a
+                // gap), circles laid, and a boss's shots on their way home to it (the void lord's ring come back).
+                json.Field("lineMarks", world.Hazards.Count(h => h.Shape == HazardShape.Line && h.Damage > 0));
+                json.Field("circleMarks", world.Hazards.Count(h => h.Shape == HazardShape.Circle && h.Damage > 0));
+                json.Field("shotsHome", world.Projectiles.Count(p => !p.Friendly && world.FindBoss(p.Source) is Boss b && Vec2.Dot(p.Velocity, b.Position - p.Position) > 0.5f * p.Velocity.Length * Vec2.Distance(b.Position, p.Position)));
                 json.Field("snared", player.Afflictions.Snared);
                 // Ordinary monsters' attacks (monster_attacks.csv, 2026-11-21): those near that fight from the sheet with
                 // their state and attack, their marks and what they left in the world, and what the screen draws of them

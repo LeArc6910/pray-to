@@ -1236,9 +1236,19 @@ namespace Game.Core
             else
             {
                 var home = FindEnemy(shot.Source);
-                if (home == null || home.IsDead) return shot.Velocity.LengthSquared < 1e-6f;
-                homeAt = home.Position;
-                homeRadius = home.Definition.Radius;
+                // A boss's ring comes back to the boss (R4b left over, boost back).
+                var boss = home == null ? FindBoss(shot.Source) : null;
+                if (boss != null && !boss.IsDead)
+                {
+                    homeAt = boss.Position;
+                    homeRadius = boss.Definition.Radius;
+                }
+                else
+                {
+                    if (home == null || home.IsDead) return shot.Velocity.LengthSquared < 1e-6f;
+                    homeAt = home.Position;
+                    homeRadius = home.Definition.Radius;
+                }
             }
             var toward = homeAt - shot.Position;
             if (toward.Length <= homeRadius + shot.Radius + shot.Pace * TickSeconds) return true;
