@@ -2358,6 +2358,35 @@ DevTools/Local/setup.sh --commit
   - `Game.Client.Tests.FeatureTests.TheBagAndHudDraw: The food's buff has no icon.`
   - `Game.Client.Tests.FeatureTests.TheCaveWardenWakesAndWindsUp: Expected: True`
 
+### 2026-11-29 03:55 setup.ps1 (Unity 6000.6.3f1)
+
+- 프로젝트 설정: 성공
+- 패키지: com.unity.netcode.gameobjects 2.13.3, com.unity.transport 6.6.0, com.unity.render-pipelines.universal 17.6.0, com.unity.inputsystem 1.20.0, com.unity.multiplayer.playmode 3.0.0, com.unity.test-framework 1.8.0
+- EditMode 테스트: 1327개 중 1326개 통과, 1개 실패
+  - `Game.Core.Tests.BotTests.FirstHourReachesTheFirstMonsterCraftAndBoss(1UL): at the warden's arena`
+- PlayMode 테스트: 78개 중 64개 통과, 14개 실패
+  - `Game.Client.Tests.FeatureTests.ADungeonGateLeadsIntoThePocketAndOut: The gate's button starts going in.`
+  - `Game.Client.Tests.FeatureTests.ASingleShotIsLinedToItsTargetBeforeItFlies: A line to the player the shot is for.`
+  - `Game.Client.Tests.FeatureTests.ElitesWearTheirNamesAndWarnOfTheirBigAttack: A name over the leader and each champion.`
+  - `Game.Client.Tests.FeatureTests.EveryKindHasItsOwnAttacks: A blow its shell turned shows a grey number.`
+  - `Game.Client.Tests.FeatureTests.RumoursAndSlowRest: The goal list says only which way:`
+  - `Game.Client.Tests.FeatureTests.TheBagAndHudDraw: The food's buff has no icon.`
+  - `Game.Client.Tests.FeatureTests.TheCaveWardenWakesAndWindsUp: Expected: True`
+  - `Game.Client.Tests.FeatureTests.TheEncounterWindowsDraw: Her portrait is in the talk box.`
+  - `Game.Client.Tests.FeatureTests.TheQueenLightsHerCrystalsAndMorgHoldsHisInterlude: The interlude is named under the boss bar.`
+  - `Game.Client.Tests.FeatureTests.TheWraithSplitsAndTheVoidLordRewinds: Expected: True`
+  - `Game.Client.Tests.LayoutTests.TheBagAndHudFit: 작은 휴대폰 가로 667×375: 배너가 [메뉴] 판에 겹친다 (x:0.00, y:301.00, width:667.00, height:64.00) (x:353.00, y:186.00, width:304.00, height:160.00)`
+  - `Game.Client.Tests.LayoutTests.TheFixedPartsKeepToTheSafeArea: 작은 휴대폰 가로(안전 영역 32 0 32 16) 667×375, 스킬 1: 겹침 - 시간·장소 줄 / 구르기`
+  - `Game.Client.Tests.LayoutTests.TheGrowthScreensFit: 작은 휴대폰 세로 360×640, 특성: 고른 점과 서랍이 하늘을 거의 다 덮는다 (84)`
+  - `Game.Client.Tests.TitleScreenTests.TheTestGroundsPanelAndHitLogDraw: The hit log is on the screen.`
+- 화면 캡처: 사진 216장, 장면 56개 중 50개 통과
+  - `Game.Client.Tests.FeatureTests.ADungeonRunGoesToItsMasterAndItsEndChest: The gate's button starts going in.`
+  - `Game.Client.Tests.FeatureTests.ASingleShotIsLinedToItsTargetBeforeItFlies: A line to the player the shot is for.`
+  - `Game.Client.Tests.FeatureTests.EveryKindHasItsOwnAttacks: A blow its shell turned shows a grey number.`
+  - `Game.Client.Tests.FeatureTests.TheBagAndHudDraw: The food's buff has no icon.`
+  - `Game.Client.Tests.FeatureTests.TheCaveWardenWakesAndWindsUp: Expected: True`
+  - `Game.Client.Tests.FeatureTests.TheWraithSplitsAndTheVoidLordRewinds: Expected: True`
+
 ### 2026-11-29 04:30 NPC 비켜 가기, NPC·몬스터 그림 시안 (로컬 세션, 사람 요청으로 코드까지)
 
 - 사람 요청(2026-11-29, 자러 가며 "확인이 꼭 필요한 것만 남기고 알아서"): ① 마을에서 NPC들이 서로 겹쳐 걷는 것 고치기 ② NPC 마을 도트와 대화 초상화를 로컬 AI로(초상화는 일반 2D 그림에 도트 느낌만 살짝) ③ 품질 낮은 오브젝트·일반 몬스터를 골라 로컬 AI로(예: 균사 어미)
