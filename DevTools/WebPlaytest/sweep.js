@@ -1646,20 +1646,21 @@ async function ground(browser) {
     const game = await open(browser, run, profile, url);
     await game.startSolo();
     await game.wait(1200);
-    await game.send('equip void_sword void_helmet void_armor void_boots; heal');
+    // A level 1 body falls to the titan's blows between the checks (first web check): grown up first.
+    await game.send('xp 2000000; equip void_sword void_helmet void_armor void_boots; heal');
     await game.send('heal; goto boss lava_titan');
     await game.until(t => has(t.banner, '용암 거인') || has(t.entrance, '용암 거인'), 8000, game.texts);
     await game.wait(4500);
     let s;
     if (pc) {
       await game.send('heal; clear; boss lava_titan use lava_trail');
-      await game.wait(1600);
+      await game.wait(2300);
       s = await game.state();
       check(s.lava >= 1 && s.lavaHarmful === 0 && s.lavaShown >= 1, `용암 줄기가 용암 띠를 남긴다, 첫 번은 피해 없음 (용암 ${s.lava}, 해로움 ${s.lavaHarmful}, 그림 ${s.lavaShown})`);
       await game.shot('ground-lava-first', '첫 용암 띠(피해 없음, 조금 흐림)');
       await game.wait(1500);
       await game.send('heal; boss lava_titan use lava_trail');
-      await game.wait(1600);
+      await game.wait(2300);
       s = await game.state();
       check(s.lavaHarmful >= 1, `둘째 용암 띠는 해롭다 (해로움 ${s.lavaHarmful})`);
       await game.shot('ground-lava', '둘째 용암 띠(밝게 끓음)');
