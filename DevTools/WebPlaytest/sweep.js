@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu title testground hunt harvest zones towns time basics first firstphone hour bag combat hero roll weapons arts bosses patterns tempo veineater samurai knight warden antlion serpent titan voidlord wraith queen general spider arenas world farm life npc factory defense gear skills skillfx layers monsterfx hazards bossfx hits shots blast mobwarn map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
+// Sections: menu title testground hunt harvest zones towns time basics first firstphone hour bag combat hero roll weapons arts bosses patterns tempo ground veineater samurai knight warden antlion serpent titan voidlord wraith queen general spider arenas world farm life npc factory defense gear skills skillfx layers monsterfx hazards bossfx hits shots blast mobwarn map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -866,7 +866,7 @@ async function patterns(browser) {
     ['tide_serpent', 'whirlpool', '물살 뱀의 소용돌이(고리)'], ['tide_serpent', 'tidal_trail', '물살 뱀의 밀물(연쇄 폭발)'],
     ['antlion', 'pit', '개미귀신의 개미지옥(멀리 있는 사람 발밑)'], ['antlion', 'quicksand', '개미귀신의 모래늪(고리)'],
     // Follow-ups (2026-11-25, B5b, the follow column): the second is marked with the first and lands 0.5 s after it.
-    ['tide_serpent', 'water_jet', '물살 뱀의 물줄기 → 역류(발밑만 안전한 고리가 0.5초 뒤)', 2], ['lava_titan', 'slam', '용암 거인의 내려찍기 → 여진(내려찍은 원만 안전한 고리)', 2],
+    ['tide_serpent', 'water_jet', '물살 뱀의 물줄기 → 역류(발밑만 안전한 고리가 0.5초 뒤)', 2],
   ];
   let woken = '';
   for (const [id, attack, name, least = 1] of uses) {
@@ -1607,11 +1607,10 @@ async function titan(browser) {
     ['fire_wave', '불꽃 휩쓸기(불붙은 팔을 뒤로 당김)', 0.8, false, true],
     ['meteor', '유성 낙하(두 팔을 V로 들고 심장이 타오름)', 1.2, false, true],
     ['magma_ring', '용암 고리(심장을 끌어안고 웅크림)', 0.5, false, false],
-    ['eruption', '분화(웅크려 한 주먹을 높이)', 1.0, false, true],
+    ['eruption', '분출구(웅크려 한 주먹을 높이, 분출구가 없으면 발밑)', 0.8, false, true],
     ['lava_trail', '용암 줄기(낮게 숙여 손을 뒤로)', 0.8, false, true],
-    ['heat_ring', '열기 고리(팔을 가슴 앞에 엇갈림)', 1.1, false, true],
     ['lava_cross', '용암 십자(한 발을 높이)', 1.1, false, true],
-    ['fire_rain', '불비(필살기, 경고, 하얗게 달아올라 솟음)', 1.4, true, true],
+    ['fire_rain', '화산 폭발(필살기, 경고, 식은 바위 위만 안전)', 1.4, true, true],
   ];
   for (const [attack, name, telegraph, strong, marked] of uses) {
     await game.send('heal; clear');
@@ -1634,6 +1633,83 @@ async function titan(browser) {
   check((last.bosses || '').includes('lava_titan') && (last.bosses || '').includes(':p3:'), `체력을 깎으면 3페이즈 (${last.bosses})`);
   await game.shot('titan-phase3', '3페이즈(금이 하얗게 달고 불꽃이 커짐)');
   await game.context.close();
+}
+
+// ---------------------------------------------------------------- 용암 거인의 바닥 (2026-11-28, R2a, Docs/Bosses.md 지형·물체·분노)
+// The lava titan's ground: its trail leaves a strip of lava (the first harmless, dimmer), lava cools into black rock;
+// from phase 2 three vents stand and burst in turns and its heart overheats (rage); in phase 3 the outer three tiles
+// sink into lava with four islands of rock, and its finisher spares only rock. PC, then the phone for the edge.
+async function ground(browser) {
+  for (const profile of [Profiles.pc, Profiles.phone]) {
+    const pc = profile === Profiles.pc;
+    note(`\n## 용암 거인의 바닥 (${pc ? 'PC' : '휴대폰'})\n`);
+    const game = await open(browser, run, profile, url);
+    await game.startSolo();
+    await game.wait(1200);
+    await game.send('equip void_sword void_helmet void_armor void_boots; heal');
+    await game.send('heal; goto boss lava_titan');
+    await game.until(t => has(t.banner, '용암 거인') || has(t.entrance, '용암 거인'), 8000, game.texts);
+    await game.wait(4500);
+    let s;
+    if (pc) {
+      await game.send('heal; clear; boss lava_titan use lava_trail');
+      await game.wait(1600);
+      s = await game.state();
+      check(s.lava >= 1 && s.lavaHarmful === 0 && s.lavaShown >= 1, `용암 줄기가 용암 띠를 남긴다, 첫 번은 피해 없음 (용암 ${s.lava}, 해로움 ${s.lavaHarmful}, 그림 ${s.lavaShown})`);
+      await game.shot('ground-lava-first', '첫 용암 띠(피해 없음, 조금 흐림)');
+      await game.wait(1500);
+      await game.send('heal; boss lava_titan use lava_trail');
+      await game.wait(1600);
+      s = await game.state();
+      check(s.lavaHarmful >= 1, `둘째 용암 띠는 해롭다 (해로움 ${s.lavaHarmful})`);
+      await game.shot('ground-lava', '둘째 용암 띠(밝게 끓음)');
+      await game.wait(5000);
+      s = await game.state();
+      check(s.rock >= 1 && s.rockShown >= 1, `시간이 지나면 용암이 식은 바위가 된다 (바위 ${s.rock}, 그림 ${s.rockShown})`);
+      await game.shot('ground-rock', '식은 검은 바위');
+    }
+    await game.send('heal; clear; boss lava_titan hurt 0.36');
+    await game.until(t => t.bossPhase === 2, 4000);
+    await game.wait(2500);
+    s = await game.state();
+    check(s.vents === 3 && s.propsShown === 3, `2페이즈: 분출구 셋 (세상 ${s.vents}, 그림 ${s.propsShown})`);
+    if (pc) {
+      await game.send('heal; boss lava_titan use eruption');
+      await game.wait(600);
+      await game.shot('ground-vents', '분출구가 번갈아 터진다(첫 박자)');
+      await game.wait(1500);
+      await game.shot('ground-vents-2', '분출구 둘째 박자');
+      await game.wait(2500);
+      await game.send('heal; boss lava_titan rage');
+      await game.wait(400);
+      s = await game.state();
+      check(s.raging && s.rageShown, `심장 과열: 하얗게 빛난다 (분노 ${s.raging}, 그림 ${s.rageShown})`);
+      await game.shot('ground-rage', '심장 과열(분노): 흰 빛과 "과열!"');
+      await game.send('heal; boss lava_titan use lava_cross');
+      await game.wait(1400);
+      s = await game.state();
+      check(s.cracks >= 2 && s.cracksShown >= 2, `용암 십자가 균열 둘을 남긴다 (균열 ${s.cracks}, 그림 ${s.cracksShown})`);
+      await game.shot('ground-cracks', '용암 십자의 균열(분노 중)');
+    }
+    await game.send('heal; clear; boss lava_titan hurt 0.33');
+    await game.until(t => t.bossPhase === 3, 4000);
+    await game.wait(1200);
+    s = await game.state();
+    check(Math.abs(s.floor - 7) < 0.01 && s.edgeShown, `3페이즈: 가장자리 3칸이 용암, 남은 바닥 반지름 7 (${s.floor}, 그림 ${s.edgeShown})`);
+    await game.shot(pc ? 'ground-edge' : 'ground-edge-phone', '3페이즈: 가장자리 용암과 식은 바위 섬 넷(차오르는 중)');
+    await game.wait(2500);
+    s = await game.state();
+    check(s.vents === 5, `3페이즈: 분출구 다섯 (${s.vents})`);
+    if (pc) {
+      await game.shot('ground-edge-full', '가장자리 용암이 다 찬 뒤');
+      await game.send('heal; boss lava_titan use fire_rain');
+      await game.wait(900);
+      s = await game.state();
+      check(s.rock >= 1 || s.edgeShown, `화산 폭발: 안전한 바위가 있다 (바위 ${s.rock})`);
+      await game.shot('ground-refuge', '화산 폭발(필살기): 식은 바위 위만 안전');
+    }
+    await game.context.close();
+  }
 }
 
 // ---------------------------------------------------------------- 실 잣는 어미 아라네 (2026-11-13, Docs/Bosses.md)
@@ -3419,7 +3495,7 @@ const BossBlows = {
     'circle 7 3.2 1.4 0 0 F crown_wraith storm_brand', 'line -8 -3.4 8 1.2 0 F crown_wraith soul_lance', 'ring 5 -2.4 3.4 1.4 0 F crown_wraith crown_ring'],
   // The lava titan's own fire (2026-11-28): lava bursting out of the floor, the wall of fire, the split floor, the band.
   titan: ['circle -7 3 2.2 0 0 F lava_titan slam', 'cone -3.6 2.4 3.8 110 0 F lava_titan fire_wave', 'circle 2.6 3.2 2.2 0 0 F lava_titan eruption',
-    'circle 7 3.2 1.5 0 0 F lava_titan fire_rain', 'line -8 -3.4 9 1.6 0 F lava_titan lava_cross', 'ring 5 -2.4 3.4 1.4 0 F lava_titan heat_ring'],
+    'circle 7 3.2 1.5 0 0 F lava_titan fire_rain', 'line -8 -3.4 9 1.6 0 F lava_titan lava_cross', 'circle 5 -2.4 1.6 0 0 F lava_titan meteor'],
   // F3: the stone bosses' own attacks by their own names (E6 looked at them only as the warden's).
   vein: ['cone -8 2.6 3.6 120 0 F vein_eater claw', 'circle -2.6 3 1.5 0 0 F vein_eater cave_in', 'circle 2.4 2.6 2.6 0 0 F vein_eater burrow',
     'circle -6 -2.8 3.2 0 0 F vein_eater quake', 'circle 0.4 -3.4 1.2 0 0 F vein_eater spike_line', 'ring 5.6 -2.2 3.6 1.4 0 F vein_eater collapse_ring'],
@@ -9388,7 +9464,7 @@ async function towns(browser) {
   }
 }
 
-const Sections = { menu, title, testground, hunt, harvest, zones, towns, time, basics, first, firstphone, hour, bag, combat, hero, roll, weapons, arts, bosses, patterns, tempo, veineater, samurai, knight, warden, antlion, serpent, titan, voidlord, wraith, queen, general, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, layers, monsterfx, hazards, bossfx, hits, shots, blast, mobwarn, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
+const Sections = { menu, title, testground, hunt, harvest, zones, towns, time, basics, first, firstphone, hour, bag, combat, hero, roll, weapons, arts, bosses, patterns, tempo, ground, veineater, samurai, knight, warden, antlion, serpent, titan, voidlord, wraith, queen, general, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, layers, monsterfx, hazards, bossfx, hits, shots, blast, mobwarn, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

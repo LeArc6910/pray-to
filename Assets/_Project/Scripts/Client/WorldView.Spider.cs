@@ -27,7 +27,7 @@ namespace Game.Client
         const float SpiderGatherEnd = 0.38f;
         const float SpiderGoneAt = 0.72f;
 
-        static bool IsPool(HazardState hazard) => hazard.Shape == HazardShape.Web || hazard.Shape == HazardShape.Venom;
+        static bool IsPool(HazardState hazard) => hazard.Shape == HazardShape.Web || hazard.Shape == HazardShape.Venom || IsGround(hazard);
 
         // Webs and pools on the ground now, for the playtests.
         public int PoolsShown => _marks.Values.Count(m => IsPool(m.State));
@@ -517,6 +517,7 @@ namespace Game.Client
 
         Mark MakePool(HazardState hazard)
         {
+            if (IsGround(hazard)) return MakeGround(hazard);
             var root = new GameObject("Pool").transform;
             root.SetParent(_root.transform, false);
             root.localPosition = new Vector3(hazard.Position.X, hazard.Position.Y, 0);
@@ -543,6 +544,11 @@ namespace Game.Client
         // A web spreads out in a moment and shimmers; venom seeps out and bubbles; each fades as its time runs out.
         void DrawPool(Mark mark, HazardView view)
         {
+            if (IsGround(view.State))
+            {
+                DrawGround(mark, view);
+                return;
+            }
             var hazard = view.State;
             bool web = hazard.Shape == HazardShape.Web;
             float age = view.Progress * hazard.Duration / World.TicksPerSecond;

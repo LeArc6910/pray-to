@@ -65,9 +65,9 @@ namespace Game.Core.Tests
             Assert.AreEqual(PoolKind.Web, mother.Attacks.Single(a => a.Id == "thread_drop").Pool);
             Assert.AreEqual(PoolKind.Venom, mother.Attacks.Single(a => a.Id == "venom_pool").Pool);
             Assert.IsTrue(mother.Attacks.Where(a => a.Pool != PoolKind.None).All(a => a.Linger >= 5 && a.Linger <= 8));
-            // Nobody before it leaves anything behind.
+            // Nobody else leaves webs or venom (the lava titan's ground is its own, R2).
             foreach (var boss in Bosses.Shipped.Bosses.Where(b => b.Id != "silk_mother"))
-                Assert.IsTrue(boss.Attacks.All(a => a.Pool == PoolKind.None), boss.Id);
+                Assert.IsTrue(boss.Attacks.All(a => a.Pool != PoolKind.Web && a.Pool != PoolKind.Venom), boss.Id);
             // Every attack fits in what the view is told of it (World.BossPhaseField carries fifteen).
             Assert.LessOrEqual(mother.Attacks.Count, 15);
             // Its young come only when it calls them.

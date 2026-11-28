@@ -24,20 +24,15 @@ crystal_queen,crystal_spiral,수정 나선,3,spiral,self,0.7,81,0.3,,20,4,6,,7,1
 crystal_queen,crystal_lattice,수정 격자,3,cross,nearest,1.1,254,,8,45,1.2,,,,1.0,16,,,,,
 crystal_queen,shard_hail,수정 우박,3,circle,each,1.4,231,1.3,,,,3,2.6,,1.1,16,,strong,,,
 crystal_queen,crystal_ripple,수정 파문,2|3,ring,nearest,0.5,122,1.2,7,,,,,,0.9,0,,,,,
-lava_titan,slam,내려찍기,,circle,nearest,0.9,423,2.2,,,,1,,,0.9,30,,,,aftershock:0.5,3:repeat=1
-lava_titan,fire_wave,불꽃 휩쓸기,,cone,nearest,0.8,367,,3.8,110,,,,,0.8,25,,,,heat_ring:0.5,3:repeat=1
-lava_titan,meteor,유성 낙하,2|3,circle,random,1.2,541,1.6,,,,5,5,,1.0,25,,,,,3:count=7
+lava_titan,slam,내려찍기,,circle,nearest,0.9,423,2.2,,,,1,,,0.9,30,,,lava:5:2,,3:repeat=1
+lava_titan,fire_wave,불꽃 휩쓸기,,cone,nearest,0.8,367,,3.8,110,,,,,0.8,25,,,,,3:repeat=1
+lava_titan,meteor,유성 낙하,2|3,circle,random,1.2,541,1.6,,,,5,5,,1.0,25,,,rock:10,,
 lava_titan,magma_ring,용암 고리,1|2,burst,self,0.5,118,0.3,,,,14,,8,0.9,20,,,,,2:count=20
-lava_titan,charge,돌진,1|2,charge,farthest,1.0,423,,12,,2.6,,,16,1.2,20,,,,,2:count=2
-lava_titan,eruption,분화,2|3,circle,each,1.0,388,2.2,,,,1,,,1.0,20,,,,,
-lava_titan,magma_storm,용암 폭풍,3,burst,self,0.5,118,0.3,,,,22,,8,0.9,15,,,,,
-lava_titan,call_slimes,용암 슬라임 부르기,3,summon,self,0.8,,,,,,3,3,,1.0,10,magma_slime,,,,
-lava_titan,lava_trail,용암 줄기,,trail,farthest,0.8,367,1.3,10,,,6,,9,0.9,20,,,,,3:count=8 length=12
-lava_titan,heat_ring,열기 고리,2|3,ring,self,1.1,367,2.6,7,,,,,,1.0,18,,,,,
-lava_titan,magma_spiral,용암 나선,3,spiral,self,0.7,118,0.3,,25,5,6,,7,1.3,15,,,,,
-lava_titan,lava_cross,용암 십자,2|3,cross,self,1.1,412,,9,0,1.6,,,,1.0,16,,,,,
-lava_titan,fire_rain,불비,3,circle,each,1.4,337,1.5,,,,3,2.6,,1.1,16,,strong,,,
-lava_titan,aftershock,여진,2|3,ring,nearest,0.5,177,2.2,8,,,,,,0.9,0,,,,,
+lava_titan,charge,돌진,1|2,charge,farthest,1.0,423,,12,,2.6,,,16,1.2,20,,,lava:3,,2:count=2
+lava_titan,eruption,분출구,2|3,vent,self,0.8,388,1.6,,,,3,1.5,,1.0,20,,,,,3:spread=1.2
+lava_titan,lava_trail,용암 줄기,,trail,farthest,0.8,367,1.3,10,,,6,,9,0.9,20,,,lava:6,,3:count=8 length=12 linger=8
+lava_titan,lava_cross,용암 십자,2|3,cross,self,1.1,412,,9,0,1.6,,,,1.0,16,,,crack:8,,
+lava_titan,fire_rain,화산 폭발,3,refuge,self,1.4,337,1.5,,,,,,,1.1,16,,strong,,,
 void_lord,grasp,공허의 손아귀,,cone,nearest,0.8,536,,3.8,110,,,,,0.8,25,,,,void_ripple:0.5,3:repeat=1
 void_lord,star_fall,별똥별,2|3,circle,random,1.2,720,1.8,,,,8,5,,1.0,25,,,,,3:count=10
 void_lord,beam,공허 광선,1|2,line,nearest,0.9,563,,13,,1.6,,,,1.0,20,,,,,

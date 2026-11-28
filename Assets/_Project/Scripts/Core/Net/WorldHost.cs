@@ -791,7 +791,7 @@ namespace Game.Core
                 .Where(b => !b.IsDead && InView(b.Position, b.Definition.Radius))
                 .Select(b => new EntityState(
                     b.Id, EntityKind.Boss, IndexOf(_bosses?.Bosses, b.Definition), b.Position, b.Facing, b.Health, b.MaxHealth, World.BossStateByte(b),
-                    Protocol.WithStatus(World.BossPhaseField(b), b.Afflictions.Bits), aim: World.BossAim(b)));
+                    Protocol.WithStatus(World.BossPhaseField(b), b.Afflictions.Bits), aim: World.BossAim(b), flags: b.Raging ? BossFlags.Raging : (byte)0));
             var minions = World.Minions
                 .Where(m => InView(m.Position))
                 .Select(m => new EntityState(
@@ -833,10 +833,14 @@ namespace Game.Core
 
             // A monster's attack that starts at the monster is drawn from its state and the sheet, so its area is not
             // sent (Hazard.Attached, Docs/WorldRework.md 통신).
+            // A boss's ground lies long and would be left out first; up to MaxGroundPerSnapshot of the newest go
+            // with the marks still to land (R2: lava must be seen to be walked round).
+            var ground = World.Hazards.Where(h => h.IsGround && InView(h.Position, h.Size)).OrderByDescending(h => h.StartTick).Take(MaxGroundPerSnapshot).ToList();
             var hazards = World.Hazards
-                .Where(h => !h.Attached && InView(h.Position, h.Size))
+                .Where(h => !h.Attached && !h.IsGround && InView(h.Position, h.Size))
                 .OrderBy(h => h.ResolveTick)
-                .Take(_config.MaxHazardsPerSnapshot)
+                .Take(Math.Max(0, _config.MaxHazardsPerSnapshot - ground.Count))
+                .Concat(ground)
                 .Select(h => new HazardState(
                     h.Id, h.Shape, h.Position, h.Direction, h.Size, h.Width,
                     (int)(h.ResolveTick - World.Tick), (int)(h.ResolveTick - h.StartTick), h.Damage > 0,
@@ -865,8 +869,14 @@ namespace Game.Core
             var defending = World.ActiveDefense;
             var defense = new DefenseState(World.DefenseLevel, World.DefendedToday, defending?.Level ?? 0, defending?.Wave ?? 0, defending?.MonstersLeft ?? 0,
                 defending == null ? 0 : (int)Math.Ceiling(defending.StoneHealth / defending.MaxStoneHealth * 100));
-            return new SnapshotMessage(World.Tick, self, entities, projectiles, hazards, events, World.Clock, World.Sleepers, rift, defense, World.DayMinutes);
+            var props = World.Props.Where(p => InView(p.Position, p.Radius))
+                .Select(p => new PropState(p.Id, p.Kind, p.Position, p.Radius, p.Breakable ? (byte)Math.Clamp((int)MathF.Ceiling(p.Health / p.MaxHealth * 255), 0, 255) : (byte)255))
+                .ToList();
+            return new SnapshotMessage(World.Tick, self, entities, projectiles, hazards, events, World.Clock, World.Sleepers, rift, defense, World.DayMinutes) { Props = props };
         }
+
+        // The most of the bosses' ground (lava, water, cracks, rock) a snapshot carries (R2: a boss lays six at most).
+        public const int MaxGroundPerSnapshot = 6;
 
         // The snapshot as it goes out: up to MaxEntitiesPerSnapshot (two packs and four players, 2026-11-22), but never
         // past MaxSnapshotBytes; over it, the furthest monsters are left out first (Docs/WorldRework.md 상한).
@@ -887,7 +897,7 @@ namespace Game.Core
                 }
                 if (dropped == 0) break;
                 message = new SnapshotMessage(message.Tick, message.Self, entities, message.Projectiles, message.Hazards, message.Events, message.Clock, message.Sleepers,
-                    message.Rift, message.Defense, message.DayMinutes);
+                    message.Rift, message.Defense, message.DayMinutes) { Props = message.Props };
                 data = message.Encode();
             }
             return data;

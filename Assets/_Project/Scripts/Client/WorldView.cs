@@ -658,6 +658,7 @@ namespace Game.Client
             DrawChickens();
             SwingDoors();
             DrawMarks();
+            DrawArenaGround();
             DrawPois(deltaTime);
             DrawTravel(deltaTime);
             _rendered = 3;
@@ -2213,6 +2214,9 @@ namespace Game.Client
             {
                 case SimEventType.Cue:
                     ShowCue(e);
+                    break;
+                case SimEventType.Rage:
+                    if (Find(e.Source) is { } raging) ShowRage(e, raging.Root.localPosition);
                     break;
                 case SimEventType.PhaseChanged:
                     PhaseShown(e);

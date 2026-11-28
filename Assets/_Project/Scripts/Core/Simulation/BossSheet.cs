@@ -43,6 +43,12 @@ namespace Game.Core
         // waits, it answers at once (World.CounterSeconds) with count cuts right through itself, each length out each
         // way and width across; left alone, it stands open for World.CounterOpening when the telegraph ends.
         Counter,
+        // R2 (2026-11-28, Docs/BossRedesign.md 7.1 T3): every vent of the boss's (BossProp) bursts, count times
+        // spread seconds apart, the vents taking turns, so the way through is between the beats.
+        Vent,
+        // A blast over the whole arena that spares whoever stands on cooled rock (PoolKind.Rock, an edge's islands);
+        // with no rock down, a ring of it is laid round the boss (radius tiles past its body) for the telegraph.
+        Refuge,
     }
 
     // How plainly an attack is announced (2026-11-12, the vein eater). Marked is how every boss announced every attack
@@ -83,6 +89,13 @@ namespace Game.Core
         None,
         Web,
         Venom,
+        // R2 (2026-11-28, T3): lava bites every World.GroundSeconds and slows (World.PlayerWadeSpeed), and cools into
+        // rock when its time is up; shallow water only slows; a crack only bites; cooled rock does nothing and is
+        // where a blast that spares rock cannot reach (AttackShape.Refuge), and where lava does not burn.
+        Lava,
+        Water,
+        Crack,
+        Rock,
     }
 
     public enum AttackTarget : byte
@@ -173,8 +186,10 @@ namespace Game.Core
         public AttackWarning Warning { get; }
 
         // What each of its circles leaves behind once it has landed, and for how many seconds (pool column, "web:6").
+        // A third part is the first phase it leaves it in ("lava:5:2"); a boost may change the seconds (linger).
         public PoolKind Pool { get; }
-        public float Linger { get; }
+        public float Linger { get; private set; }
+        public int PoolFrom { get; internal set; } = 1;
 
         // Another attack of the same boss laid at the same moment on the same target, landing FollowDelay seconds
         // after this one (2026-11-25, follow column "attack:seconds"). The gap is longer than a roll's unhurt moment and
@@ -182,6 +197,11 @@ namespace Game.Core
         // is to walk, or to roll out of both at once.
         public BossAttack FollowUp { get; internal set; }
         public float FollowDelay { get; internal set; }
+
+        // Whether it may come again straight after itself (boost repeat, and a raging boss's one more: World.Rage).
+        public bool CanRepeat => !(Shape == AttackShape.Charge || Shape == AttackShape.Spiral || Shape == AttackShape.Summon
+            || Shape == AttackShape.Counter || Shape == AttackShape.Vent || Shape == AttackShape.Refuge || Shape == AttackShape.Burrow
+            || Shape == AttackShape.Leap || Shape == AttackShape.Pluck);
 
         // Whether it marks ground that lands by itself when the telegraph ends (what a follow-up may be).
         public bool LaysAreas => Shape switch
@@ -273,7 +293,7 @@ namespace Game.Core
                     foreach (var boost in list) boost.Apply(copy);
                     if (copy.Telegraph < Math.Min(Telegraph, floor)) copy.Telegraph = Math.Min(Telegraph, floor);
                 }
-                if (copy.Repeat > 0)
+                if (copy.Repeat > 0 || CanRepeat)
                 {
                     var again = copy.Copy();
                     again.Telegraph = copy.AgainSeconds;
@@ -300,7 +320,7 @@ namespace Game.Core
             public char Op { get; }
             public float Value { get; }
 
-            public static readonly string[] Fields = { "count", "repeat", "tele", "again", "radius", "length", "angle", "width", "spread", "speed", "cooldown", "hold" };
+            public static readonly string[] Fields = { "count", "repeat", "tele", "again", "radius", "length", "angle", "width", "spread", "speed", "cooldown", "hold", "linger" };
 
             float On(float now) => Op == '+' ? now + Value : Op == '*' ? now * Value : Value;
 
@@ -320,6 +340,7 @@ namespace Game.Core
                     case "speed": a.Speed = On(a.Speed); break;
                     case "cooldown": a.Cooldown = On(a.Cooldown); break;
                     case "hold": a.Hold = Math.Max(0, On(a.Hold)); break;
+                    case "linger": a.Linger = Math.Max(0, On(a.Linger)); break;
                 }
             }
         }
@@ -439,6 +460,15 @@ namespace Game.Core
         // 2026-11-28, the person: "the finishers could wait a little longer"). 0 lets it choose one at once.
         public float FinisherRest { get; internal set; } = DefaultFinisherRest;
         public const float DefaultFinisherRest = 12;
+
+        // ---- R2 (2026-11-28, Docs/BossRedesign.md 7.1 T3·T9; BossTerrainSheet) ----
+        // The ground that closes in from the arena's edge from a phase on (edge column), or null.
+        public BossEdge Edge { get; internal set; }
+        // What stands in the arena from each phase (props column; index by phase, null where it changes nothing).
+        public IReadOnlyList<IReadOnlyList<(PropKind Kind, int Count)>> PropsByPhase { get; internal set; } = BossTerrainSheet.NoProps;
+        // How it rages in each phase (rage column; index by phase, null for not at all).
+        public IReadOnlyList<BossRage> RageByPhase { get; internal set; } = BossTerrainSheet.NoRage;
+        public BossRage RageIn(int phase) => phase >= 0 && phase < RageByPhase.Count ? RageByPhase[phase] : null;
     }
 
     public sealed class BossData
@@ -525,7 +555,9 @@ namespace Game.Core
                         Whole(row, "potion_count"),
                         row["material"],
                         Whole(row, "material_count"),
-                        row["element"].Length == 0 ? SkillTag.None : BossElement(row["element"])) { Level = Whole(row, "level"), Place = row["place"].Length == 0 ? null : row["place"], Bursts = Gait(row["gait"]), TelegraphTempo = Tempo(row["tempo"]), FinisherRest = FinisherRest(row["finisher_rest"]) });
+                        row["element"].Length == 0 ? SkillTag.None : BossElement(row["element"])) { Level = Whole(row, "level"), Place = row["place"].Length == 0 ? null : row["place"], Bursts = Gait(row["gait"]), TelegraphTempo = Tempo(row["tempo"]), FinisherRest = FinisherRest(row["finisher_rest"]),
+                        Edge = BossTerrainSheet.Edge(row["edge"], thresholds.Count + 1), PropsByPhase = BossTerrainSheet.Props(row["props"], thresholds.Count + 1),
+                        RageByPhase = BossTerrainSheet.Rage(row["rage"], thresholds.Count + 1) });
                 });
             }
             return bosses;
@@ -581,7 +613,7 @@ namespace Game.Core
                         row["summon"].Length > 0 ? FindMonster(monsters, row["summon"]) : null,
                         Warning(row["warn"]),
                         pool.Kind,
-                        pool.Seconds);
+                        pool.Seconds) { PoolFrom = pool.From };
                     Validate(attack);
                     boosts[attack] = Boosts(row["boost"], boss.PhaseCount, shape);
                     boss.Add(attack);
@@ -729,6 +761,12 @@ namespace Game.Core
                 case AttackShape.Counter:
                     Need(attack.Length > 0 && attack.Width > 0 && attack.Count > 0 && attack.Damage > 0, "length, width, count(일섬 몇 줄), damage");
                     break;
+                case AttackShape.Vent:
+                    Need(attack.Radius > 0 && attack.Count > 0 && attack.Spread > 0 && attack.Damage > 0, "radius, count(몇 번), spread(사이 초), damage");
+                    break;
+                case AttackShape.Refuge:
+                    Need(attack.Radius > 0 && attack.Damage > 0, "radius(바위가 없을 때 몸 둘레의 안전한 칸), damage");
+                    break;
             }
             if ((attack.Warning == AttackWarning.Near || attack.Warning == AttackWarning.Far)
                 && !(attack.Shape == AttackShape.Circle || attack.Shape == AttackShape.Cone || attack.Shape == AttackShape.Ring))
@@ -756,18 +794,31 @@ namespace Game.Core
 
         // The pool column: blank, or what a circle leaves behind and for how long, as web:6 or venom:4.5. Only the
         // shapes that land as circles can leave one.
-        static (PoolKind Kind, float Seconds) Pool(string cell, AttackShape shape)
+        static (PoolKind Kind, float Seconds, int From) Pool(string cell, AttackShape shape)
         {
-            if (cell.Length == 0) return (PoolKind.None, 0);
+            if (cell.Length == 0) return (PoolKind.None, 0, 1);
             var parts = cell.Split(':');
-            PoolKind kind = parts[0] == "web" ? PoolKind.Web : parts[0] == "venom" ? PoolKind.Venom
-                : throw new FormatException($"pool은 비우거나 web:초, venom:초여야 합니다('{cell}').");
-            if (parts.Length != 2) throw new FormatException($"pool은 web:초, venom:초처럼 적습니다('{cell}').");
+            PoolKind kind = parts[0] switch
+            {
+                "web" => PoolKind.Web,
+                "venom" => PoolKind.Venom,
+                "lava" => PoolKind.Lava,
+                "water" => PoolKind.Water,
+                "crack" => PoolKind.Crack,
+                "rock" => PoolKind.Rock,
+                _ => throw new FormatException($"pool은 비우거나 web, venom, lava, water, crack, rock 가운데 하나와 초입니다('{cell}')."),
+            };
+            if (parts.Length != 2 && parts.Length != 3) throw new FormatException($"pool은 lava:6처럼, 늦게 깔면 lava:5:2(2페이즈부터)처럼 적습니다('{cell}').");
             float seconds = SheetValues.ParseDecimal(parts[1], "pool");
             if (seconds <= 0 || seconds > 30) throw new FormatException("pool의 시간은 0보다 크고 30초 이하여야 합니다.");
-            if (shape != AttackShape.Circle && shape != AttackShape.Trail && shape != AttackShape.Burrow && shape != AttackShape.Leap)
-                throw new FormatException($"pool은 원으로 떨어지는 공격(circle, trail, burrow, leap)에만 씁니다({shape}).");
-            return (kind, seconds);
+            int from = parts.Length == 3 ? SheetValues.ParseNumber(parts[2], "pool") : 1;
+            if (from < 1 || from > 3) throw new FormatException("pool의 페이즈는 1~3입니다.");
+            bool circles = shape == AttackShape.Circle || shape == AttackShape.Trail || shape == AttackShape.Burrow || shape == AttackShape.Leap;
+            // Ground (not webs or venom) may also lie along a charge's run and a cross's arms (2026-11-28, R2).
+            bool strips = (shape == AttackShape.Charge || shape == AttackShape.Cross) && kind >= PoolKind.Lava;
+            if (!circles && !strips)
+                throw new FormatException($"pool은 원으로 떨어지는 공격(circle, trail, burrow, leap)에, 용암·물·균열·바위는 charge·cross에도 씁니다({shape}).");
+            return (kind, seconds, from);
         }
 
         static MonsterDefinition FindMonster(MonsterData monsters, string id) =>

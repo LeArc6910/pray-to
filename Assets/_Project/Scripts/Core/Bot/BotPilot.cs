@@ -656,8 +656,13 @@ namespace Game.Core
         // A monster's cloud of spores, ice or sand only bites a little or slows: walked through to get at whoever
         // left it (2026-11-22: kept out by the clouds a rooted mushroom throws again and again, the bot never reached
         // it and gave a request up).
+        // A boss's ground (R2): lava and cracks are kept out of, water and cooled rock are not; a blast that spares rock
+        // is no danger on rock; a boss's edge that bites is (World.BadGround).
         bool Danger(Vec2 at) => _world.Hazards.Any(h => h.Shape != HazardShape.Share && h.Shape != HazardShape.Web && h.Shape != HazardShape.Balm
-            && !Mild(h) && !(h.Damage == 0 && h.Mark == (byte)MonsterAttackShape.Blink + 1) && h.Contains(at, World.PlayerRadius + 0.1f));
+            && h.Shape != HazardShape.Water && h.Shape != HazardShape.Rock
+            && !Mild(h) && !(h.Damage == 0 && h.Mark == (byte)MonsterAttackShape.Blink + 1) && h.Contains(at, World.PlayerRadius + 0.1f)
+            && !(h.Spares && _world.OnRock(h.Source, at)))
+            || _world.BadGround(at);
 
         // Standing in a warning on the floor (not a share marker): toward the nearest spot out of every one.
         // Fighting a boss, not a spot outside its ground while there is one inside (2026-11-21: stepping out of its
@@ -676,7 +681,7 @@ namespace Game.Core
                 // wisps' icicles never reached them and fell sixty times). Up close the first way out, as before.
                 var onward = Path.Count > 0 && ThrownFromAfar() ? TileMap.Center(Path[0].X, Path[0].Y) - _player.Position : Vec2.Zero;
                 if (onward.LengthSquared > 1e-6f) onward = onward.Normalized;
-                foreach (float reach in new[] { 1.5f, 2.5f, 3.5f, 5f })
+                foreach (float reach in new[] { 1.5f, 2.5f, 3.5f, 5f, 7f })
                 {
                     Vec2? best = null;
                     float bestDot = float.NegativeInfinity;
@@ -684,7 +689,7 @@ namespace Game.Core
                     {
                         var step = new Vec2(MathF.Cos(k * MathF.PI / 4), MathF.Sin(k * MathF.PI / 4)) * reach;
                         var to = _player.Position + step;
-                        if (inside && Vec2.Distance(to, boss.Home) > boss.ArenaRadius) continue;
+                        if (inside && Vec2.Distance(to, boss.Home) > World.FloorRadius(boss)) continue;
                         if (!Nav.Walkable(TileMap.Cell(to.X), TileMap.Cell(to.Y)) || Danger(to)) continue;
                         float dot = Vec2.Dot(step, onward);
                         if (dot <= bestDot + 1e-4f) continue;

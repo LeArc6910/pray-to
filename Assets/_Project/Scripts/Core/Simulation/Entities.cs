@@ -200,7 +200,8 @@ namespace Game.Core
         internal Vec2 SleptAt { get; set; }
         // How fast the player may move now: slower while chilled.
         public float MoveSpeed => Afflictions.Rooted ? 0
-            : Stats.MoveSpeed * (Afflictions.Chilled ? World.PlayerChillSpeed : 1) * (Afflictions.Snared ? World.PlayerSnareSpeed : 1);
+            : Stats.MoveSpeed * (Afflictions.Chilled ? World.PlayerChillSpeed : 1) * (Afflictions.Snared ? World.PlayerSnareSpeed : 1)
+                * (Afflictions.Wading ? World.PlayerWadeSpeed : 1);
         // The last food eaten while its buff lasts, and the ticks it has left. Falling does not end it.
         public ConsumableDefinition Food { get; private set; }
         public int FoodTicks { get; private set; }
@@ -697,6 +698,8 @@ namespace Game.Core
         // screen holds the wind-up until now and swings in time; or its noto counter was struck and it answers (Amount
         // World.CueCounter). Direction is the way it faces.
         Cue,
+        // A boss's rage (2026-11-28, R2): Amount 1 as it starts, 0 as it is spent.
+        Rage,
     }
 
     public readonly struct SimEvent
@@ -754,6 +757,10 @@ namespace Game.Core
         // Coming in (2026-11-17, arenas.csv): woken, it takes a moment to rise, come down or walk out before the fight
         // starts. It does not attack and cannot be hurt; the view shows its entrance.
         Enter,
+        // Its rage spent (2026-11-28, R2, BossRage): it cowers, open, before it chooses again.
+        Spent,
+        // It ran into a pillar (BossProp) and stands stunned.
+        Stun,
     }
 
     public sealed class Boss
@@ -791,6 +798,8 @@ namespace Game.Core
         public bool Away => State == BossState.Telegraph && Attack != null && Attack.GoesAway;
 
         internal Vec2 ChargeDirection { get; set; }
+        // Where its charge set off (a charge that leaves ground lays it along the run, World.EndCharge).
+        internal Vec2 ChargeFrom { get; set; }
         internal HashSet<int> ChargeHits { get; } = new HashSet<int>();
         // A spiral's volleys still to fire, the ticks to the next and the turn it has reached (radians).
         internal int VolleysLeft { get; set; }
@@ -821,6 +830,42 @@ namespace Game.Core
         internal bool Cues { get; set; }
         // Its noto counter was struck and it is answering (World.Counter).
         public bool Countered { get; internal set; }
+
+        // ---- R2 (2026-11-28): rage and the ground ----
+        // Ticks of rage left (BossRage); its hurt toward the next; whether it cowers once the attack it is on is done.
+        public int RageTicks { get; internal set; }
+        public bool Raging => RageTicks > 0;
+        internal float RageHurt { get; set; }
+        internal bool SpendNext { get; set; }
+        // The tick its first ground of the fight was laid (harmless, Docs/BossRedesign.md 4.2); -1 before any.
+        internal long TaughtTick { get; set; } = -1;
+        // The tick its edge came (World.EdgeGraceSeconds), or -1.
+        internal long EdgeTick { get; set; } = -1;
+    }
+
+    // Something standing in a boss's arena (2026-11-28, R2, PropKind): a vent, a pillar, a vein. MaxHealth 0 cannot be
+    // broken.
+    public sealed class BossProp
+    {
+        internal BossProp(int id, int owner, PropKind kind, Vec2 position, float radius, float health)
+        {
+            Id = id;
+            Owner = owner;
+            Kind = kind;
+            Position = position;
+            Radius = radius;
+            Health = health;
+            MaxHealth = health;
+        }
+
+        public int Id { get; }
+        public int Owner { get; }
+        public PropKind Kind { get; }
+        public Vec2 Position { get; }
+        public float Radius { get; }
+        public float Health { get; internal set; }
+        public float MaxHealth { get; }
+        public bool Breakable => MaxHealth > 0;
     }
 
     public enum HazardShape : byte
@@ -848,6 +893,12 @@ namespace Game.Core
         Pull,
         // A trap: a circle that waits, and goes off early when someone steps into it once it is armed.
         Mine,
+        // A boss's ground (2026-11-28, R2, PoolKind): lava, shallow water, a crack, cooled rock. A circle of Size, or
+        // with Width a strip Size long and Width across from Position along Direction.
+        Lava,
+        Water,
+        Crack,
+        Rock,
     }
 
     // A marked area that hurts every player inside it when ResolveTick comes. Zero damage marks a charge's path.
@@ -908,7 +959,15 @@ namespace Game.Core
         public int Plucks { get; internal set; }
         // A web or a pool of venom: it does its work while it lies there, and nothing when its time is up.
         public bool Lingers => Shape == HazardShape.Web || Shape == HazardShape.Venom || Shape == HazardShape.Fire || Shape == HazardShape.Ice
-            || Shape == HazardShape.Spore || Shape == HazardShape.Sand || Shape == HazardShape.Balm;
+            || Shape == HazardShape.Spore || Shape == HazardShape.Sand || Shape == HazardShape.Balm || IsGround;
+
+        // A boss's lava, water, crack or cooled rock (R2).
+        public bool IsGround => Shape == HazardShape.Lava || Shape == HazardShape.Water || Shape == HazardShape.Crack || Shape == HazardShape.Rock;
+
+        // The last blast of a trail that leaves ground: the strip runs from here to where it lands (World.LeavePool).
+        internal Vec2? StripFrom { get; set; }
+        // A blast that spares whoever stands on cooled rock (AttackShape.Refuge).
+        public bool Spares { get; internal set; }
 
         // Whether a circle of the given radius at point touches the area.
         public bool Contains(Vec2 point, float radius)
@@ -931,6 +990,13 @@ namespace Game.Core
                 case HazardShape.Balm:
                     // A pool takes whoever's feet are in it, not whoever brushes its edge.
                     return distance <= Size;
+                case HazardShape.Lava:
+                case HazardShape.Water:
+                case HazardShape.Crack:
+                case HazardShape.Rock:
+                    if (Width <= 0) return distance <= Size;
+                    float run = Vec2.Dot(offset, Direction);
+                    return run >= 0 && run <= Size && MathF.Abs(offset.X * Direction.Y - offset.Y * Direction.X) <= Width / 2;
                 case HazardShape.Ring:
                     return distance <= Size + radius && distance >= Width - radius;
                 case HazardShape.Cone:

@@ -107,6 +107,11 @@ namespace Game.Client
         internal string HeldWhy => _view?.HeldWhy ?? "";
         internal int HelmetsDropped => _view?.HelmetsDropped ?? 0;
         internal int PoolsShown => _view?.PoolsShown ?? 0;
+        // R2 (2026-11-28): a boss's ground, edge, vents and rage as drawn (WorldView.Ground.cs).
+        internal int GroundShown(HazardShape shape) => _view?.GroundShown(shape) ?? 0;
+        internal bool EdgeShown => _view?.EdgeShown ?? false;
+        internal int PropsShown => _view?.PropsShown ?? 0;
+        internal bool RageShown => _view?.RageShown ?? false;
         // Ordinary monsters' marks, pools, one-off effects, pieces and shots as drawn (WorldView.MonsterFx).
         internal int MonsterMarksShown => _view?.MonsterMarksShown ?? 0;
         // E5: monsters' marks drawn as a picture of their shape last frame, and bodies drawn rushing.

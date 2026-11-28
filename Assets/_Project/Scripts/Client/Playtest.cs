@@ -476,6 +476,8 @@ namespace Game.Client
                     if (words[2] == "hurt") world.Hurt(boss, Math.Max(1, (int)(boss.MaxHealth * Float(words[3]))));
                     // boss <id> strike: the player's blow lands on it, as a swing would (its noto counter answers, R1b).
                     else if (words[2] == "strike") world.Hurt(boss, player, 1);
+                    // boss <id> rage: its rage starts now (R2, BossRage), as if hurt enough.
+                    else if (words[2] == "rage") world.Enrage(boss);
                     else if (words[2] == "use" && !world.ForceAttack(boss, words[3])) throw new ArgumentException($"'{words[1]}' cannot use '{words[3]}' now (awake, someone in the arena?)");
                     // Its entrance (arenas.csv, 2026-11-17): asleep again, or coming in now (the whole way, or "again").
                     else if (words[2] == "sleep") world.ForceSleep(boss);
@@ -2987,6 +2989,22 @@ namespace Game.Client
                 json.Field("bossGroundMobs", world.Enemies.Count(e => !e.IsDead && !e.FromBoss && world.InBossGround(e.Position)));
                 json.Field("onBossGround", world.InBossGround(player.Position));
                 json.Field("poolsShown", root.PoolsShown);
+                // R2 (2026-11-28, Docs/Bosses.md 지형·물체·분노): the boss's ground in the world and drawn, its edge, its vents
+                // and its rage, and whether the player wades.
+                json.Field("lava", world.Hazards.Count(h => h.Shape == HazardShape.Lava));
+                json.Field("lavaHarmful", world.Hazards.Count(h => h.Shape == HazardShape.Lava && h.Damage > 0));
+                json.Field("rock", world.Hazards.Count(h => h.Shape == HazardShape.Rock));
+                json.Field("cracks", world.Hazards.Count(h => h.Shape == HazardShape.Crack));
+                json.Field("lavaShown", root.GroundShown(HazardShape.Lava));
+                json.Field("rockShown", root.GroundShown(HazardShape.Rock));
+                json.Field("cracksShown", root.GroundShown(HazardShape.Crack));
+                json.Field("floor", fighting == null ? 0 : World.FloorRadius(fighting));
+                json.Field("edgeShown", root.EdgeShown);
+                json.Field("vents", world.Props.Count(p => p.Kind == PropKind.Vent));
+                json.Field("propsShown", root.PropsShown);
+                json.Field("raging", fighting?.Raging ?? false);
+                json.Field("rageShown", root.RageShown);
+                json.Field("wading", player.Afflictions.Wading);
                 json.Field("snared", player.Afflictions.Snared);
                 // Ordinary monsters' attacks (monster_attacks.csv, 2026-11-21): those near that fight from the sheet with
                 // their state and attack, their marks and what they left in the world, and what the screen draws of them

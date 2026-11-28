@@ -144,6 +144,8 @@ namespace CoreSandbox
                 input = toTarget.Normalized;
             }
 
+            // Walking (not escaping), it goes round a boss's lava, cracks and biting edge rather than through (R2).
+            if (dodge && escape.LengthSquared == 0 && input.LengthSquared > 0) input = RoundGround(world, player, input);
             RollBot.Move(world, player, input, facing, escape, dodge);
             bool inReach = slime != null || (boss != null && gap <= FightSim.Reach(player));
             world.SetAttacking(player.Id, inReach);
@@ -163,9 +165,19 @@ namespace CoreSandbox
                 if (world.Tick - hazard.StartTick < reactionTicks) continue;
                 // A cloud that only fills monsters and the mark of where one will come out harm no one.
                 if (hazard.Shape == HazardShape.Balm || hazard.Damage == 0 && hazard.Mark == (byte)MonsterAttackShape.Blink + 1) continue;
+                // A boss's ground (R2): water and cooled rock harm no one; a blast that spares rock is no danger on it,
+                // and off it the bot heads for the nearest rock.
+                if (hazard.Shape == HazardShape.Water || hazard.Shape == HazardShape.Rock) continue;
                 if (!hazard.Contains(player.Position, World.PlayerRadius + 0.3f)) continue;
+                if (hazard.Spares)
+                {
+                    if (world.OnRock(hazard.Source, player.Position)) continue;
+                    var rock = NearestRock(world, hazard.Source, player.Position);
+                    if (rock != null) away += (rock.Value - player.Position).Normalized * 2;
+                    continue;
+                }
                 var offset = player.Position - hazard.Position;
-                if (hazard.Shape == HazardShape.Line)
+                if (hazard.Shape == HazardShape.Line || hazard.IsGround && hazard.Width > 0)
                 {
                     // Sideways, toward whichever edge is nearer.
                     var side = new Vec2(-hazard.Direction.Y, hazard.Direction.X);
@@ -210,7 +222,35 @@ namespace CoreSandbox
                 away += side * (across >= 0 ? 1 : -1);
             }
             if (beams >= 2 && away.Length < 1.2f) away = outOfStar;
+            // Out of a boss's edge that bites, back toward its middle.
+            var edged = world.Bosses.FirstOrDefault(b => !b.IsDead && World.InEdge(b, player.Position));
+            if (edged != null && world.BadGround(player.Position)) away += (edged.Home - player.Position).Normalized * 2;
             return away.Normalized;
+        }
+
+        // The way to walk: as given unless a step that way goes onto a boss's ground that bites, then the nearest turn
+        // that does not (or stand still).
+        static Vec2 RoundGround(World world, Player player, Vec2 way)
+        {
+            bool Bad(Vec2 at) => world.BadGround(at) || world.Hazards.Any(h => (h.Shape == HazardShape.Lava || h.Shape == HazardShape.Crack) && h.Damage > 0
+                && h.Contains(at, World.PlayerRadius) && !(h.Shape == HazardShape.Lava && world.OnRock(h.Source, at)));
+            if (Bad(player.Position)) return way;
+            foreach (float turn in new[] { 0f, 45, -45, 90, -90 })
+            {
+                var dir = Vec2.FromAngle(way.Angle + turn * MathF.PI / 180);
+                if (!Bad(player.Position + dir * 0.7f)) return dir * way.Length;
+            }
+            return Vec2.Zero;
+        }
+
+        // The middle of the nearest cooled rock of the boss's (a pool, or an edge's island).
+        static Vec2? NearestRock(World world, int bossId, Vec2 from)
+        {
+            var spots = world.Hazards.Where(h => h.Shape == HazardShape.Rock && h.Source == bossId)
+                .Select(h => h.Width > 0 ? h.Position + h.Direction * (h.Size / 2) : h.Position).ToList();
+            var boss = world.FindBoss(bossId);
+            if (boss != null) spots.AddRange(World.Islands(boss));
+            return spots.Count == 0 ? (Vec2?)null : spots.OrderBy(s => Vec2.Distance(s, from)).First();
         }
     }
 }

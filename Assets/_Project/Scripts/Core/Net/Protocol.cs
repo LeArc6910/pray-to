@@ -47,7 +47,7 @@ namespace Game.Core
 
         // Host and client must run the same rules and sheets, so a different version is refused (Docs/CrossPlay.md 버전 정책:
         // every change to the rules, the sheets or a message goes up; PC, phone and web of the same version play together).
-        public const string Version = "0.119.0";
+        public const string Version = "0.120.0";
 
         // Why a joiner of another version is refused, and who has to update: the older side.
         public static string VersionRefusal(string theirs)
@@ -1180,8 +1180,9 @@ namespace Game.Core
     public readonly struct EntityState
     {
         public EntityState(int id, EntityKind kind, int type, Vec2 position, Vec2 facing, float health, float maxHealth, byte state, int phase = 0, int elite = 0,
-            int aim = 0)
+            int aim = 0, byte flags = 0)
         {
+            Flags = flags;
             Aim = aim;
             Elite = elite;
             Id = id;
@@ -1215,8 +1216,38 @@ namespace Game.Core
         // loose single shots: the id of the player they are aimed at (World.EnemyAim).
         public int Aim { get; }
 
-        public EntityState WithElite(int elite) => new EntityState(Id, Kind, Type, Position, Facing, Health, MaxHealth, State, Phase, elite, Aim);
-        public EntityState WithAim(int aim) => new EntityState(Id, Kind, Type, Position, Facing, Health, MaxHealth, State, Phase, Elite, aim);
+        // A boss's marks (0.120.0, R2): BossFlags.Raging. 0 for any other.
+        public byte Flags { get; }
+
+        public EntityState WithElite(int elite) => new EntityState(Id, Kind, Type, Position, Facing, Health, MaxHealth, State, Phase, elite, Aim, Flags);
+        public EntityState WithAim(int aim) => new EntityState(Id, Kind, Type, Position, Facing, Health, MaxHealth, State, Phase, Elite, aim, Flags);
+        public EntityState WithFlags(byte flags) => new EntityState(Id, Kind, Type, Position, Facing, Health, MaxHealth, State, Phase, Elite, Aim, flags);
+    }
+
+    // A boss's marks on the wire (EntityState.Flags).
+    public static class BossFlags
+    {
+        public const byte Raging = 1;
+    }
+
+    // Something standing in a boss's arena (0.120.0, R2, BossProp): its kind, where, how big, and how much of its
+    // health it has left in 255ths (255 for one that cannot be broken).
+    public readonly struct PropState
+    {
+        public PropState(int id, PropKind kind, Vec2 position, float radius, byte health)
+        {
+            Id = id;
+            Kind = kind;
+            Position = position;
+            Radius = radius;
+            Health = health;
+        }
+
+        public int Id { get; }
+        public PropKind Kind { get; }
+        public Vec2 Position { get; }
+        public float Radius { get; }
+        public byte Health { get; }
     }
 
     // Clients move projectiles on by their velocity between snapshots, so they are drawn where they really are.
@@ -1416,6 +1447,9 @@ namespace Game.Core
         public IReadOnlyList<ProjectileState> Projectiles { get; }
         public IReadOnlyList<HazardState> Hazards { get; }
         public IReadOnlyList<SimEvent> Events { get; }
+        // What stands in the bosses' arenas in view (R2).
+        public IReadOnlyList<PropState> Props { get; set; } = NoProps;
+        public static readonly IReadOnlyList<PropState> NoProps = new PropState[0];
 
         public byte[] Encode() => Protocol.Build(MessageType.Snapshot, w =>
         {
@@ -1493,6 +1527,14 @@ namespace Game.Core
                 w.Write((ushort)i);
                 w.Write(Entities[i].Aim);
             }
+            // And the few bosses with marks (EntityState.Flags, R2).
+            var flagged = Enumerable.Range(0, Entities.Count).Where(i => Entities[i].Flags != 0).ToList();
+            w.Write((byte)Math.Min(flagged.Count, 255));
+            foreach (int i in flagged.Take(255))
+            {
+                w.Write((ushort)i);
+                w.Write(Entities[i].Flags);
+            }
 
             w.Write((ushort)Projectiles.Count);
             foreach (var projectile in Projectiles)
@@ -1538,6 +1580,16 @@ namespace Game.Core
                 int struck = e.Type == SimEventType.Hit ? World.ElementBits(e.Tags) : 0;
                 w.Write((byte)((e.Critical ? 1 : 0) | (element & 3) << 1 | struck << 3));
                 w.Write(Protocol.PackDirection(e.Direction));
+            }
+
+            w.Write((byte)Math.Min(Props.Count, 255));
+            foreach (var prop in Props.Take(255))
+            {
+                w.Write(prop.Id);
+                w.Write((byte)prop.Kind);
+                w.WriteNear(prop.Position, Self.Position);
+                w.Write((byte)Math.Clamp((int)MathF.Round(prop.Radius * 32), 0, 255));
+                w.Write(prop.Health);
             }
         });
 
@@ -1607,6 +1659,12 @@ namespace Game.Core
                 int aim = r.ReadInt32();
                 if (index < entities.Count) entities[index] = entities[index].WithAim(aim);
             }
+            for (int flagged = r.ReadByte(); flagged > 0; flagged--)
+            {
+                int index = r.ReadUInt16();
+                byte flags = r.ReadByte();
+                if (index < entities.Count) entities[index] = entities[index].WithFlags(flags);
+            }
 
             int projectileCount = r.ReadUInt16();
             var projectiles = new List<ProjectileState>(projectileCount);
@@ -1656,7 +1714,10 @@ namespace Game.Core
                 events.Add(new SimEvent(type, source, target, amount, critical, Protocol.UnpackDirection(r.ReadByte()), cause, position: at,
                     tags: World.ElementsFromBits(flags >> 3)));
             }
-            return new SnapshotMessage(tick, self, entities, projectiles, hazards, events, clock, sleepers, rift, defense, dayMinutes);
+            var props = new List<PropState>();
+            for (int count = r.ReadByte(); count > 0; count--)
+                props.Add(new PropState(r.ReadInt32(), (PropKind)r.ReadByte(), r.ReadNear(position), r.ReadByte() / 32f, r.ReadByte()));
+            return new SnapshotMessage(tick, self, entities, projectiles, hazards, events, clock, sleepers, rift, defense, dayMinutes) { Props = props };
         });
     }
 }

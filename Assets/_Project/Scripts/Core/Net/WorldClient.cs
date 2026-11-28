@@ -35,8 +35,10 @@ namespace Game.Core
             SkillDefinition skill = null,
             int elite = 0,
             uint look = 0,
-            int aim = 0)
+            int aim = 0,
+            byte flags = 0)
         {
+            Raging = kind == EntityKind.Boss && (flags & BossFlags.Raging) != 0;
             Aim = aim;
             Look = kind == EntityKind.Player ? CharacterLook.Unpack(look) : default;
             Elite = kind == EntityKind.Monster ? (EliteRank)(elite >> 8) : EliteRank.None;
@@ -112,6 +114,8 @@ namespace Game.Core
         public BossAttack BossAttack { get; }
         // A boss coming in (BossState.Enter) the short way: it has come in before in this world.
         public bool EntersAgain { get; }
+        // A boss in its rage (R2, BossRage).
+        public bool Raging { get; }
 
         static BossAttack AttackAt(BossDefinition boss, int index) => index >= 1 && index <= boss.Attacks.Count ? boss.Attacks[index - 1] : null;
         // Burning, chilled (StatusBits).
@@ -1478,7 +1482,8 @@ namespace Game.Core
                     entity.Kind == EntityKind.Minion ? _classes.Skills[entity.Type] : null,
                     entity.Elite,
                     entity.IsPlayer ? LookOf(entity.Id).Packed : 0,
-                    shown.Aim));
+                    shown.Aim,
+                    entity.Flags));
             }
             return views;
         }
@@ -1649,6 +1654,20 @@ namespace Game.Core
                 if (best == null || state.TicksLeft < best.Value.State.TicksLeft) best = hazard;
             }
             return best?.State.Position;
+        }
+
+        // What stands in the bosses' arenas in view, as of the last snapshot (R2).
+        public IReadOnlyList<PropState> Props() => _snapshots.Count == 0 ? SnapshotMessage.NoProps : _snapshots[_snapshots.Count - 1].Props;
+
+        // A boss's edge as the screen draws it (R2, BossEdge): its arena's middle (the nearest arena), the arena's
+        // radius and where the open floor ends; null when it has none yet.
+        public (Vec2 Home, float Arena, float Floor, BossEdge Edge)? EdgeOf(EntityView boss)
+        {
+            var edge = boss.Boss?.Edge;
+            if (edge == null || boss.Phase < edge.Phase || Arenas.Count == 0 || boss.BossState == BossState.Dormant) return null;
+            var home = Arenas.OrderBy(a => Vec2.Distance(a, boss.Position)).First();
+            if (Vec2.Distance(home, boss.Position) > ArenaRadius + 2) return null;
+            return (home, ArenaRadius, ArenaRadius - edge.Width, edge);
         }
 
         // Telegraphs with how far along they are right now; ones that have already landed are left out.

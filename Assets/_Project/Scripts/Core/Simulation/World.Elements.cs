@@ -21,6 +21,9 @@ namespace Game.Core
         // Caught in a web (2026-11-13, HazardShape.Web): slowed while in it and a moment after.
         public bool Snared => SnareTicks > 0;
         internal int SnareTicks { get; set; }
+        // Wading through a boss's lava or water (2026-11-28, R2): slower (World.PlayerWadeSpeed).
+        public bool Wading => WadeTicks > 0;
+        internal int WadeTicks { get; set; }
         // Held where they stand by a monster's blow (2026-11-21, HitEffect.Root).
         public bool Rooted => RootTicks > 0;
         internal int RootTicks { get; set; }
@@ -41,6 +44,7 @@ namespace Game.Core
             BurnOwed = 0;
             ChillTicks = 0;
             SnareTicks = 0;
+            WadeTicks = 0;
             RootTicks = 0;
             PoisonTicks = 0;
         }
@@ -59,6 +63,7 @@ namespace Game.Core
         {
             if (ChillTicks > 0) ChillTicks--;
             if (SnareTicks > 0) SnareTicks--;
+            if (WadeTicks > 0) WadeTicks--;
             if (RootTicks > 0) RootTicks--;
             if (BurnTicks <= 0) return 0;
             BurnTicks--;
@@ -98,6 +103,8 @@ namespace Game.Core
         public const float PlayerChillSpeed = 0.7f;
         // Caught in a web a player moves at this share of their pace, while in it and for SnareSeconds after.
         public const float PlayerSnareSpeed = 0.55f;
+        // Through a boss's lava or shallow water (R2, Docs/BossRedesign.md 5.7: 80% of the walk).
+        public const float PlayerWadeSpeed = 0.8f;
         public const float SnareSeconds = 0.4f;
         // A pool of venom hurts whoever stands in it this often, for this share of the blow that left it.
         public const float VenomSeconds = 0.5f;

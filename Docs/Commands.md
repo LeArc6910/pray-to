@@ -138,6 +138,12 @@ node DevTools/WebPlaytest/sweep.js --wait <커밋> --only hunt
 
 
 ```
+# 보스의 땅·물체·분노(R2a, Docs/Bosses.md 지형·물체·분노): 용암 거인 봇 전투(알맞음 조건, 시드를 바꿔 1~5)와 웹 점검 구역 ground(PC·휴대폰)
+dotnet run --project DevTools/CoreSandbox -- --boss 600 1 --boss-id lava_titan --gear mithril_sword,mithril_armor,mithril_helmet,mithril_boots,mithril_ring,mithril_amulet --classes warrior,fire_mage --reaction 0.5 --level 25 --build
+node DevTools/WebPlaytest/sweep.js --wait <커밋> --only ground
+```
+
+```
 # 새 월드의 새벽 마을·왕도를 글자로(Docs/Towns.md)
 dotnet run --project DevTools/CoreSandbox -- --town 1
 ```

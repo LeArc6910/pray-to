@@ -95,7 +95,8 @@ namespace Game.Core.Tests
             Assert.AreEqual(SkillTag.Fire, Titan.Element);
             Assert.AreEqual(30, Titan.DropLevel, "obsidian gear is level 30");
             Assert.AreEqual("titan_heart", Titan.MaterialId);
-            Assert.IsTrue(Titan.Attacks.Any(a => a.Summon?.Id == "magma_slime"));
+            // Its slimes were taken out with the R2 redesign (Docs/BossRedesign.md 5.7 뺌): the ground is its army now.
+            Assert.IsFalse(Titan.Attacks.Any(a => a.Shape == AttackShape.Summon));
             var sword = Gear.Data.Recipes.Single(r => r.Item?.Id == "obsidian_sword");
             Assert.IsTrue(sword.Ingredients.Any(i => i.Material.Id == "titan_heart"));
 

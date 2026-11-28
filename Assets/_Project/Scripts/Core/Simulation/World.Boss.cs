@@ -119,6 +119,10 @@ namespace Game.Core
             boss.Health = boss.MaxHealth;
             boss.Phase = 1;
             boss.EmptyTicks = 0;
+            boss.TaughtTick = -1;
+            boss.EdgeTick = -1;
+            CalmDown(boss);
+            PlaceProps(boss);
             _events.Add(new SimEvent(SimEventType.BossAwake, boss.Id));
             // It comes in first (arenas.csv): a moment in which it neither attacks nor can be hurt. The host decides
             // it, so everyone in the game sees the same entrance and the fight starts for all at once.
@@ -171,9 +175,16 @@ namespace Game.Core
                 return;
             }
             boss.EmptyTicks = 0;
+            RunRage(boss);
+            WorkEdge(boss);
 
             switch (boss.State)
             {
+                case BossState.Spent:
+                case BossState.Stun:
+                    if (--boss.StateTicks <= 0) ChooseAttack(boss, fighters);
+                    break;
+
                 case BossState.Approach:
                     var target = FindPlayer(boss.TargetId);
                     if (target == null || target.IsDead || !fighters.Contains(target))
@@ -186,7 +197,7 @@ namespace Game.Core
                         StartTelegraph(boss, target, fighters);
                         break;
                     }
-                    MoveBoss(boss, (target.Position - boss.Position).Normalized * (boss.Definition.Speed * MoveTempo(boss.Phase) * GaitFactor(boss) * TickSeconds));
+                    MoveBoss(boss, (target.Position - boss.Position).Normalized * (boss.Definition.Speed * MoveTempo(boss.Phase) * GaitFactor(boss) * RageSpeed(boss) * TickSeconds));
                     break;
 
                 case BossState.Telegraph:
@@ -268,6 +279,8 @@ namespace Game.Core
         void ChooseAttack(Boss boss, List<Player> fighters)
         {
             if (fighters.Count == 0) return;
+            // Its rage spent, it cowers first (R2).
+            if (Spend(boss)) return;
             var choices = boss.Definition.Attacks.Where(a => a.InPhase(boss.Phase) && a.Weight > 0).ToList();
             // A finisher not long ago: not another yet (BossDefinition.FinisherRest), unless nothing else is left. A new
             // phase's opening blow is chosen among the rest.
@@ -364,7 +377,8 @@ namespace Game.Core
             if (!again && !repeat)
             {
                 boss.ChargesLeft = attack.Shape == AttackShape.Charge ? Math.Max(0, attack.Count - 1) : 0;
-                boss.RepeatsLeft = attack.Repeat;
+                // Raging, every blow that can comes once more (R2, BossRage); not a finisher.
+                boss.RepeatsLeft = attack.Repeat + (boss.Raging && attack.CanRepeat && attack.Warning != AttackWarning.Strong ? 1 : 0);
             }
             // A late blow (boost hold) waits 0.4 to 1 of its hold past its telegraph, rolled from a stream of its own
             // (as the aim of a burst) so nothing else rolls differently for it; its tell comes CueSeconds before it lands.
@@ -489,7 +503,7 @@ namespace Game.Core
         Vec2 LandingFor(Boss boss, Vec2 spot)
         {
             var fromHome = spot - boss.Home;
-            float limit = Math.Max(0, boss.ArenaRadius - boss.Definition.Radius);
+            float limit = Math.Max(0, FloorRadius(boss) - boss.Definition.Radius);
             if (fromHome.Length > limit) spot = boss.Home + fromHome.Normalized * limit;
             return Collision.Resolve(Map, spot, boss.Definition.Radius);
         }
@@ -555,8 +569,16 @@ namespace Game.Core
                     for (int i = 0; i < attack.Count; i++)
                     {
                         long at = resolve + Ticks(gap * i / attack.Speed);
-                        AddHazard(boss, cause, HazardShape.Circle, boss.Position + facing * (gap * (i + 1)), facing, attack.Radius, 0, attack.Damage, at);
+                        var blast = AddHazard(boss, cause, HazardShape.Circle, boss.Position + facing * (gap * (i + 1)), facing, attack.Radius, 0, attack.Damage, at);
+                        // Ground left along it (pool) is one strip, laid as the last lands (World.LeavePool).
+                        if (i == attack.Count - 1) blast.StripFrom = boss.Position + facing * (gap * 0.5f);
                     }
+                    break;
+                case AttackShape.Vent:
+                    LayVents(boss, attack, resolve, cause);
+                    break;
+                case AttackShape.Refuge:
+                    LayRefuge(boss, attack, resolve, cause);
                     break;
                 case AttackShape.Share:
                     AddHazard(boss, cause, HazardShape.Share, target.Position, facing, attack.Radius, 0, attack.Damage, resolve);
@@ -591,6 +613,7 @@ namespace Game.Core
                     boss.State = BossState.Charge;
                     boss.StateTicks = Ticks(attack.Length / attack.Speed);
                     boss.ChargeHits.Clear();
+                    boss.ChargeFrom = boss.Position;
                     return;
                 case AttackShape.Burst:
                     Burst(boss, attack);
@@ -695,8 +718,19 @@ namespace Game.Core
                 AfflictPlayer(player, boss.Id, HurtPlayer(player, boss.Id, attack.Damage, Cause(boss, attack)));
             }
 
+            // Into a pillar of its own (R2): it stops there and stands stunned.
+            if (RanIntoPillar(boss))
+            {
+                EndCharge(boss, attack, boss.ChargeFrom);
+                _events.Add(new SimEvent(SimEventType.Impact, boss.Id, amount: 8));
+                boss.ChargesLeft = 0;
+                boss.State = BossState.Stun;
+                boss.StateTicks = Ticks(StunSeconds);
+                return;
+            }
             bool blocked = Vec2.Distance(before, boss.Position) < step.Length * 0.3f;
             if (--boss.StateTicks > 0 && !blocked) return;
+            EndCharge(boss, attack, boss.ChargeFrom);
             _events.Add(new SimEvent(SimEventType.Impact, boss.Id, amount: 6));
             // Another run at whoever is nearest now, wound up in less time.
             var fighters = Fighters(boss);
@@ -717,7 +751,8 @@ namespace Game.Core
         {
             var position = Collision.Move(Map, boss.Position, boss.Definition.Radius, delta, monster: true);
             var fromHome = position - boss.Home;
-            float limit = Math.Max(0, boss.ArenaRadius - boss.Definition.Radius);
+            // Once its edge has come (R2), it keeps to the floor that is left, so no one has to follow it into the edge.
+            float limit = Math.Max(0, FloorRadius(boss) - boss.Definition.Radius);
             if (fromHome.Length > limit) position = boss.Home + fromHome.Normalized * limit;
             if (delta.LengthSquared > 1e-8f) boss.Facing = delta.Normalized;
             boss.Position = position;
@@ -727,6 +762,7 @@ namespace Game.Core
         {
             boss.Health -= amount;
             _events.Add(new SimEvent(SimEventType.Hit, source, boss.Id, amount, critical, cause: cause, tags: tags));
+            if (!boss.IsDead) Heat(boss, amount);
             if (boss.IsDead)
             {
                 ClearAttacksFrom(boss);
@@ -757,6 +793,9 @@ namespace Game.Core
             boss.Cues = false;
             boss.Countered = false;
             boss.OpensPhase = true;
+            CalmDown(boss);
+            EdgeComes(boss);
+            PlaceProps(boss);
             boss.State = BossState.Roar;
             boss.StateTicks = Ticks(definition.Roar);
             _events.Add(new SimEvent(SimEventType.PhaseChanged, boss.Id, amount: phase));
@@ -778,6 +817,9 @@ namespace Game.Core
             boss.EmptyTicks = 0;
             boss.OpensPhase = false;
             boss.FinisherReady = 0;
+            boss.TaughtTick = -1;
+            boss.EdgeTick = -1;
+            CalmDown(boss);
             boss.Countered = false;
             boss.Cues = false;
         }
@@ -796,6 +838,7 @@ namespace Game.Core
         {
             _hazards.RemoveAll(h => h.Source == boss.Id);
             _projectiles.RemoveAll(p => p.Source == boss.Id);
+            _props.RemoveAll(p => p.Owner == boss.Id);
         }
 
         Hazard AddHazard(Boss boss, int cause, HazardShape shape, Vec2 position, Vec2 direction, float size, float width, int damage, long resolve)
@@ -819,12 +862,17 @@ namespace Game.Core
             List<int> plucked = null;
             // Webs that lie over each other burst together: whoever stands in two of them is struck once.
             HashSet<int> burst = null;
+            List<Hazard> cooled = null;
             for (int i = _hazards.Count - 1; i >= 0; i--)
             {
                 var hazard = _hazards[i];
                 if (hazard.Lingers)
                 {
-                    if (Tick >= hazard.ResolveTick) _hazards.RemoveAt(i);
+                    if (Tick >= hazard.ResolveTick)
+                    {
+                        _hazards.RemoveAt(i);
+                        if (hazard.Shape == HazardShape.Lava) (cooled ??= new List<Hazard>()).Add(hazard);
+                    }
                     else Linger(hazard);
                     continue;
                 }
@@ -844,6 +892,8 @@ namespace Game.Core
                     burst ??= new HashSet<int>();
                     hit.RemoveAll(p => !burst.Add(p.Id));
                 }
+                // A blast that spares cooled rock (AttackShape.Refuge).
+                if (hazard.Spares) hit.RemoveAll(p => OnRock(hazard.Source, p.Position));
                 // A shared circle splits its damage among everyone in it; alone, one takes it all.
                 int damage = hazard.Shape == HazardShape.Share ? (int)MathF.Ceiling(hazard.Damage / (float)Math.Max(1, hit.Count)) : hazard.Damage;
                 foreach (var player in hit)
@@ -859,6 +909,8 @@ namespace Game.Core
             }
             // A plucked web bursts and is gone.
             if (plucked != null) _hazards.RemoveAll(h => h.Shape == HazardShape.Web && plucked.Contains(h.Id));
+            // Lava whose time is up cools into rock (R2).
+            if (cooled != null) foreach (var lava in cooled) Cool(lava);
         }
 
         // What a landed circle leaves behind (boss_attacks.csv pool): a web or a pool of venom the same size, for the
@@ -866,24 +918,14 @@ namespace Game.Core
         // eight arms marked as well they still fit in a snapshot (WorldHost.MaxHazardsPerSnapshot).
         public const int MaxPools = 6;
 
-        void LeavePool(Hazard hazard)
-        {
-            if (hazard.Shape != HazardShape.Circle || hazard.Cause <= 0) return;
-            var boss = FindBoss(hazard.Source);
-            if (boss == null || boss.IsDead || hazard.Cause > boss.Definition.Attacks.Count) return;
-            var attack = boss.Definition.Attacks[hazard.Cause - 1];
-            if (attack.Pool == PoolKind.None) return;
-            var pools = _hazards.Where(h => h.Lingers && h.Source == boss.Id).OrderBy(h => h.StartTick).ToList();
-            if (pools.Count >= MaxPools) _hazards.Remove(pools[0]);
-            bool web = attack.Pool == PoolKind.Web;
-            int damage = web ? 0 : Math.Max(1, (int)MathF.Round(attack.Damage * VenomShare));
-            _hazards.Add(new Hazard(_nextId++, boss.Id, hazard.Cause, web ? HazardShape.Web : HazardShape.Venom, hazard.Position, hazard.Direction,
-                hazard.Size, 0, damage, Tick, Tick + Ticks(attack.Linger)));
-        }
-
         // A web snares whoever is in it; venom hurts whoever stands in it, every VenomSeconds from when it fell.
         void Linger(Hazard pool)
         {
+            if (pool.IsGround)
+            {
+                LingerGround(pool);
+                return;
+            }
             if (pool.Shape != HazardShape.Web && pool.Shape != HazardShape.Venom)
             {
                 LingerMonsterPool(pool);
@@ -924,7 +966,7 @@ namespace Game.Core
                     _projectiles.Remove(projectile);
                     continue;
                 }
-                bool ended = --projectile.RemainingTicks <= 0 || wall || ComesBack(projectile);
+                bool ended = --projectile.RemainingTicks <= 0 || wall || ComesBack(projectile) || Blocked(projectile);
                 bool gone = projectile.Friendly ? FlyFriendly(projectile, ended) : ended || StrikePlayer(projectile);
                 if (gone) _projectiles.Remove(projectile);
             }
