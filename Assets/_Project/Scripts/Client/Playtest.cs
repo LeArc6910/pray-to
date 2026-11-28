@@ -437,6 +437,16 @@ namespace Game.Client
                 case "swap":
                     // As the X key or the swap button does: through the client to the host.
                     return root.SwapWeapons() ? null : "error swap: nothing to swap";
+                case "art":
+                    // As V, the right button or the art's button does: through the client to the host (Docs/Weapons.md
+                    // 묶음 C). "art up" lets a held one go; "art ready" clears every kind's cooldown on the host.
+                    if (words.Length > 1 && words[1] == "up") return root.ReleaseWeaponArt() ? null : "error art: nothing held";
+                    if (words.Length > 1 && words[1] == "ready")
+                    {
+                        player.ArtReady.Clear();
+                        return null;
+                    }
+                    return root.UseWeaponArt() ? null : "error art: not now";
                 case "hero":
                     // The hero's attack with a weapon (2026-11-19, HeroArt): the weapon in hand (none: bare hands), three
                     // sturdy slimes the way given, and the attack held that way so the three steps go round.
@@ -2607,6 +2617,7 @@ namespace Game.Client
                 }
                 list.Item(new Json('{').Field("label", "roll").Field("rect", Rect(OnScreen(SkillBar.RollArea(skills)))).Field("enabled", true).Field("shown", true).Raw('}'));
                 list.Item(new Json('{').Field("label", "swap").Field("rect", Rect(OnScreen(SkillBar.WeaponArea(skills)))).Field("enabled", true).Field("shown", true).Raw('}'));
+                list.Item(new Json('{').Field("label", "art").Field("rect", Rect(OnScreen(SkillBar.ArtArea(skills)))).Field("enabled", true).Field("shown", true).Raw('}'));
                 for (int slot = 0; slot < Hotbar.Slots; slot++)
                 {
                     list.Item(new Json('{').Field("label", $"quick {slot}").Field("rect", Rect(OnScreen(Hotbar.Area(slot, skills)))).Field("enabled", true).Field("shown", true).Raw('}'));
@@ -2856,6 +2867,14 @@ namespace Game.Client
                 // The second weapon and the kind in hand (Docs/Weapons.md).
                 json.Field("spare", player.Equipment.Spare?.Base.Id);
                 json.Field("weaponKind", player.Stats.Kind.Id);
+                // The weapon arts (Docs/Weapons.md 묶음 C): the art in hand, its cooldown left on the host and as the
+                // client counts it, the art going on, and those the view has shown.
+                json.Field("art", player.Stats.Kind.Art?.Kind.ToString());
+                json.Field("artTicks", world.ArtTicksLeft(player, player.Stats.Kind));
+                json.Field("artClientSeconds", root.ArtCooldownLeft);
+                json.Field("artGoing", player.Art?.Kind.ToString());
+                json.Field("artsShown", root.ArtsShown);
+                json.Field("lastArt", root.LastArt);
                 json.Field("day", world.Today);
                 json.Field("clock", Calendar.Text(world.Clock));
                 json.Field("clockTicks", world.Clock);

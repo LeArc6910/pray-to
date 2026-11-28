@@ -1321,6 +1321,11 @@ DevTools/Local/setup.sh --commit
   - 명령 한 줄을 다시 돌린다. 새 파일 `Client/Art/HeroArt.Kinds.cs`, `Client/WeaponFeel.cs`의 `.meta`가 생기면 커밋한다. 통신 0.117.0(탄에 모양 한 바이트)
   - PlayMode `Screens` 사진 여덟 장이 `local-screens`에 올라오는지: `weapon-dagger`·`weapon-greatsword`·`weapon-spear`·`weapon-hammer`·`weapon-crossbow`·`weapon-boomerang`·`weapon-wand`·`weapon-orb`(`FeatureTests.EachWeaponKindStrikesItsOwnWay`)
   - (사람) 시험장에서 여덟 종을 들고 손맛을 본다: 대검·망치가 무겁게(흔들림·멈춤) 느껴지는지, 단검·완드가 가볍고 빠른지, 석궁 반동, 부메랑이 손을 떠났다 돌아오는지, 오브 폭발, 망치 3단 기절의 별. 소리가 종류에 어울리는지
+- [ ] 203단계: 무기마다 고유 기술(묶음 C, 2026-11-28) — `Docs/Weapons.md` 묶음 C
+  - 명령 한 줄을 다시 돌린다. 새 파일 `Core/Simulation/World.WeaponArts.cs`, `Client/WorldView.Arts.cs`, `Client/Art/SkillFx.Arts.cs`, `Tests/EditMode/WeaponArtTests.cs`의 `.meta`가 생기면 커밋한다. 통신 0.118.0. 키 바꾸기 목록에 "무기 기술"(V)이 새로 생긴다
+  - PlayMode `Screens` 사진 일곱 장이 `local-screens`에 올라오는지: `arts`·`arts-slam-lifted`·`arts-slam`·`arts-orb`·`arts-charge`·`arts-cleave`·`arts-touch`(`FeatureTests.TheWeaponArtsDraw`)
+  - (사람) 시험장(시험판 [장비]의 "무기 기술", 대기 비우기)에서 열한 종의 기술을 V와 마우스 오른쪽으로 써 보고 손맛·소리가 종류에 맞는지, 검의 막기가 맞는 순간 확실히 막히는지, 대검을 누르고 모으는 느낌, 완드 탄막(발당 45%)이 너무 약하지 않은지
+  - (사람) 실제 휴대폰에서 무기 칸 위의 기술 단추를 엄지로 누르기 편한지, 대검을 누르고 있다 떼기가 되는지
 
 ## 결과 보고
 

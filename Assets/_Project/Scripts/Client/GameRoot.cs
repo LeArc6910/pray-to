@@ -90,6 +90,10 @@ namespace Game.Client
         internal int SkillFxAlive => _view?.SkillFxAlive ?? 0;
         // Rolls begun on the screen and dodged blows shown (WorldView.StartRoll), for the playtests.
         internal int RollsShown => _view?.RollsShown ?? 0;
+        // The weapon arts shown (WorldView.ShowArt) and the client's count of the cooldown, for the playtests.
+        internal int ArtsShown => _view?.ArtsShown ?? 0;
+        internal string LastArt => _view == null || _view.ArtsShown == 0 ? null : $"{_view.LastArt} {_view.LastArtPhase}";
+        internal float ArtCooldownLeft => _client?.ArtCooldownLeft ?? 0;
         internal int DodgesShown => _view?.DodgesShown ?? 0;
         internal int SkillFxPieces => _view?.SkillFxPieces ?? 0;
         internal int SkillFxLights => _view?.SkillFxLights ?? 0;
@@ -836,6 +840,7 @@ namespace Game.Client
             bool potion = Controls.TakePotionPress();
             bool roll = Controls.TakeRollPress();
             bool swap = Controls.TakeSwapPress();
+            bool art = Controls.TakeArtPress();
             var quick = Controls.TakeHotbarPresses();
             bool machine = Controls.MachinePressed();
             bool advance = Controls.AdvancePressed();
@@ -855,6 +860,9 @@ namespace Game.Client
             foreach (int slot in slots) UseSkill(slot, aim);
             if (potion) DrinkPotion();
             if (swap) SwapWeapons();
+            if (art) UseWeaponArt(aim);
+            // A held art (a greatsword's charge) lets go when its key, button or finger does.
+            if (_client.ArtBusy && _client.Art?.Holds == true && !Controls.ArtHeld) ReleaseWeaponArt(aim);
             foreach (int slot in quick) UseQuickSlot(slot);
             // G meets what is in reach (Docs/UiRework.md 4-1, the person's pick of 2026-11-22): see Meet.
             if (machine) Meet();
@@ -1228,6 +1236,23 @@ namespace Game.Client
             if (_client == null || _client.Equipment[ItemSlot.Weapon] == null && _client.Equipment.Spare == null) return false;
             Sounds.Play(Sound.Click);
             SendToHost(_client.SwapWeaponsCommand());
+            return true;
+        }
+
+        // The weapon's own art (Docs/Weapons.md 묶음 C). Also called by the playtests. False when it cannot be used now.
+        internal bool UseWeaponArt(Vec2 aim = default)
+        {
+            byte[] command = _client?.ArtCommand(aim);
+            if (command == null) return false;
+            SendToHost(command);
+            return true;
+        }
+
+        internal bool ReleaseWeaponArt(Vec2 aim = default)
+        {
+            byte[] command = _client?.ArtReleaseCommand(aim);
+            if (command == null) return false;
+            SendToHost(command);
             return true;
         }
 

@@ -330,7 +330,7 @@ namespace Game.Client
         }
 
         // A piece laid on the picture as a sprite would be: centred on its place, turned without smoothing.
-        static void Blit(PixelImage image, Scene scene, float originX, float originY, FxStamp stamp)
+        internal static void Blit(PixelImage image, Scene scene, float originX, float originY, FxStamp stamp)
         {
             PixelImage piece;
             int anchorX, anchorY;

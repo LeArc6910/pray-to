@@ -134,6 +134,9 @@ namespace Game.Client
         // The dodge roll's slot (SkillBar).
         public static Sprite RollIcon => Centered("skill/roll", SkillArt.Roll);
 
+        // A weapon art's slot (SkillBar.DrawArt).
+        public static Sprite ArtIcon(WeaponArtKind kind) => Centered("art/" + kind, () => SkillArt.WeaponArt(kind));
+
         static Sprite MakeIcon(SkillDefinition skill) => Remember(skill, Centered("skill/" + skill.Id, () => SkillArt.Icon(skill)));
 
         static Sprite Known(object definition) => Icons.TryGetValue(definition, out var sprite) && sprite != null ? sprite : null;

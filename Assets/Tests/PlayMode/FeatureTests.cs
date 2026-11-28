@@ -580,6 +580,41 @@ namespace Game.Client.Tests
             Assert.IsTrue(_root.Playing);
         }
 
+        // The weapon arts (Docs/Weapons.md 묶음 C): the art's slot beside the weapons' slot, a greatsword's charge held,
+        // a hammer's slam among slimes, an orb's well, and the slot on a touch screen right above the weapons' slot.
+        [UnityTest, Category(Screens.Category)]
+        public IEnumerator TheWeaponArtsDraw()
+        {
+            yield return Start();
+            Playtest.Run(_root, "equip iron_hammer; spare iron_orb; hero iron_hammer 1 0; attack off");
+            yield return new WaitForSecondsRealtime(SceneSeconds);
+            yield return Screens.Take("arts");
+            Assert.IsTrue(_root.UseWeaponArt(new Vec2(1, 0)));
+            yield return new WaitForSecondsRealtime(0.2f);
+            yield return Screens.Take("arts-slam-lifted");
+            yield return new WaitForSecondsRealtime(0.25f);
+            yield return Screens.Take("arts-slam");
+            Assert.Greater(_root.ArtsShown, 0);
+            Assert.IsTrue(_root.SwapWeapons());
+            yield return new WaitForSecondsRealtime(0.5f);
+            Assert.IsTrue(_root.UseWeaponArt(new Vec2(1, 0)), "the orb's own art is ready though the hammer's is cooling");
+            yield return new WaitForSecondsRealtime(0.8f);
+            yield return Screens.Take("arts-orb");
+            Playtest.Run(_root, "art ready; hero iron_greatsword 1 0; attack off");
+            yield return new WaitForSecondsRealtime(0.5f);
+            Assert.IsTrue(_root.UseWeaponArt(new Vec2(1, 0)));
+            yield return new WaitForSecondsRealtime(0.6f);
+            yield return Screens.Take("arts-charge");
+            _root.ReleaseWeaponArt(new Vec2(1, 0));
+            yield return new WaitForSecondsRealtime(0.1f);
+            yield return Screens.Take("arts-cleave");
+            Controls.ForceTouch(true);
+            yield return new WaitForSecondsRealtime(0.4f);
+            yield return Screens.Take("arts-touch");
+            Controls.ForceTouch(false);
+            Assert.IsTrue(_root.Playing);
+        }
+
         // Mana spent and drunk back, and the set and rift legendaries worn.
         [UnityTest, Category(Screens.Category)]
         public IEnumerator ManaAndSetsDraw()

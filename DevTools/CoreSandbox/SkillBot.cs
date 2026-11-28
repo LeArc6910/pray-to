@@ -21,6 +21,9 @@ namespace CoreSandbox
         // 성장 곡선): the skill points spread over the open skills (Rank is worked out, not taken), the passive points
         // spent greedily on damage first, and the best crystals in every damage skill's slots.
         public static ClassData Build;
+        // --arts: the weapon in hand's own art as soon as it is ready and the target is in its reach (Docs/Weapons.md
+        // 묶음 C); a greatsword's is held to the full and lets go by itself.
+        public static bool Arts;
 
         public SkillBot(Player player, LootData loot)
         {
@@ -72,6 +75,20 @@ namespace CoreSandbox
                 };
                 if (worth) world.UseSkill(player.Id, slot, toTarget);
             }
+            var art = World.ArtOf(player);
+            if (Arts && fighting && art != null && player.Art == null && world.ArtTicksLeft(player, player.Stats.Kind) == 0)
+            {
+                // Near enough for it to land: a shooter's or a caster's at their range, a blade's at its reach.
+                float reach = art.Kind switch
+                {
+                    WeaponArtKind.Slam or WeaponArtKind.Whirl => art.Radius + 0.8f,
+                    WeaponArtKind.Backstep or WeaponArtKind.Barrage => 7,
+                    WeaponArtKind.Gravity => art.Reach + art.Radius,
+                    WeaponArtKind.Pierce => art.Reach,
+                    _ => art.Reach + 0.8f,
+                };
+                if (toTarget.Length <= reach) world.UseWeaponArt(player.Id, toTarget);
+            }
         }
 
         public void Count(SimEvent e)
@@ -83,11 +100,16 @@ namespace CoreSandbox
                     string used = Player.Skills[e.Amount].Name;
                     _uses[used] = _uses.GetValueOrDefault(used) + 1;
                     break;
+                // Once a use: its beginning, or the blow of one that has none (a dagger's, a staff's, a bow's).
+                case SimEventType.Art when World.ArtPhaseOf(e.Amount) == ArtPhase.Start
+                    || World.ArtPhaseOf(e.Amount) == ArtPhase.Strike && World.ArtKindOf(e.Amount) is WeaponArtKind.Vital or WeaponArtKind.Wave or WeaponArtKind.Backstep:
+                    _uses["무기 기술"] = _uses.GetValueOrDefault("무기 기술") + 1;
+                    break;
                 case SimEventType.Healed:
                     Drunk++;
                     break;
                 case SimEventType.Hit:
-                    string by = e.Cause == 0 ? "기본 공격" : e.Cause <= Player.Skills.Count ? Player.Skills[e.Cause - 1].Name : "기타";
+                    string by = e.Cause == 0 ? "기본 공격" : e.Cause == World.ArtCause ? "무기 기술" : e.Cause <= Player.Skills.Count ? Player.Skills[e.Cause - 1].Name : "기타";
                     _dealt[by] = _dealt.GetValueOrDefault(by) + e.Amount;
                     break;
             }

@@ -1508,6 +1508,39 @@ namespace Game.Core
             return new SkillCommandMessage(slot, aim).Encode();
         }
 
+        // The weapon arts (Docs/Weapons.md 묶음 C): the art of the weapon in hand (null for none), seconds until it and
+        // the spare's are ready, counting down between snapshots, and how far a held charge has gathered (0 to 1).
+        public WeaponArt Art => Stats?.Kind?.Art;
+        public WeaponArt SpareArt => Equipment.Spare?.Base.Kind?.Art;
+        public float ArtCooldownLeft => (float)Math.Max(0, (_artCooldown - (HostTick - _skillsTick)) / World.TicksPerSecond);
+        public float SpareArtCooldownLeft => (float)Math.Max(0, (_spareArtCooldown - (HostTick - _skillsTick)) / World.TicksPerSecond);
+        public float ArtCooldownShare => Art == null ? 0 : Math.Min(1, ArtCooldownLeft / Math.Max(0.01f, Art.Cooldown));
+        public bool ArtBusy => _artAge >= 0 || _artHeld;
+        public float ArtCharge => Art == null || !Art.Holds || _artAge < 0 ? 0
+            : Math.Min(1, (float)((_artAge + (HostTick - _skillsTick)) / World.TicksPerSecond / Math.Max(0.01f, Art.Time)));
+        int _artCooldown, _spareArtCooldown, _artAge = -1;
+        // Pressed and not yet let go (a held art), on this side.
+        bool _artHeld;
+
+        // The message that uses the art of the weapon in hand, or null when it plainly cannot (no art, cooling down,
+        // dead). Its cooldown starts on screen at once, as a skill's does.
+        public byte[] ArtCommand(Vec2 aim)
+        {
+            var art = Art;
+            if (Status != ClientStatus.Playing || IsDead || art == null || ArtCooldownLeft > 0 || ArtBusy) return null;
+            _artCooldown = World.Ticks(art.Cooldown) + (int)Math.Ceiling(HostTick - _skillsTick);
+            _artHeld = art.Holds;
+            return new SkillCommandMessage(SkillCommandMessage.ArtPress, aim).Encode();
+        }
+
+        // Letting go of a held art (a greatsword's charge); null when nothing is held.
+        public byte[] ArtReleaseCommand(Vec2 aim)
+        {
+            if (!_artHeld) return null;
+            _artHeld = false;
+            return new SkillCommandMessage(SkillCommandMessage.ArtRelease, aim).Encode();
+        }
+
         // A player's look: this player's own, or another's as the host's roster has it (the default until it comes).
         public CharacterLook LookOf(int playerId) =>
             playerId == PlayerId ? Look : _looks.TryGetValue(playerId, out var look) ? look : CharacterLook.Default;
@@ -2180,6 +2213,9 @@ namespace Game.Core
                 _buffs[slot] = self.Buffs[slot];
             }
             _consumableCooldown = self.ConsumableCooldown;
+            _artCooldown = self.ArtCooldown;
+            _spareArtCooldown = self.SpareArtCooldown;
+            _artAge = self.ArtAge;
             var food = self.Food >= 0 && _loot != null && self.Food < _loot.Consumables.Count ? _loot.Consumables[self.Food] : null;
             buffsChanged |= food != Food;
             Food = food;

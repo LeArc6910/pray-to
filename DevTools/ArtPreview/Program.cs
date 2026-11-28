@@ -184,7 +184,7 @@ namespace Game.Client
             // --only weaponarts: the weapon kinds' own arts as a mock-up (out/weapon_arts.png, WeaponArtsPreview, Docs/Weapons.md 묶음 C).
             if (args.Length == 2 && args[0] == "--only" && args[1] == "weaponarts")
             {
-                WeaponArtsPreview.Write(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out"));
+                WeaponArtsPreview.Write(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out"), loot);
                 return 0;
             }
             // --only gear: the hunting sets', elite uniques' and boss sets' icons and the hunting trophies (out/gear.png, GearPreview).

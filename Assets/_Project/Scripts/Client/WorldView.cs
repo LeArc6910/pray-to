@@ -2393,6 +2393,9 @@ namespace Game.Client
                 case SimEventType.SkillUsed:
                     ShowSkill(e);
                     break;
+                case SimEventType.Art:
+                    ShowArt(e);
+                    break;
                 case SimEventType.Trampled:
                     // A monster trampled a crop at night: dust, a word, and once a session what to do about it.
                     var trampled = new Vector3(e.Position.X, e.Position.Y, 0);

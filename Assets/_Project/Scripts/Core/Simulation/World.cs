@@ -296,8 +296,9 @@ namespace Game.Core
             UpdateFishing(player);
             UpdateRoll(player);
             if (player.AttackCooldown > 0) player.AttackCooldown--;
-            // No swing comes out in the middle of a roll.
-            if (player.Attacking && player.AttackCooldown == 0 && !player.Rolling && !player.Riding) Attack(player);
+            UpdateArt(player);
+            // No swing comes out in the middle of a roll, nor of a weapon art (World.WeaponArts.cs).
+            if (player.Attacking && player.AttackCooldown == 0 && !player.Rolling && !player.Riding && player.Art?.Busy != true) Attack(player);
         }
 
         // A swing that hits nobody strikes the tile ahead. Rock (walls and ore veins) only gives way to a pickaxe in
@@ -670,6 +671,8 @@ namespace Game.Core
             // Nothing touches one riding a minecart (World.Travel.cs).
             if (player.Riding) return 0;
             if (dodge && Dodges(player, source)) return 0;
+            // A sword's guard turns the blow aside and answers it (World.WeaponArts.cs).
+            if (dodge && Parries(player)) return 0;
             int amount = armor ? DamageBands.Taken(damage, player.Stats.Armor, BandOf(source, player), HitKindOf(source, cause)) : Math.Max(1, (int)MathF.Round(damage));
             // Gear's ward, low-health guard and thorns (World.GearEffects.cs); nothing for a hit that is no attack.
             if (armor) amount = GearTaken(player, source, amount);
@@ -687,6 +690,7 @@ namespace Game.Core
 
             player.Health = 0;
             EndRoll(player);
+            player.Art = null;
             player.Attacking = false;
             player.HealTicks = 0;
             player.ClearBuffs();
@@ -993,6 +997,15 @@ namespace Game.Core
             float widen = MathF.Asin(Math.Min(1, MonsterSizes.Beyond(targetRadius) / distance));
             float half = Math.Min(MathF.PI, arcDegrees * 0.5f * MathF.PI / 180f + widen);
             return cosine >= MathF.Cos(half);
+        }
+
+        // How far the point is from the segment a-b.
+        public static float DistanceToSegment(Vec2 point, Vec2 a, Vec2 b)
+        {
+            var ab = b - a;
+            float length = ab.LengthSquared;
+            float t = length < 1e-8f ? 0 : Math.Clamp(Vec2.Dot(point - a, ab) / length, 0, 1);
+            return Vec2.Distance(point, a + ab * t);
         }
     }
 }

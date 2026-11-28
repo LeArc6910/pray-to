@@ -209,7 +209,9 @@ namespace Game.Core
                         if (_connections.TryGetValue(connection, out var caster) && caster.Player != null)
                         {
                             var command = SkillCommandMessage.Decode(data);
-                            World.UseSkill(caster.Player.Id, command.Slot, command.Aim);
+                            if (command.Slot == SkillCommandMessage.ArtPress) World.UseWeaponArt(caster.Player.Id, command.Aim);
+                            else if (command.Slot == SkillCommandMessage.ArtRelease) World.ReleaseWeaponArt(caster.Player.Id, command.Aim);
+                            else World.UseSkill(caster.Player.Id, command.Slot, command.Aim);
                         }
                         break;
                 }
@@ -777,7 +779,10 @@ namespace Game.Core
                 viewer.Stats.MaxMana,
                 viewer.Crafting == null ? -1 : IndexOf(_loot?.Recipes, viewer.Crafting.Recipe),
                 viewer.Crafting?.Progress ?? 0,
-                viewer.Crafting?.Left ?? 0);
+                viewer.Crafting?.Left ?? 0,
+                World.ArtTicksLeft(viewer, viewer.Stats.Kind),
+                World.ArtTicksLeft(viewer, viewer.Equipment.Spare?.Base.Kind),
+                viewer.Art?.Busy == true ? viewer.Art.Age : -1);
             // A player's type is the weapon in their hands (its base's index plus one), so others can draw it.
             var players = World.Players.Select(p => new EntityState(
                 p.Id, EntityKind.Player, HeldWeapon(p), p.Position, p.Facing, p.Health, p.Stats.MaxHealth, BuffBits(p),

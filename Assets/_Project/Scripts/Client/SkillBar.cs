@@ -70,6 +70,18 @@ namespace Game.Client
             return new Rect(first.x - Gap - KeySize, first.y, KeySize, KeySize);
         }
 
+        // The weapon art's slot (Docs/Weapons.md 묶음 C): on the PC bar left of the weapons' slot, on touch right above
+        // it, a little bigger (there is no fixed attack button on touch, the right half is the attack stick; this is the
+        // nearest the aiming thumb gets without covering the stick).
+        public const float ArtSize = 56;
+
+        public static Rect ArtArea(int skills)
+        {
+            var weapons = WeaponArea(skills);
+            if (Controls.UsingTouch) return new Rect(weapons.center.x - ArtSize / 2, weapons.y - Gap - ArtSize, ArtSize, ArtSize);
+            return new Rect(weapons.x - Gap - KeySize, weapons.y, KeySize, KeySize);
+        }
+
         // Everything the slots cover, for keeping other text clear of them.
         public static Rect Bounds(int skills)
         {
@@ -78,6 +90,8 @@ namespace Game.Client
             bounds = Rect.MinMaxRect(Mathf.Min(bounds.xMin, roll.xMin), Mathf.Min(bounds.yMin, roll.yMin), Mathf.Max(bounds.xMax, roll.xMax), Mathf.Max(bounds.yMax, roll.yMax));
             var weapons = WeaponArea(skills);
             bounds = Rect.MinMaxRect(Mathf.Min(bounds.xMin, weapons.xMin), Mathf.Min(bounds.yMin, weapons.yMin), Mathf.Max(bounds.xMax, weapons.xMax), Mathf.Max(bounds.yMax, weapons.yMax));
+            var art = ArtArea(skills);
+            bounds = Rect.MinMaxRect(Mathf.Min(bounds.xMin, art.xMin), Mathf.Min(bounds.yMin, art.yMin), Mathf.Max(bounds.xMax, art.xMax), Mathf.Max(bounds.yMax, art.yMax));
             for (int slot = 0; slot < skills; slot++)
             {
                 var area = Area(slot, skills);
@@ -150,6 +164,49 @@ namespace Game.Client
             DrawPotion(client, Area(count, count));
             DrawRoll(client, RollArea(count));
             DrawWeapons(client, WeaponArea(count));
+            DrawArt(client, ArtArea(count));
+        }
+
+        // The art of the weapon in hand: its icon, shaded while it cools (each kind its own), a bar filling while a
+        // greatsword gathers; pressed by V, the right mouse button, a click or a tap (held to gather). Dim with none.
+        static void DrawArt(WorldClient client, Rect area)
+        {
+            var art = client.Art;
+            Controls.Block(area);
+            Controls.ArtButton(area);
+            Panel(area, Palette.Weapons);
+
+            var previous = GUI.color;
+            float left = client.ArtCooldownLeft;
+            if (art != null)
+            {
+                GUI.color = left > 0 || client.IsDead ? new Color(1, 1, 1, 0.45f) : Color.white;
+                Sprites.DrawInGui(IconArea(area), Sprites.ArtIcon(art.Kind));
+            }
+            else
+            {
+                GUI.color = new Color(1, 1, 1, 0.5f);
+                GUI.Label(NameArea(area), "기술\n없음", _nameStyle);
+            }
+            GUI.color = previous;
+            if (!Controls.UsingTouch) GUI.Label(KeyArea(area), Controls.ArtKeyName, _keyStyle);
+            if (art != null) Shade(area, left, art.Cooldown);
+            float charge = client.ArtCharge;
+            if (charge > 0)
+            {
+                var bar = new Rect(area.x + Inner, area.yMax - Inner - 6, (area.width - Inner * 2) * charge, 5);
+                Fill(bar, charge >= 1 ? new Color(1f, 0.95f, 0.55f) : new Color(1f, 0.75f, 0.3f));
+            }
+
+            if (!Controls.UsingTouch && area.Contains(Event.current.mousePosition))
+            {
+                var spare = client.SpareArt;
+                string spareLine = spare == null ? "" : $"\n보조 무기: {spare.Name}" + (client.SpareArtCooldownLeft > 0 ? $" ({Mathf.CeilToInt(client.SpareArtCooldownLeft)}초 뒤)" : " (준비됨)");
+                DrawTooltip(art == null
+                    ? "무기 기술 없음\n곡괭이와 맨손에는 기술이 없다. 무기마다 고유 기술이 있다" + spareLine
+                    : $"{art.Name} ({Controls.ArtKeyName} · 오른쪽 클릭)\n{art.Description}\n마나 없이 {art.Cooldown:0.#}초마다. 무기 종류마다 대기가 따로다"
+                      + (art.Holds ? "\n누르고 있는 동안 모으고, 떼면 벤다" : "") + spareLine, area);
+            }
         }
 
         // The weapon in hand, big, and the spare, small in the corner; tapped, clicked or its key (X) swaps them

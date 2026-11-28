@@ -68,6 +68,7 @@ namespace UnityEngine.InputSystem
         Tab,
         I,
         X,
+        V,
         M,
         Q,
         E,
@@ -142,6 +143,7 @@ namespace UnityEngine.InputSystem
     {
         public static Mouse current { get; private set; }
         public ButtonControl leftButton { get; protected set; }
+        public ButtonControl rightButton { get; protected set; }
         public Vector2Control position { get; protected set; }
     }
 }

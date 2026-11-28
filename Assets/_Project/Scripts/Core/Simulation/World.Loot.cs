@@ -300,6 +300,8 @@ namespace Game.Core
             var player = FindPlayer(playerId);
             if (player == null || player.IsDead) return false;
             if (player.Equipment[ItemSlot.Weapon] == null && player.Equipment.Spare == null) return false;
+            // A guard, charge or aim of the weapon put away is cut off; an orb's well goes on (World.WeaponArts.cs).
+            CancelArt(player);
             player.Equipment.SwapWeapons();
             player.RefreshStats();
             player.InventoryVersion++;

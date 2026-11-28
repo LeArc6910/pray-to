@@ -240,6 +240,10 @@ namespace Game.Core
         public int ComboStep { get; internal set; }
         internal long LastAttackTick { get; set; } = -1;
         internal int AttackRecovery { get; set; }
+        // The weapon arts (World.WeaponArts.cs, Docs/Weapons.md 묶음 C): the tick each kind's is ready again, kept for
+        // each kind apart so a swap neither resets nor shares it; and the one going on, if any.
+        internal Dictionary<string, long> ArtReady { get; } = new Dictionary<string, long>();
+        public ActiveArt Art { get; internal set; }
         internal int RespawnTicks { get; set; }
         // How many times the player has fallen since joining (the playtest bot's numbers, BotMemory.Deaths).
         public int Falls { get; internal set; }
@@ -686,6 +690,9 @@ namespace Game.Core
         Dungeon,
         // Source, a player, swapped the weapon in hand for the spare (World.SwapWeapons, Docs/Weapons.md).
         Swapped,
+        // A weapon art (World.WeaponArts.cs): Amount is the WeaponArtKind plus ArtPhase * 16, Direction the way it goes,
+        // Position where it happens (the player, or an orb's well).
+        Art,
     }
 
     public readonly struct SimEvent
@@ -725,7 +732,7 @@ namespace Game.Core
             || type == SimEventType.LifeLevel || type == SimEventType.Defense || type == SimEventType.TurretShot
             || type == SimEventType.AnimalsPetted || type == SimEventType.Trampled || type == SimEventType.MovedIn
             || type == SimEventType.MonsterFx || type == SimEventType.PoiOpened || type == SimEventType.Blessed
-            || type == SimEventType.Ambush || type == SimEventType.Trap || type == SimEventType.Dungeon;
+            || type == SimEventType.Ambush || type == SimEventType.Trap || type == SimEventType.Dungeon || type == SimEventType.Art;
     }
 
     public enum BossState : byte

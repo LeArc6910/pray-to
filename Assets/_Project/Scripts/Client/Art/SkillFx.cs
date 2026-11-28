@@ -69,7 +69,7 @@ namespace Game.Client
     // which pieces are where. Each has three parts, a short gathering (anticipation), the blow itself (the most pieces
     // and the brightest, the shortest part) and what is left to thin out (smoke, embers, mist, motes). Nothing here
     // keeps state, so the game (WorldView.SkillFx) and the preview tool (DevTools/ArtPreview) draw the very same thing.
-    static class SkillFx
+    static partial class SkillFx
     {
         // The gathering before a blow, in seconds: the skill has already happened on the host, so it is short.
         public const float Lead = 0.1f;
@@ -95,7 +95,7 @@ namespace Game.Client
         const float RollTime = 0.3f;
 
         // A skill without an effect of its own (a new one in the sheet) keeps the old look of its kind.
-        public static bool Knows(string skill) => skill != null && Known.Contains(skill);
+        public static bool Knows(string skill) => skill != null && (Known.Contains(skill) || IsArt(skill));
 
         public static bool HasLoop(string skill) =>
             skill == "war_cry" || skill == "iron_skin" || skill == "flame_brand" || skill == "eagle_eye" || skill == "spirit_pact" || skill == "storm_mantle";
@@ -347,6 +347,8 @@ namespace Game.Client
 
         static float Cast(string skill, in FxContext c, float t, List<FxStamp> o)
         {
+            // The weapon arts' (SkillFx.Arts.cs).
+            if (IsArt(skill)) return ArtCast(skill, c, t, o);
             float R = c.Radius, face = c.Dir * Deg;
             int seed = c.Seed;
             var m = c.Main;

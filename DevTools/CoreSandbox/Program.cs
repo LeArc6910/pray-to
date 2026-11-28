@@ -111,6 +111,12 @@ namespace CoreSandbox
                 SkillBot.Level = int.Parse(args[levelFlag + 1]);
                 args = args.Where((_, i) => i != levelFlag && i != levelFlag + 1).ToArray();
             }
+            // --arts: the bots use the weapon in hand's own art too (Docs/Weapons.md 묶음 C).
+            if (args.Contains("--arts"))
+            {
+                SkillBot.Arts = true;
+                args = args.Where(a => a != "--arts").ToArray();
+            }
             if (args.Contains("--build"))
             {
                 SkillBot.Build = LoadClassData();

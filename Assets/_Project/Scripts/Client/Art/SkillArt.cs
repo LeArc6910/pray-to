@@ -61,6 +61,85 @@ namespace Game.Client
             return image;
         }
 
+        // A weapon art's icon (Docs/Weapons.md 묶음 C, SkillBar.DrawArt): steel for a blade's, wood-gold for a shooter's,
+        // violet for a caster's, each with the shape of what it does.
+        public static PixelImage WeaponArt(WeaponArtKind kind)
+        {
+            string tint = kind switch
+            {
+                WeaponArtKind.Backstep or WeaponArtKind.Pierce or WeaponArtKind.Whirl => "#D9B860",
+                WeaponArtKind.Wave or WeaponArtKind.Barrage or WeaponArtKind.Gravity => "#B07CF0",
+                _ => "#B8C8DC",
+            };
+            var ramp = Ramp.Of(Rgba.Hex(tint));
+            var image = Tile(ramp);
+            var c = new Canvas(image, ramp);
+            switch (kind)
+            {
+                case WeaponArtKind.Parry:
+                    c.Shield(6, 8);
+                    c.Arc(8, 8, 6, -50, 50, ramp.Light);
+                    break;
+                case WeaponArtKind.Vital:
+                    c.Sword(3, 12, 10, 5);
+                    c.Cross(12, 4, Rgba.Hex("#FF5A4A"), small: true);
+                    break;
+                case WeaponArtKind.Charge:
+                    c.Sword(4, 13, 12, 3);
+                    c.Arc(8, 8, 6, 120, 330, ramp.Light);
+                    c.Dot(3, 4, Rgba.Hex("#FFE080"));
+                    c.Dot(13, 12, Rgba.Hex("#FFE080"));
+                    break;
+                case WeaponArtKind.Dash:
+                    c.Line(2, 8, 13, 8, c.Ramp.Main);
+                    c.Line(11, 6, 13, 8, ramp.Light);
+                    c.Line(11, 10, 13, 8, ramp.Light);
+                    c.Chevrons(2, 8);
+                    break;
+                case WeaponArtKind.Slam:
+                    c.Hammer(8, 2);
+                    c.Line(2, 13, 13, 13, ramp.Shade);
+                    c.Dot(3, 11, ramp.Light);
+                    c.Dot(12, 11, ramp.Light);
+                    break;
+                case WeaponArtKind.Backstep:
+                    c.Arrow(4, 5, 13, 5);
+                    c.Arrow(4, 8, 13, 8);
+                    c.Arrow(4, 11, 13, 11);
+                    c.Line(2, 13, 4, 13, ramp.Shade);
+                    break;
+                case WeaponArtKind.Pierce:
+                    c.Arrow(2, 8, 14, 8, thick: true);
+                    c.Ring(6, 8, 2, Rgba.Hex("#FF8A6A"));
+                    c.Ring(10, 8, 2, Rgba.Hex("#FF8A6A"));
+                    break;
+                case WeaponArtKind.Whirl:
+                    c.Ring(8, 8, 5, ramp.Shade);
+                    c.Arc(8, 8, 5, 0, 120, ramp.Light);
+                    c.Dot(8, 8, ramp.Main);
+                    break;
+                case WeaponArtKind.Wave:
+                    c.Arc(3, 8, 4, -45, 45, ramp.Light);
+                    c.Arc(3, 8, 7, -45, 45, ramp.Main);
+                    c.Arc(3, 8, 10, -40, 40, ramp.Shade);
+                    break;
+                case WeaponArtKind.Barrage:
+                    for (int i = 0; i < 5; i++) c.Dot(4 + i * 2, 4 + (i * 5) % 9, i % 2 == 0 ? ramp.Light : Rgba.Hex("#FFD45A"));
+                    c.Dot(3, 12, ramp.Main);
+                    c.Dot(12, 12, ramp.Main);
+                    break;
+                case WeaponArtKind.Gravity:
+                    c.Disc(8, 8, 3, Rgba.Hex("#2A1650"));
+                    c.Ring(8, 8, 4, ramp.Light);
+                    c.Dot(2, 3, ramp.Main);
+                    c.Dot(13, 4, ramp.Main);
+                    c.Dot(3, 13, ramp.Main);
+                    c.Dot(13, 12, ramp.Main);
+                    break;
+            }
+            return image;
+        }
+
         // Whether the skill has a picture of its own rather than its kind's (ArtPreview checks the shipped ones do).
         public static bool HasOwnPicture(SkillDefinition skill) => Pictures.ContainsKey(skill.Id);
 

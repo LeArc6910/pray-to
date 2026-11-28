@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu title testground hunt harvest zones towns time basics first firstphone hour bag combat hero roll weapons bosses patterns veineater samurai knight warden antlion serpent queen general spider arenas world farm life npc factory defense gear skills skillfx layers monsterfx hazards bossfx hits shots blast mobwarn map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
+// Sections: menu title testground hunt harvest zones towns time basics first firstphone hour bag combat hero roll weapons arts bosses patterns veineater samurai knight warden antlion serpent queen general spider arenas world farm life npc factory defense gear skills skillfx layers monsterfx hazards bossfx hits shots blast mobwarn map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -5207,6 +5207,100 @@ async function weapons(browser) {
   }
 }
 
+// Each weapon kind's own art (Docs/Weapons.md 묶음 C): its slot above the weapons' slot on a phone (drawn, on screen,
+// on no other button) and left of it on the PC bar; used by V and the right mouse button on the PC and by a tap on a
+// phone; its cooldown starts and is each kind's own through a swap; and on the PC every kind's art against slimes in a
+// row, with a picture of each (a greatsword's held with V down, then let go).
+async function arts(browser) {
+  for (const name of ['pc', 'phone', 'phone-wide']) {
+    const profile = Profiles[name];
+    note(`\n## 무기 기술 (${name === 'pc' ? 'PC, V·오른쪽 클릭' : name === 'phone' ? '휴대폰 세로, 단추' : '휴대폰 가로, 단추'})\n`);
+    const game = await open(browser, run, profile, url);
+    if (game.touch) {
+      await game.startThroughMenu();
+      await game.until(s => s.playing, 25000);
+      await game.wait(800);
+      await game.send('classes warrior,archer');
+    } else {
+      await game.startSolo('playtest', false, 'warrior,archer');
+    }
+    await game.wait(1000);
+    await game.send('teach; goto wild; heal; equip iron_sword; spare iron_dagger');
+    await game.wait(1200);
+    let s = await game.state();
+    check(s.art === 'Parry', `${name}: 철 검의 기술은 되받아치기 (${s.art})`);
+
+    const buttons = (await game.buttons()).filter(b => b.shown);
+    const button = buttons.find(b => b.label === 'art');
+    check(!!button, `${name}: 무기 기술 칸이 그려진다`);
+    if (button) {
+      const [x, y, w, h] = button.rect;
+      check(x >= 0 && y >= 0 && x + w <= button.screen.width + 0.5 && y + h <= button.screen.height + 0.5, `${name}: 기술 칸이 화면 안에 있다 (${x.toFixed(0)},${y.toFixed(0)} ${w}×${h})`);
+      const over = buttons.filter(b => b !== button && b.rect[0] < x + w && x < b.rect[0] + b.rect[2] && b.rect[1] < y + h && y < b.rect[1] + b.rect[3]);
+      check(over.length === 0, `${name}: 기술 칸이 다른 단추와 겹치지 않는다${over.length ? ` (겹침: ${over.map(b => b.label).join(', ')})` : ''}`);
+      const swap = buttons.find(b => b.label === 'swap');
+      if (swap && game.touch) check(Math.abs(button.rect[0] + w / 2 - (swap.rect[0] + swap.rect[2] / 2)) < 2 && button.rect[1] + h <= swap.rect[1], `${name}: 기술 칸이 무기 칸 바로 위`);
+    }
+    await game.shot(`arts-hud-${name}`, '무기 칸 곁의 기술 칸 (되받아치기 아이콘)');
+
+    // Used: V on the PC, a tap on a phone. The cooldown starts on the host and on the screen.
+    if (game.touch) await game.press('art');
+    else await game.page.keyboard.press('KeyV');
+    s = await game.until(t => t.artTicks > 0, 3000);
+    check(!!s && s.artClientSeconds > 0, `${name}: 쓰면 재사용 대기가 시작된다 (호스트 ${s ? s.artTicks : '-'}틱, 화면 ${s ? s.artClientSeconds.toFixed(1) : '-'}초)`);
+    await game.wait(150);
+    await game.shot(`arts-cooling-${name}`, '쓴 뒤 기술 칸에 대기 그늘');
+
+    // Each kind its own: the dagger in hand is ready though the sword's is cooling.
+    if (game.touch) await game.press('swap');
+    else await game.page.keyboard.press('KeyX');
+    s = await game.until(t => t.weaponKind === 'dagger', 3000);
+    check(!!s && s.art === 'Vital' && s.artTicks === 0, `${name}: 단검으로 바꾸면 단검 기술은 준비됨 (${s ? `${s.art} ${s.artTicks}` : '바뀌지 않음'})`);
+
+    if (name === 'pc') {
+      // The right mouse button does it too (a sword again, its cooldown cleared).
+      await game.send('equip iron_sword; art ready');
+      await game.wait(400);
+      const box = await game.canvas();
+      await game.page.mouse.click(box.left + box.width * 0.6, box.top + box.height * 0.4, { button: 'right' });
+      s = await game.until(t => t.artTicks > 0, 3000);
+      check(!!s, `${name}: 오른쪽 클릭으로도 쓴다`);
+
+      await clearRoom(game, 4, 4);
+      const kinds = [['sword', '검'], ['dagger', '단검'], ['greatsword', '대검'], ['spear', '창'], ['hammer', '망치'], ['bow', '활'], ['crossbow', '석궁'], ['boomerang', '부메랑'], ['staff', '지팡이'], ['wand', '완드'], ['orb', '오브']];
+      for (const [kind, label] of kinds) {
+        await game.send(`heal; art ready; hero iron_${kind} 1 0; attack off`);
+        await game.wait(500);
+        const before = (await game.state()).artsShown;
+        // The art goes toward the mouse on a PC: to the right, where the slimes stand.
+        const field = await game.canvas();
+        await game.page.mouse.move(field.left + field.width * 0.75, field.top + field.height * 0.5);
+        if (kind === 'greatsword') {
+          await game.page.keyboard.down('KeyV');
+          await game.wait(700);
+          await game.shot(`arts-${kind}-charge`, `${label}: V를 누르고 모으는 중`);
+          await game.page.keyboard.up('KeyV');
+        } else {
+          await game.page.keyboard.press('KeyV');
+        }
+        const used = await game.until(t => t.artTicks > 0 && t.artsShown > before, 3000);
+        check(!!used, `${name} ${label}: 기술이 쓰이고 화면에 보인다 (${used ? used.lastArt : '안 쓰임'})`);
+        // Pictured at its blow: a lasting one (an aim, a lift, a throw, a well) after its beginning.
+        const lasting = { hammer: 400, crossbow: 550, boomerang: 500, wand: 300, orb: 800, sword: 100 };
+        await game.wait(lasting[kind] ?? 60);
+        await game.shot(`arts-${kind}`, `${label}의 기술`);
+        if (kind !== 'sword') {
+          const struck = await game.until(t => t.hurtMonsters > 0, 2500);
+          check(!!struck, `${name} ${label}: 기술이 슬라임에 닿는다`);
+        }
+        await game.send('clear');
+        await game.wait(300);
+      }
+    }
+    await game.context.close();
+  }
+}
+
 async function roll(browser) {
   for (const name of ['pc', 'phone', 'phone-wide']) {
     const profile = Profiles[name];
@@ -8975,7 +9069,7 @@ async function towns(browser) {
   }
 }
 
-const Sections = { menu, title, testground, hunt, harvest, zones, towns, time, basics, first, firstphone, hour, bag, combat, hero, roll, weapons, bosses, patterns, veineater, samurai, knight, warden, antlion, serpent, queen, general, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, layers, monsterfx, hazards, bossfx, hits, shots, blast, mobwarn, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
+const Sections = { menu, title, testground, hunt, harvest, zones, towns, time, basics, first, firstphone, hour, bag, combat, hero, roll, weapons, arts, bosses, patterns, veineater, samurai, knight, warden, antlion, serpent, queen, general, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, layers, monsterfx, hazards, bossfx, hits, shots, blast, mobwarn, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

@@ -106,6 +106,14 @@ namespace Game.Client
                     world.WearSpareForTest(player, item);
                     return Done("spare", $"보조 무기: {ItemText.Name(item)} ({itemBase.Kind.Name}) · {Stats(player)}");
                 }
+                case "art":
+                    // The weapon's own art, the way the player faces (Docs/Weapons.md 묶음 C); a greatsword's lets go by
+                    // itself when full.
+                    if (!world.UseWeaponArt(player.Id, player.Facing)) throw new InvalidOperationException("no art now (none, cooling down or nobody ahead)");
+                    return Done("art", $"{player.Stats.Kind.Art.Name} · {player.Stats.Kind.Name}");
+                case "artready":
+                    player.ArtReady.Clear();
+                    return Done("artready", "무기 기술 대기를 모두 비웠다");
                 case "swap":
                     if (!world.SwapWeapons(player.Id)) throw new InvalidOperationException("nothing to swap");
                     return Done("swap", $"손에: {player.Equipment[ItemSlot.Weapon]?.Base.Name ?? "맨손"} · 보조: {player.Equipment.Spare?.Base.Name ?? "없음"} · {Stats(player)}");

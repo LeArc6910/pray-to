@@ -1,16 +1,17 @@
-id,name,branch,attack,speed,reach,arc,push,stun,shot_speed,range,radius,pierce,returns,burst,description
+id,name,branch,attack,speed,reach,arc,push,stun,shot_speed,range,radius,pierce,returns,burst,description,art,art_name,art_power,art_low,art_cooldown,art_reach,art_radius,art_arc,art_time,art_count,art_stun,art_description
 # 무기 종류(Docs/Weapons.md). speed는 기본 공격 횟수의 배율(1이면 초당 2번). 피해는 item_bases.csv의 무기마다 적는다(같은 단계의 초당 피해가 비슷하게)
 # 휘두르기(swing): reach는 몸 가장자리에서 닿는 칸, arc는 부채꼴 각도, push는 밀치는 배율, stun은 마무리 일격(3단)의 기절 초
 # 쏘기(arrow, bolt): shot_speed 초당 칸, range 칸, radius 굵기, pierce 꿰뚫고 지나가는 적 수, returns는 되돌아오며 다시 맞힘, burst는 멈춘 곳의 폭발 반지름
-sword,검,melee,swing,1,1.1,120,1,,,,,,,,균형 잡힌 휘두르기
-dagger,단검,melee,swing,1.6,0.8,90,0.7,,,,,,,,빠르고 짧다. 치명타가 잘 난다
-greatsword,대검,melee,swing,0.6,1.4,160,1.5,,,,,,,,느리지만 넓고 세게 밀친다
-spear,창,melee,swing,0.85,1.9,30,1,,,,,,,,길고 좁게 찌른다. 줄지은 적을 모두 맞힌다
-hammer,망치,melee,swing,0.5,1,100,1.3,0.6,,,,,,,가장 느리다. 마무리 일격이 적을 기절시킨다
-pickaxe,곡괭이,,swing,1,1.1,120,1,,,,,,,,벽과 광맥을 캔다. 클래스 무기로 치지 않는다
-bow,활,ranged,arrow,1,,,,,16,8,0.12,,,,균형 잡힌 화살
-crossbow,석궁,ranged,arrow,0.45,,,,,24,10,0.12,1,,,장전이 느린 대신 한 발이 세고 적 하나를 꿰뚫는다
-throwing,부메랑,ranged,arrow,0.6,,,,,12,5,0.25,,yes,,짧게 날아갔다 돌아오며 오가는 길의 적을 두 번 맞힌다
-staff,지팡이,magic,bolt,1,,,,,11,7,0.2,,,,균형 잡힌 마법 탄
-wand,완드,magic,bolt,1.75,,,,,14,6,0.1,,,,빠르게 연사한다. 한 발은 약하다
-orb,오브,magic,bolt,0.68,,,,,9,4,0.3,,,1.3,가까이 날아가 닿은 곳에서 터져 둘레의 적을 모두 맞힌다
+# 고유 기술(art, 묶음 C): art_power %(throwing은 합), art_low 모으기 시작 %, art_cooldown 초(종류마다 따로), art_reach 칸(돌진·뒤로 뛰기·광선 길이·구체 거리), art_radius 반지름 또는 줄 굵기, art_arc 각도(활·완드는 탄 사이 각), art_time 초(막기·모으기·예고·조준·지속), art_count 수, art_stun 기절 초. 비우면 기술 없음
+sword,검,melee,swing,1,1.1,120,1,,,,,,,,균형 잡힌 휘두르기,parry,되받아치기,250,,6,1.6,,200,0.4,,,0.4초 막기 자세. 그 사이 맞으면 막고 둘레를 250%로 되받아친다
+dagger,단검,melee,swing,1.6,0.8,90,0.7,,,,,,,,빠르고 짧다. 치명타가 잘 난다,vital,급소 찌르기,200,,5,1.5,,90,,,,앞의 적 하나를 치명타로 200% 찌른다
+greatsword,대검,melee,swing,0.6,1.4,160,1.5,,,,,,,,느리지만 넓고 세게 밀친다,charge,모아 베기,350,100,7,1.8,,200,1,,,누르는 동안 최대 1초 모아 떼면 200° 1.8칸을 100~350%로 벤다
+spear,창,melee,swing,0.85,1.9,30,1,,,,,,,,길고 좁게 찌른다. 줄지은 적을 모두 맞힌다,dash,돌진 찌르기,180,,6,3,0.6,,,,,3칸 돌진하며 지나는 줄의 적을 모두 180%로 찌른다
+hammer,망치,melee,swing,0.5,1,100,1.3,0.6,,,,,,,가장 느리다. 마무리 일격이 적을 기절시킨다,slam,내려찍기,220,,8,,1.6,,0.35,,1,0.35초 들어 올렸다 둘레 1.6칸을 220%로 찍고 1초 기절시킨다
+pickaxe,곡괭이,,swing,1,1.1,120,1,,,,,,,,벽과 광맥을 캔다. 클래스 무기로 치지 않는다,,,,,,,,,,,,
+bow,활,ranged,arrow,1,,,,,16,8,0.12,,,,균형 잡힌 화살,backstep,뒤로 뛰며 쏘기,90,,6,2,,15,,3,,2칸 뒤로 뛰며 화살 셋을 각 90%로 쏜다
+crossbow,석궁,ranged,arrow,0.45,,,,,24,10,0.12,1,,,장전이 느린 대신 한 발이 세고 적 하나를 꿰뚫는다,pierce,관통 사격,400,,8,12,0.4,,0.5,,,0.5초 조준해 12칸 줄의 적을 모두 400%로 꿰뚫는다
+throwing,부메랑,ranged,arrow,0.6,,,,,12,5,0.25,,yes,,짧게 날아갔다 돌아오며 오가는 길의 적을 두 번 맞힌다,whirl,회오리 던지기,300,,7,,2.5,,1.5,3,,1.5초 동안 둘레 2.5칸을 돌며 세 번 나눠 합 300%
+staff,지팡이,magic,bolt,1,,,,,11,7,0.2,,,,균형 잡힌 마법 탄,wave,파동,150,,6,3,,90,,,,앞 3칸 부채꼴을 밀쳐내며 150%
+wand,완드,magic,bolt,1.75,,,,,14,6,0.1,,,,빠르게 연사한다. 한 발은 약하다,barrage,탄막,45,,8,,,30,0.8,8,,0.8초에 탄 8발을 흩뿌린다. 한 발 45%
+orb,오브,magic,bolt,0.68,,,,,9,4,0.3,,,1.3,가까이 날아가 닿은 곳에서 터져 둘레의 적을 모두 맞힌다,gravity,중력 구체,300,,9,3.5,2,,1.5,,,앞 3.5칸에 구체를 두어 1.5초 끌어당긴 뒤 둘레 2칸을 300%로 터뜨린다

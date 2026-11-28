@@ -19,8 +19,9 @@ namespace Game.Core
         public static readonly WeaponKind Pickaxe = new WeaponKind("pickaxe", "곡괭이", SkillTag.None, 1, BasicAttack.Swing);
         public static readonly WeaponKind Fists = new WeaponKind("fists", "맨손", SkillTag.None, 1, BasicAttack.Swing);
 
-        internal WeaponKind(string id, string name, SkillTag branch, float speed, BasicAttack attack, string description = "")
+        internal WeaponKind(string id, string name, SkillTag branch, float speed, BasicAttack attack, string description = "", WeaponArt art = null)
         {
+            Art = art;
             Id = id;
             Name = name;
             Branch = branch;
@@ -38,6 +39,8 @@ namespace Game.Core
         public BasicAttack Attack { get; }
         // What the tooltip says of it.
         public string Description { get; }
+        // Its own art (Docs/Weapons.md 묶음 C), or null for a pickaxe, fists and a kind with none.
+        public WeaponArt Art { get; }
 
         // The kind a base is without a kind of its own: by its tool and tags.
         public static WeaponKind DefaultFor(ItemBase itemBase) =>
@@ -91,7 +94,7 @@ namespace Game.Core
                         stun: Decimal(row, "stun", 0));
                     if (attack.Shoots && (attack.Speed <= 0 || attack.Range <= 0)) throw new FormatException("쏘는 무기는 shot_speed와 range가 0보다 커야 합니다.");
                     if (!attack.Shoots && (attack.Reach <= 0 || attack.Arc <= 0 || attack.Arc > 360)) throw new FormatException("휘두르는 무기는 reach가 0보다, arc가 0~360이어야 합니다.");
-                    kinds.Add(new WeaponKind(id, name, branch, speed, attack, row["description"]));
+                    kinds.Add(new WeaponKind(id, name, branch, speed, attack, row["description"], WeaponArt.Read(row)));
                 }
                 catch (FormatException e)
                 {
@@ -102,6 +105,101 @@ namespace Game.Core
 
             static float Decimal(CsvRow row, string column, float fallback) =>
                 row[column].Length > 0 ? SheetValues.ParseDecimal(row[column], column) : fallback;
+        }
+    }
+
+    // Each weapon kind's own art (Docs/Weapons.md 묶음 C): used with the weapon in hand, apart from the class skills, no
+    // mana, only its cooldown, which each kind keeps for itself. It hits with the weapon's own numbers and tags
+    // (PlayerStats of the weapon in hand), so a class's passives for that branch count.
+    public enum WeaponArtKind : byte
+    {
+        None,
+        // Sword: a guard for Time; a blow taken in it is turned aside and answered round the player.
+        Parry,
+        // Dagger: the nearest monster ahead, a sure crit.
+        Vital,
+        // Greatsword: held to gather up to Time, let go to cleave from Low to Power.
+        Charge,
+        // Spear: a rush Reach tiles that strikes all it passes.
+        Dash,
+        // Hammer: lifted for Time, then all round within Radius, dazed Stun seconds.
+        Slam,
+        // Bow: a jump Reach tiles back, then Count arrows Arc degrees apart.
+        Backstep,
+        // Crossbow: aimed for Time, then everything on a line Reach long, Radius wide, to the first wall.
+        Pierce,
+        // Boomerang: thrown round the player for Time, striking within Radius Count times, Power in all.
+        Whirl,
+        // Staff: a cone Reach long and Arc wide that pushes hard.
+        Wave,
+        // Wand: Count bolts over Time, fanned Arc degrees.
+        Barrage,
+        // Orb: a well Reach ahead that draws monsters in for Time, then bursts within Radius.
+        Gravity,
+    }
+
+    public sealed class WeaponArt
+    {
+        public WeaponArt(WeaponArtKind kind, string name, float power, float cooldown, float low = 0, float reach = 0, float radius = 0, float arc = 0,
+            float time = 0, int count = 0, float stun = 0, string description = "")
+        {
+            Kind = kind;
+            Name = name;
+            Power = power;
+            Cooldown = cooldown;
+            Low = low;
+            Reach = reach;
+            Radius = radius;
+            Arc = arc;
+            Time = time;
+            Count = count;
+            Stun = stun;
+            Description = description;
+        }
+
+        public WeaponArtKind Kind { get; }
+        public string Name { get; }
+        // Percent of the weapon's hit (a boomerang's in all, split over Count).
+        public float Power { get; }
+        public float Cooldown { get; }
+        public float Low { get; }
+        public float Reach { get; }
+        public float Radius { get; }
+        public float Arc { get; }
+        public float Time { get; }
+        public int Count { get; }
+        public float Stun { get; }
+        public string Description { get; }
+
+        // Held down: gathers while held (a greatsword's).
+        public bool Holds => Kind == WeaponArtKind.Charge;
+
+        // The row's art columns, or null when art is empty or missing.
+        internal static WeaponArt Read(CsvRow row)
+        {
+            if (row["art"].Length == 0) return null;
+            var kind = SheetValues.ParseEnum<WeaponArtKind>(row["art"], "art");
+            if (kind == WeaponArtKind.None) return null;
+            string name = row["art_name"];
+            if (name.Length == 0) throw new FormatException("'art_name' 칸이 비어 있습니다.");
+            var art = new WeaponArt(kind, name, Number("art_power"), Number("art_cooldown"), Number("art_low"), Number("art_reach"), Number("art_radius"),
+                Number("art_arc"), Number("art_time"), (int)Number("art_count"), Number("art_stun"), row["art_description"]);
+            if (art.Power <= 0 || art.Cooldown <= 0) throw new FormatException("art_power와 art_cooldown은 0보다 커야 합니다.");
+            bool needsReach = kind == WeaponArtKind.Parry || kind == WeaponArtKind.Vital || kind == WeaponArtKind.Charge || kind == WeaponArtKind.Dash
+                || kind == WeaponArtKind.Backstep || kind == WeaponArtKind.Pierce || kind == WeaponArtKind.Wave || kind == WeaponArtKind.Gravity;
+            if (needsReach && art.Reach <= 0) throw new FormatException($"{row["art"]}에는 art_reach가 있어야 합니다.");
+            bool needsRadius = kind == WeaponArtKind.Dash || kind == WeaponArtKind.Slam || kind == WeaponArtKind.Pierce || kind == WeaponArtKind.Whirl || kind == WeaponArtKind.Gravity;
+            if (needsRadius && art.Radius <= 0) throw new FormatException($"{row["art"]}에는 art_radius가 있어야 합니다.");
+            bool needsTime = kind == WeaponArtKind.Parry || kind == WeaponArtKind.Charge || kind == WeaponArtKind.Slam || kind == WeaponArtKind.Pierce
+                || kind == WeaponArtKind.Whirl || kind == WeaponArtKind.Barrage || kind == WeaponArtKind.Gravity;
+            if (needsTime && art.Time <= 0) throw new FormatException($"{row["art"]}에는 art_time이 있어야 합니다.");
+            bool needsCount = kind == WeaponArtKind.Backstep || kind == WeaponArtKind.Whirl || kind == WeaponArtKind.Barrage;
+            if (needsCount && art.Count <= 0) throw new FormatException($"{row["art"]}에는 art_count가 있어야 합니다.");
+            if ((kind == WeaponArtKind.Parry || kind == WeaponArtKind.Vital || kind == WeaponArtKind.Charge || kind == WeaponArtKind.Wave) && (art.Arc <= 0 || art.Arc > 360))
+                throw new FormatException("art_arc는 0~360입니다.");
+            return art;
+
+            float Number(string column) => row[column].Length > 0 ? SheetValues.ParseDecimal(row[column], column) : 0;
         }
     }
 }

@@ -12,6 +12,8 @@ dotnet run --project DevTools/CoreSandbox -- --boss 300 42 --players 2
 dotnet run --project DevTools/CoreSandbox -- --boss 300 42 --classes warrior,fire_mage
 # 무기 두 벌(Docs/Weapons.md): --gear에 무기를 둘 적으면 둘째가 보조 무기
 dotnet run --project DevTools/CoreSandbox -- --boss 300 1 --boss-id antlion --gear iron_bow,iron_sword,iron_armor,iron_helmet --classes warrior,archer --level 10 --build
+# 같은 싸움에서 봇이 손에 든 무기의 고유 기술도 쓴다(--arts, Docs/Weapons.md 묶음 C 밸런스)
+dotnet run --project DevTools/CoreSandbox -- --boss 300 1 --boss-id antlion --gear iron_hammer,iron_armor,iron_helmet --classes warrior,archer --level 10 --build --arts
 dotnet run --project DevTools/CoreSandbox -- --boss 400 1 --boss-id crystal_queen --gear iron_sword,iron_armor --reaction 0.5
 # 그 레벨의 캐릭터처럼: 스킬 포인트, 숙련 특성, 결정을 다 쓴 봇 (Docs/Bosses.md 성장 곡선)
 dotnet run --project DevTools/CoreSandbox -- --boss 600 1 --boss-id void_lord --gear obsidian_sword,obsidian_armor,obsidian_helmet,obsidian_boots,obsidian_ring,obsidian_amulet --classes warrior,fire_mage --level 34 --build
@@ -97,7 +99,7 @@ dotnet run --project DevTools/ArtPreview -- --only portraits
 dotnet run --project DevTools/ArtPreview -- --only title
 # 무기 종류를 주인공이 든 모습(out/weapons_held.png), 종류마다 연타 1·2·3단 다섯 장씩(out/weapons_combo.png, 시간도 출력), 종류마다 탄(out/weapons_shots.png). Docs/Weapons.md 묶음 B. 아이콘 줄은 --only gear의 out/weapons.png
 dotnet run --project DevTools/ArtPreview -- --only weapons
-# 무기 고유 기술 시안: 종류마다 세 순간(out/weapon_arts.png). Docs/Weapons.md 묶음 C
+# 무기 고유 기술: 종류마다 실제 이펙트 프로그램 네 순간(out/weapon_arts.png). Docs/Weapons.md 묶음 C
 dotnet run --project DevTools/ArtPreview -- --only weaponarts
 # 그림 린트만(몇 초): 외딴 픽셀·색 수·흔들림·쌍둥이를 세고 out/lint.md에 적는다. 기준(lint-baseline.txt)보다 늘면 실패
 dotnet run --project DevTools/ArtPreview -- --only lint

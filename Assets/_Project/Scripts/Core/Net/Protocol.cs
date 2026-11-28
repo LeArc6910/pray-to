@@ -47,7 +47,7 @@ namespace Game.Core
 
         // Host and client must run the same rules and sheets, so a different version is refused (Docs/CrossPlay.md 버전 정책:
         // every change to the rules, the sheets or a message goes up; PC, phone and web of the same version play together).
-        public const string Version = "0.117.0";
+        public const string Version = "0.118.0";
 
         // Why a joiner of another version is refused, and who has to update: the older side.
         public static string VersionRefusal(string theirs)
@@ -902,6 +902,10 @@ namespace Game.Core
     // Uses the skill in a slot, aimed where the player points. Sent reliably: a press must not get lost.
     public sealed class SkillCommandMessage
     {
+        // Slots that are no skill slot: the weapon art pressed and let go (World.UseWeaponArt, ReleaseWeaponArt).
+        public const int ArtPress = 250;
+        public const int ArtRelease = 251;
+
         public SkillCommandMessage(int slot, Vec2 aim)
         {
             Slot = slot;
@@ -1307,8 +1311,14 @@ namespace Game.Core
             float maxMana = PlayerStats.BaseMana,
             int craftRecipe = -1,
             float craftProgress = 0,
-            int craftLeft = 0)
+            int craftLeft = 0,
+            int artCooldown = 0,
+            int spareArtCooldown = 0,
+            int artAge = -1)
         {
+            ArtCooldown = artCooldown;
+            SpareArtCooldown = spareArtCooldown;
+            ArtAge = artAge;
             CraftRecipe = craftRecipe;
             CraftProgress = craftProgress;
             CraftLeft = craftLeft;
@@ -1357,6 +1367,11 @@ namespace Game.Core
         public int CraftRecipe { get; }
         public float CraftProgress { get; }
         public int CraftLeft { get; }
+        // The weapon arts (Docs/Weapons.md 묶음 C): ticks until the art of the weapon in hand and of the spare are ready,
+        // and how many ticks the player's busy art has gone on (-1 for none), so a held charge can be shown.
+        public int ArtCooldown { get; }
+        public int SpareArtCooldown { get; }
+        public int ArtAge { get; }
         public bool IsDead => Health <= 0;
     }
 
@@ -1443,6 +1458,9 @@ namespace Game.Core
             w.Write((ushort)(Self.CraftRecipe + 1));
             w.Write((byte)Math.Clamp((int)Math.Round(Self.CraftProgress * 255), 0, 255));
             w.Write((byte)Math.Clamp(Self.CraftLeft, 0, 255));
+            w.Write(Protocol.Ticks(Self.ArtCooldown));
+            w.Write(Protocol.Ticks(Self.SpareArtCooldown));
+            w.Write((short)Math.Clamp(Self.ArtAge, -1, short.MaxValue));
 
             w.Write((ushort)Entities.Count);
             foreach (var entity in Entities)
@@ -1555,8 +1573,11 @@ namespace Game.Core
             int craftRecipe = r.ReadUInt16() - 1;
             float craftProgress = r.ReadByte() / 255f;
             int craftLeft = r.ReadByte();
+            int artCooldown = r.ReadUInt16();
+            int spareArtCooldown = r.ReadUInt16();
+            int artAge = r.ReadInt16();
             var self = new SelfState(corrections, position, health, maxHealth, moveSpeed, cooldowns, buffs, consumableCooldown, food, foodTicks, status, experience,
-                bedX, bedY, mana, maxMana, craftRecipe, craftProgress, craftLeft);
+                bedX, bedY, mana, maxMana, craftRecipe, craftProgress, craftLeft, artCooldown, spareArtCooldown, artAge);
 
             int entityCount = r.ReadUInt16();
             var entities = new List<EntityState>(entityCount);

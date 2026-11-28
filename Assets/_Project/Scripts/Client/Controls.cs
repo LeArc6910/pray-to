@@ -67,6 +67,12 @@ namespace Game.Client
         // The weapon swap's button (SkillBar.DrawWeapons, Docs/Weapons.md).
         static readonly List<Rect> _swapButtons = new List<Rect>();
         static bool _swapTapped;
+        // The weapon art's button (SkillBar.DrawArt, Docs/Weapons.md 묶음 C): pressed this frame, and the finger or
+        // the click on it that holds it (a greatsword gathers while it is held).
+        static readonly List<Rect> _artButtons = new List<Rect>();
+        static bool _artTapped;
+        static int _artFinger = -1;
+        static bool _artClicked;
         static readonly Predicate<int> Released = id => !Held(id);
         static readonly Stick _move = new Stick();
         static readonly Stick _aim = new Stick();
@@ -112,6 +118,7 @@ namespace Game.Client
             _potionTapped = false;
             _rollTapped = false;
             _swapTapped = false;
+            _artTapped = false;
             _touches.Clear();
             var screen = Touchscreen.current;
             if (screen != null)
@@ -129,6 +136,7 @@ namespace Game.Client
 
             if (!Held(_move.Finger)) _move.Finger = -1;
             if (!Held(_aim.Finger)) _aim.Finger = -1;
+            if (!Held(_artFinger)) _artFinger = -1;
             _ignored.RemoveWhere(Released);
             foreach (var (id, pixels) in _touches)
             {
@@ -151,14 +159,27 @@ namespace Game.Client
                     // Not on a touch screen: a tap there also comes as a click a moment later, and a swap, which has no
                     // wait, would undo itself (the roll's wait hid the same double).
                     if (!UsingTouch) foreach (var area in _swapButtons) _swapTapped |= area.Contains(point);
+                    if (!UsingTouch)
+                    {
+                        foreach (var area in _artButtons)
+                        {
+                            if (!area.Contains(point)) continue;
+                            _artTapped = true;
+                            _artClicked = true;
+                        }
+                    }
                     foreach (var (area, slot) in _hotbarButtons)
                     {
                         if (area.Contains(point)) _hotbarTaps.Add(slot);
                     }
                 }
             }
+            // The right button is the weapon art (Docs/Weapons.md 묶음 C), anywhere but over the UI.
+            if (mouse != null && !Typing && mouse.rightButton.wasPressedThisFrame && !_mouseOverUi) _artTapped = true;
+            if (mouse == null || !mouse.leftButton.isPressed) _artClicked = false;
             _blocked.Clear();
             _skillButtons.Clear();
+            _artButtons.Clear();
             _potionButtons.Clear();
             _rollButtons.Clear();
             _swapButtons.Clear();
@@ -218,6 +239,37 @@ namespace Game.Client
         }
 
         public static string SwapKeyName => KeyBindings.Name(KeyAction.SwapWeapon);
+
+        // Marks the weapon art's button, in points: a finger landing on it (or a click) uses the art, and holding it
+        // holds a greatsword's charge. Call from OnGUI.
+        public static void ArtButton(Rect area)
+        {
+            if (Event.current.type == EventType.Repaint) _artButtons.Add(area);
+        }
+
+        public static string ArtKeyName => KeyBindings.Name(KeyAction.WeaponArt);
+
+        // Whether the art was asked for this frame: its key (V), the right mouse button, or its button.
+        public static bool TakeArtPress()
+        {
+            bool pressed = _artTapped || KeyBindings.Pressed(KeyAction.WeaponArt);
+            _artTapped = false;
+            return pressed;
+        }
+
+        // Whether whatever asked for the art is still held down (a greatsword lets go when it is not).
+        public static bool ArtHeld
+        {
+            get
+            {
+                if (_artFinger >= 0 && Held(_artFinger)) return true;
+                var mouse = Time.unscaledTime - _lastTouch < MouseQuietSeconds ? null : Mouse.current;
+                if (mouse != null && (mouse.rightButton.isPressed || _artClicked && mouse.leftButton.isPressed)) return true;
+                var keyboard = Typing ? null : Keyboard.current;
+                var key = KeyBindings.KeyFor(KeyAction.WeaponArt);
+                return keyboard != null && key != Key.None && keyboard[key].isPressed;
+            }
+        }
 
         // Whether the swap key was pressed or its button tapped this frame.
         public static bool TakeSwapPress()
@@ -396,6 +448,14 @@ namespace Game.Client
             {
                 if (!area.Contains(point)) continue;
                 _swapTapped = true;
+                _ignored.Add(id);
+                return;
+            }
+            foreach (var area in _artButtons)
+            {
+                if (!area.Contains(point)) continue;
+                _artTapped = true;
+                _artFinger = id;
                 _ignored.Add(id);
                 return;
             }

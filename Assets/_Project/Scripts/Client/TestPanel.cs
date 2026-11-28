@@ -298,6 +298,14 @@ namespace Game.Client
                 Cell("손과 보조 바꾸기", false, () => Run(root, "test swap")),
                 Cell("보조 빼기", false, () => Run(root, "test spare none")),
             });
+            // The weapon's own art (Docs/Weapons.md 묶음 C): used from here, and every kind's cooldown cleared.
+            var art = player.Stats.Kind?.Art;
+            Heading($"무기 기술 ({Controls.ArtKeyName}·오른쪽 클릭): {(art == null ? "없음" : $"{art.Name} {art.Power:0}% · {art.Cooldown:0.#}초")}");
+            Grid("무기 기술", width, 120, new[]
+            {
+                Cell("기술 쓰기", false, () => Run(root, "test art")),
+                Cell("대기 비우기", false, () => Run(root, "test artready")),
+            });
             // The band's hunting sets and the boss sets worn in it, all their pieces at once (Docs/Gear.md).
             Heading("세트 (사냥·보스, 한 번에 모두)");
             var sets = loot.Sets.Where(set => loot.Bases.Any(b => b.Set == set && GearBand(b) == _band)).ToList();
