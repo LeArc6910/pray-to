@@ -106,9 +106,9 @@ vein_eater,quake,대지 분쇄,3,leap,farthest,1.8,351,3.2,,,,12,,9,1.6,14,,stro
 vein_eater,call_beetles,딱정벌레 부르기,3,summon,self,0.9,,,,,,3,3,,1.0,10,cave_beetle,none,,,
 vein_eater,collapse_ring,무너지는 갱도,2|3,ring,nearest,0.5,185,2.6,8.5,,,,,,0.9,0,,,,,
 shrine_samurai,iai,거합 베기,,cone,nearest,0.9,556,,4.0,150,,,,,0.6,30,,,,,3:repeat=1
-shrine_samurai,issen,일섬,,charge,farthest,1.1,567,,10,,1.6,,,40,0.8,24,,,,,2:count=2;3:count=2
+shrine_samurai,issen,일섬,,charge,farthest,1.1,567,,10,,1.6,,,40,0.8,24,,,,,3:count=2
 shrine_samurai,juji,십자 베기,,cross,nearest,1.0,520,,5,45,1.2,,,,0.7,18,,,,zanzetsu:0.5,
-shrine_samurai,sanren,삼연 발도,2|3,charge,nearest,0.9,332,,8,,1.4,3,,40,1.0,18,,,,,2:again=0.45;3:count=5 tele=0.7 again=0.43 speed=48
+shrine_samurai,sanren,삼연 발도,2|3,charge,nearest,0.9,332,,8,,1.4,3,,40,1.0,18,,,,,3:count=5 tele=0.7 again=0.43 speed=48
 shrine_samurai,getsuei,월광참,2|3,burst,nearest,1.0,159,0.5,,50,,5,,13,0.8,16,,,,,3:count=7 repeat=1
 shrine_samurai,kaiten,회전 발도,2|3,circle,self,0.9,520,3.2,,,,1,,,0.7,14,,,,,3:repeat=1
 shrine_samurai,sakura,벚꽃 난무,3,circle,each,1.1,491,1.1,,,,4,3,,0.8,16,,,,,3:count=6

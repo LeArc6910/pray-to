@@ -920,7 +920,7 @@ async function tempo(browser) {
   await game.send('heal; boss shrine_samurai use iai');
   await game.wait(150);
   s = await game.state();
-  check(s.bossPhase === 3 && Math.abs(s.bossTelegraph - 0.9 * 0.75) < 0.01, `3페이즈 거합 베기의 예고는 0.675초 (페이즈 ${s.bossPhase}, ${s.bossTelegraph})`);
+  check(s.bossPhase === 3 && Math.abs(s.bossTelegraph - 0.9 * 0.8) < 0.01, `3페이즈 거합 베기의 예고는 0.72초(시구레 템포 0.9·0.8) (페이즈 ${s.bossPhase}, ${s.bossTelegraph})`);
   await game.wait(2500);
   // The five-fold draw: count how often the boss winds up again before it rests.
   await game.send('heal; boss shrine_samurai use sanren');

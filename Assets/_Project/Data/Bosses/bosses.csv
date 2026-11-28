@@ -8,6 +8,6 @@ antlion,개미귀신,1850,130,10,2.4,1.3,66|33,1.5,4,229,2,15,rare,1,2,antlion_j
 mad_general,미쳐 버린 장군 모르그,3500,130,20,2.6,1.3,66|33,1.5,4.5,247,3,18,rare,2,3,general_crest,1,fire,15,demon_nest,,
 crown_wraith,왕관의 망령,10800,130,22,2.5,1.3,66|33,1.5,4.5,341,3,24,rare,2,3,sunken_crown,1,lightning,22,mist_harbor,,
 vein_eater,광맥 포식자 그룸,11200,130,30,2.6,1.4,66|33,1.5,4.5,359,3,28,rare,2,3,obsidian_ore,6,,27,iron_valley,,
-shrine_samurai,벚꽃 검귀 시구레,31000,130,28,3.2,1.0,66|33,1.2,4,464,3,30,rare,2,3,obsidian_bar,4,,30,old_temple,burst,
+shrine_samurai,벚꽃 검귀 시구레,31000,130,28,3.2,1.0,66|33,1.2,4,464,3,30,rare,2,3,obsidian_bar,4,,30,old_temple,burst,0.9|0.8
 black_knight,흑철 기사 발두인,64000,130,42,2.0,1.3,66|33,2.0,5,639,3,42,rare,2,3,void_bar,3,,40,hero_hut,,0.9|0.8
 silk_mother,실 잣는 어미 아라네,82000,130,34,3.0,1.4,66|33,1.6,5,650,3,45,rare,2,3,void_bar,4,,43,old_temple:2,,
