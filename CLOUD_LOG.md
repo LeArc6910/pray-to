@@ -12,6 +12,14 @@
 - **로컬 확인**: 로컬 세션이 읽고 체크한다
 
 
+## 2026-11-28 13:30 용암 거인: 로컬 AI 그림과 제 몸짓·용암 이펙트·입장 (로컬 세션이 코드까지)
+
+- **바뀐 것**: 사람 요청 "아직 개선 작업이 안 된 보스 셋을 각자 세션에서 물살 뱀과 같은 방식으로"(로컬 세션의 `.cs` 수정 허락). 그림은 이 컴퓨터의 ComfyUI(물살 뱀과 같은 모델, 새로 받은 것 없음)로 정면 열두 장 → 사람이 3번 → 네 각도 → 64×64·24색 다섯 시점과 부위 지도(`Art/LavaTitanArt.Rows.cs`, 도구 `DevTools/ArtImport/LocalAi/titan_rows.py`, `to_sprite.py`에 몸에 갇힌 배경 지우기 `HOLES`). 몸짓은 `Art/LavaTitanArt.cs`(팔을 어깨의 뼈대로 3차원으로 돌리고, 윗몸 숙이기·발 들기·용암 금이 식고 달아오르기·심장·녹은 주먹·불꽃, 자세 스물셋), 화면은 `WorldView.LavaTitan.cs`(공격 id마다 전조 자세, 예고 중 불씨, 착지의 용암·불 이펙트), 이펙트 셋(`BossFx.Magma`·`FlameWave`·`Fissure`, 열기 고리는 장군의 `FireBand`), 유성·불비에 떨어지는 불덩이(`ShardDrop`), 새 입장 `Erupt`(용암에서 주먹부터 솟고 금에 불이 번진다, `arenas.csv` 4.0초·1.2초). 옛 골렘 색 바꾸기는 더 쓰지 않는다. 피해·체력·예고 시간은 그대로
+- **확인**: `dotnet test` 1238 통과, Unity 쪽 컴파일(이 컴퓨터의 Unity DLL, WebGL 포함) 오류 0, `--only titan` 연속성 튀는 곳 0, 몸의 틈 76/1865장(가장 큰 것 34점), `--only bossfx` 용암 거인 아홉 줄 23~66조각(한도 72), Unity setup은 아래 결과 보고
+- **요청 대조**: 로컬 AI로 8방향 ○(시안 열두 장 → 사람이 3번, 64px 미리보기 같이) · 모션 ○(공격 열넷이 전조·타격 아홉 쌍, 돌진·걷기·포효·입장) · 불 원소다운 전조 ○(달아오르는 주먹·금, 심장, 불씨) · 불·용암 이펙트 ○(셋 새로) · 제 입장 ○(`Erupt`) · 수치 그대로 ○ · 페이즈 배치 기준(다른 세션 전달, `Docs/Bosses.md` 페이즈 배치) ○(`boss_attacks.csv` 열넷 모두 전조·타격, 페이즈는 그대로, 2페이즈 포효 뒤 금·불꽃 한 단계, 3페이즈 한 단계 더) · PlayMode 장면 ○(`TheLavaTitanEruptsAndWindsUp`, 사진 넷) · 웹 점검 구역 ○(`sweep.js --only titan`, `bossfx`에 `titan` 줄, `arenas`의 입장 표) · 문서 ○(`Docs/Bosses.md` 용암 거인 제 그림과 몸짓, `Docs/ArtSources.md`, `Commands.md`, `Codebase.md`, `HumanChecklist.md`) · 쓰러짐 연출 ✗(요청 없음, 다른 보스처럼 터진다) · 전체 패턴 GIF ✗(물살 뱀 때의 사람 요청, 이번엔 없음) · 웹 점검 실행 ✗(이 컴퓨터에 node가 없다. 배포 뒤 클라우드가 `sweep.js --only titan`)
+- **로컬에서 할 일**: 없음(새 스크립트 셋의 `.meta`는 이 커밋에 있다). Unity setup 결과는 `LOCAL_TASKS.md` 12:40 보고와 "용암 거인" 항목. 남은 실패 중 Unity에서만 나는 `BotTests.FirstHourReachesTheFirstMonsterCraftAndBoss(1)`을 클라우드가 볼 것
+- **로컬 확인**: [ ]
+
 ## 2026-11-28 14:00 왕관의 망령: 로컬 AI 그림과 제 몸짓·번개 이펙트·입장·쓰러짐 (로컬 세션이 코드까지)
 
 - **바뀐 것**: 사람 요청(남은 보스 셋을 각자 세션에서 물살 뱀처럼 로컬 AI 그림 + 코드 몸짓, 로컬 세션의 `.cs` 수정 허락). 그림은 ComfyUI(Z-Image-Turbo + 도트 LoRA 시안 여덟 장 → 사람이 4번 → Qwen-Image-Edit-2511 + 여러 각도 LoRA로 다섯 시점, 모두 Apache-2.0)를 64×64로 줄이고 해골 얼굴 몇 픽셀을 손으로 얹어 부위 지도(왕관·머리·두 팔과 어깨 축·꼬리·눈)와 함께 `Art/CrownWraithArt.Rows.cs`로(도구 `DevTools/ArtImport/LocalAi/crown_wraith_rows.py`·`crown_wraith_layout.json`). 몸짓은 `Art/CrownWraithArt.cs`(자세 스물셋: 공격 아홉의 전조·타격, 포효, 입장, 쓰러짐), 번개 이펙트 넷 `Art/CrownWraithFx.cs`(`BossFx.Thunder`·`Lance`·`Talons`·`ArcRing`, `BossEffects`를 partial로), 화면 `WorldView.CrownWraith.cs`(공격 id마다 전조, 예고 중 불꽃·안개, 착지의 번개, 돌진 잔상, 쓰러짐). 새 입장 `Manifest`(바닥의 왕관이 떠올라 벼락을 맞고 몸이 모인다, `arenas.csv` 3.8초·1.2초). 페이즈 배치 규칙(645e9b7)대로 2페이즈부터 눈과 왕관 불꽃이 달라진다. 공용 두건 몸(`CreatureArt.VoidLord`의 `crown_wraith` 줄)은 공허의 군주 세션도 쓰는 중이라 지우지 않았다(이제 망령은 그것을 쓰지 않는다). 피해·체력·예고·페이즈·빈도는 그대로

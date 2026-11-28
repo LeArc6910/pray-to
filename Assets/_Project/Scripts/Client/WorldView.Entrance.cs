@@ -156,7 +156,8 @@ namespace Game.Client
         {
             // Under the floor or up in the roof it casts no shadow: asleep, and under the floor until it breaks through.
             var entrance = view.Boss.Arena?.Entrance ?? BossEntrance.Common;
-            bool hidden = entrance == BossEntrance.Burrow || entrance == BossEntrance.Thread || entrance == BossEntrance.Ambush || entrance == BossEntrance.Surface || entrance == BossEntrance.Rift || entrance == BossEntrance.Manifest;
+            bool hidden = entrance == BossEntrance.Burrow || entrance == BossEntrance.Thread || entrance == BossEntrance.Ambush || entrance == BossEntrance.Surface || entrance == BossEntrance.Rift || entrance == BossEntrance.Manifest
+                || entrance == BossEntrance.Erupt;
             if (view.BossState == BossState.Dormant && hidden && !view.IsDead) body.Shadow.enabled = false;
             if (view.BossState != BossState.Enter)
             {
@@ -166,6 +167,7 @@ namespace Game.Client
             if (entrance == BossEntrance.Burrow && body.EnterFrame < VeinEaterArt.EmergeBreak) body.Shadow.enabled = false;
             if (entrance == BossEntrance.Ambush && body.EnterFrame < AntlionArt.EnterBurst) body.Shadow.enabled = false;
             if (entrance == BossEntrance.Surface && body.EnterFrame < SerpentArt.EnterBurst) body.Shadow.enabled = false;
+            if (entrance == BossEntrance.Erupt && body.EnterFrame < LavaTitanArt.EnterBurst) body.Shadow.enabled = false;
             if (entrance == BossEntrance.Rift && body.EnterFrame < VoidLordArt.EnterBurst) body.Shadow.enabled = false;
             if (entrance == BossEntrance.Manifest && body.EnterFrame < CrownWraithArt.EnterStrike) body.Shadow.enabled = false;
             var feet = body.Position;
@@ -453,6 +455,10 @@ namespace Game.Client
                         HearRoar("crown_wraith", feet, 1);
                         Hear(Sound.Zap, feet, 0.8f);
                     }
+                    break;
+
+                case BossEntrance.Erupt:
+                    LavaTitanEntrance(body, frame, Reached, puff);
                     break;
 
                 case BossEntrance.Stride:

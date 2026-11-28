@@ -412,6 +412,9 @@ namespace Game.Client
                 case "serpent":
                     Serpent(folder, arena);
                     return true;
+                case "titan":
+                    Titan(folder, arena);
+                    return true;
                 case "voidlord":
                     VoidLord(folder, arena);
                     return true;

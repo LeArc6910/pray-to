@@ -869,6 +869,51 @@ namespace Game.Client.Tests
             Assert.IsTrue(_root.Playing);
         }
 
+        // The lava titan (Docs/Bosses.md 용암 거인, 2026-11-28): under the lava of its caldera with only bubbles
+        // showing, heaving itself out, then mid wind-up of its slam (both fists overhead) and of its fire rain (risen
+        // white hot, the warning sign).
+        [UnityTest, Category(Screens.Category)]
+        public IEnumerator TheLavaTitanEruptsAndWindsUp()
+        {
+            yield return Start();
+            var boss = World.Bosses.FirstOrDefault(b => b.Definition.Id == "lava_titan");
+            Assert.IsNotNull(boss, "No lava titan.");
+            Assert.AreEqual(BossEntrance.Erupt, boss.Definition.Arena.Entrance, "arenas.csv gives the lava titan its own entrance.");
+            World.BossesHold = true;
+            Player.Position = boss.Home + new Vec2(0, -4);
+            Player.Corrections++;
+            yield return new WaitForSecondsRealtime(SceneSeconds);
+            yield return Screens.Take("titan-under");
+            World.BossesHold = false;
+            yield return new WaitForSecondsRealtime(2.8f);
+            Assert.AreEqual(BossState.Enter, boss.State, "Woken, the lava titan comes in first.");
+            yield return Screens.Take("entrance-titan");
+            // Its blows are heavy: the player is kept up and in the arena while it fights, to be there to force them.
+            IEnumerator Survive(float seconds)
+            {
+                for (float until = Time.realtimeSinceStartup + seconds; Time.realtimeSinceStartup < until;)
+                {
+                    if (Player.IsDead) World.GetUp(Player.Id);
+                    Player.Health = Player.Stats.MaxHealth;
+                    yield return null;
+                }
+            }
+            yield return Survive(4.5f);
+            Player.Position = boss.Home + new Vec2(0, -4);
+            Player.Corrections++;
+            Assert.IsTrue(World.ForceAttack(boss, "slam"), "The slam can be forced once it fights.");
+            yield return new WaitForSecondsRealtime(0.6f);
+            yield return Screens.Take("titan-slam-windup");
+            yield return Survive(2.5f);
+            if (Player.IsDead) World.GetUp(Player.Id);
+            Player.Position = boss.Home + new Vec2(0, -4);
+            Player.Corrections++;
+            Assert.IsTrue(World.ForceAttack(boss, "fire_rain"));
+            yield return new WaitForSecondsRealtime(1.0f);
+            yield return Screens.Take("titan-rain-windup");
+            Assert.IsTrue(_root.Playing);
+        }
+
         // The crown wraith (Docs/Bosses.md 왕관의 망령, 2026-11-28): only its rusted crown lying on the chapel floor, the
         // crown rising and the body gathering under it, then mid wind-up of its bolts (both arms raised to the dark) and of
         // its brands (rising with the crown storming, the warning sign).

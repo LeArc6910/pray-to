@@ -91,6 +91,15 @@ namespace Game.Client
             Add("crown_wraith", "soul_ripple", BossFx.ArcRing, HazardForm.Donut, 7f, 1.2f, 0, bolt, r => { r.Context.Inner = 1.2f * T; r.Context.Plain = true; (r.Wide, r.Tall, r.AtY) = (240, 240, 0.5f); });
             Add("crown_wraith", "deep_share", BossFx.Thunder, HazardForm.Circle, 1.8f, 0, 0, null, r => { r.Tone = WarnTone.Gather; r.Context.Ramp = bolt; r.Context.Big = true; r.Tall = 176; r.AtY = 0.82f; });
             Add("tide_serpent", "deep_share", BossFx.Geyser, HazardForm.Circle, 1.8f, 0, 0, null, r => { r.Tone = WarnTone.Gather; r.Context.Ramp = water; r.Context.Big = true; r.Tall = 160; r.AtY = 0.78f; });
+            Add("lava_titan", "slam", BossFx.Magma, HazardForm.Circle, 2.2f, 0, 0, fire, r => { r.Context.Big = true; r.Tall = 144; r.AtY = 0.7f; });
+            Add("lava_titan", "fire_wave", BossFx.FlameWave, HazardForm.Cone, 3.8f, 110, 0, fire, r => { r.Context.Width = 110; r.AtX = 0.2f; r.AtY = 0.5f; r.Tall = 144; });
+            Add("lava_titan", "meteor warned", BossFx.ShardDrop, HazardForm.Circle, 1.6f, 0, 0, fire, r => { r.Warning = true; r.Context.Count = 1; r.Tall = 144; r.AtY = 0.78f; });
+            Add("lava_titan", "meteor", BossFx.Magma, HazardForm.Circle, 1.6f, 0, 0, fire, r => { r.Tall = 128; r.AtY = 0.72f; });
+            Add("lava_titan", "eruption", BossFx.Magma, HazardForm.Circle, 2.2f, 0, 0, fire, r => { r.Context.Count = 2; r.Tall = 176; r.AtY = 0.8f; });
+            Add("lava_titan", "lava_trail", BossFx.Magma, HazardForm.Circle, 1.3f, 0, 0, fire, r => { r.Tall = 112; r.AtY = 0.7f; });
+            Add("lava_titan", "lava_cross", BossFx.Fissure, HazardForm.Band, 9f, 1.6f, 0, fire, r => { r.Wide = 176; r.Tall = 96; r.AtX = 0.06f; r.AtY = 0.55f; });
+            Add("lava_titan", "heat_ring", BossFx.FireBand, HazardForm.Donut, 7f, 2.6f, 0, fire, r => { r.Context.Inner = 2.6f * T; r.Context.Dir = 90; (r.Wide, r.Tall, r.AtY) = (240, 240, 0.5f); });
+            Add("lava_titan", "fire_rain", BossFx.Magma, HazardForm.Circle, 1.5f, 0, 0, fire, r => { r.Context.Big = true; r.Tall = 144; r.AtY = 0.72f; });
             var voidRamp = FxRamp.Violet;
             Add("void_lord", "grasp", BossFx.VoidClaw, HazardForm.Cone, 3.8f, 110, 0, voidRamp, r => { r.Context.Width = 110; r.AtX = 0.2f; r.AtY = 0.5f; r.Tall = 144; });
             Add("void_lord", "beam", BossFx.Rift, HazardForm.Band, 12f, 1.6f, 0, voidRamp, r => { r.Wide = 216; r.Tall = 72; r.AtX = 0.06f; r.AtY = 0.5f; });

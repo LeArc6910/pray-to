@@ -44,6 +44,8 @@ crashlytics-build.properties
 DevTools/**/bin/
 DevTools/**/obj/
 DevTools/ArtPreview/out/
+# Pictures the local image models made (DevTools/ArtImport/LocalAi)
+DevTools/ArtImport/LocalAi/out/
 
 # OS
 .DS_Store

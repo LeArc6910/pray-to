@@ -119,6 +119,18 @@ namespace Game.Client
         // Lightning running round a ring's band. Size the outer radius, Inner the inner. Plain: the smaller ripple.
         ArcRing,
 
+        // ---- the lava titan (2026-11-28) ----
+        // Lava bursting out of the floor where a blow came down: a ball of fire, gobbets of lava thrown up and falling
+        // back cooling from yellow to dark, a pool left glowing that crusts over, the floor split and smoking. Size its
+        // radius. Big: the heavier (more of it). Count 2: a column of lava spouting up out of it first (the eruption).
+        Magma,
+        // A wall of fire rolled out across a wedge: a row of tall flames running outward from the origin, burning on
+        // where it passed, sparks thrown ahead of it. Size the reach, Width the wedge in degrees, Dir its middle.
+        FlameWave,
+        // The floor splitting along a line from the origin: a glowing crack running out, lava spurting up out of it
+        // here and there, then cooling. Size its length, Dir its way.
+        Fissure,
+
         // ---- the bosses with no effects of their own (the lava titan, the void lord, the crown wraith) ----
         // What the blow is made of, laid over the shared landing at a few places in its shape (Form): fire that
         // bursts and burns on (Ramp Fire), rings and scraps drawn into the middle (Violet), water thrown up in a
@@ -225,6 +237,9 @@ namespace Game.Client
                 case BossFx.Torrent: life = Torrent(c, t, o); break;
                 case BossFx.Maelstrom: life = Maelstrom(c, t, o); break;
                 case BossFx.Geyser: life = Geyser(c, t, o); break;
+                case BossFx.Magma: life = Magma(c, t, o); break;
+                case BossFx.FlameWave: life = FlameWave(c, t, o); break;
+                case BossFx.Fissure: life = Fissure(c, t, o); break;
                 case BossFx.VoidClaw: life = VoidClaw(c, t, o); break;
                 case BossFx.Comet: life = Comet(c, t, o); break;
                 case BossFx.Rift: life = Rift(c, t, o); break;
@@ -988,6 +1003,123 @@ namespace Game.Client
             }
             if (t < 0.5f) FxLayers.Light(o, FxRamp.Cold, R * 2.2f, 0.6f * (1 - t / 0.5f));
             return 0.85f;
+        }
+
+        // ---- the lava titan ----
+
+        // A gobbet of lava: a lump that cools from a pale yellow core to dark rock as it flies (p 0 to 1).
+        static void Gobbet(List<FxStamp> o, float size, float p, float t, int i, float x, float y, float alpha = 1)
+        {
+            int shade = Math.Min(4, (int)(p * 4.5f));
+            Put(o, FxShape.Lump, FxRamp.Fire, Math.Max(2, (int)Math.Round(size)), shade * 4 + (((int)(t * 25) + i) & 3), x, y, alpha);
+        }
+
+        static float Magma(in BossContext c, float t, List<FxStamp> o)
+        {
+            float R = Math.Max(10, c.Size);
+            bool column = c.Count == 2;
+            // The column of the eruption goes up first; everything else follows it.
+            float start = column ? 0.12f : 0;
+            float lit = Math.Min(120, R * 2.4f);
+            if (t < 0.08f + start) FxLayers.Light(o, FxRamp.Fire, lit, 1, 0, 0, 3);
+            FxLayers.Light(o, FxRamp.Fire, lit * 0.7f, 0.8f * U(1.1f - t, 0, 0.5f), 0, 0, 1);
+            // The pool left glowing on the floor, crusting over.
+            if (t < 1.1f)
+            {
+                float grow = Out(U(t, start, start + 0.12f)), cool = U(t, 0.45f, 1.1f);
+                Put(o, FxShape.Puddle, cool < 0.5f ? FxRamp.Fire : FxRamp.Smoke, SkillFxArt.Even(Math.Max(6, R * 1.3f * grow)), ((int)(t * 6)) & 3, 0, -1,
+                    cool < 0.5f ? 0.9f : 0.9f * (1 - cool) * 2, 0, true);
+            }
+            FxLayers.Splits(o, FxRamp.Fire, c.Big ? 6 : 4, t, start + 0.02f, 1.1f, R * 1.1f, c.Seed);
+            FxLayers.Scorch(o, t, start + 0.05f, 1.1f, R * 0.8f, c.Seed);
+            FxLayers.Ball(o, FxRamp.Fire, t, start, R * (c.Big ? 1.1f : 0.9f), c.Seed & 3);
+            if (column && t < 0.6f)
+            {
+                // The column: up fast, standing, falling back into the pool.
+                float rise = t / 0.6f, high = 44 + R * 0.6f;
+                float up = high * (rise < 0.25f ? Out(rise / 0.25f) : rise < 0.55f ? 1 : 1 - (rise - 0.55f) / 0.45f);
+                for (int i = 0; i < 6; i++)
+                {
+                    float at = up * (i + 0.5f) / 6, wob = 2 * Sin(t * 800 + i * 70);
+                    Gobbet(o, Math.Max(5, R * 0.75f * (1 - 0.4f * i / 6)), i == 5 ? 0.05f : 0.15f + 0.08f * (i & 1), t, i, wob, 2 + at);
+                }
+            }
+            // Gobbets thrown up and out, falling back and cooling.
+            int count = c.Big ? 12 : 8;
+            for (int i = 0; i < count; i++)
+            {
+                float p = (t - start - 0.02f * (i % 3)) / (0.5f + 0.2f * Rnd(c.Seed, i, 71));
+                if (p < 0 || p >= 1) continue;
+                float dir = (i + 0.3f * Rnd(c.Seed, i, 72)) * 360f / count, far = R * (0.3f + 0.9f * Rnd(c.Seed, i, 73)) * Out(p);
+                float high = (c.Big ? 34 : 24) * (0.6f + 0.6f * Rnd(c.Seed, i, 74));
+                Gobbet(o, (c.Big ? 5 : 4) * (1 - 0.4f * p), p, t, i, Cos(dir) * far, Sin(dir) * far * 0.6f + 4 * high * p * (1 - p), 1 - p * p * p);
+            }
+            FxLayers.Embers(o, FxRamp.Fire, 6, t, start, R * 1.2f, c.Seed);
+            FxLayers.Plumes(o, 4, t, start + 0.2f, R, c.Seed, 0, 0, 0.6f);
+            return 1.15f;
+        }
+
+        static float FlameWave(in BossContext c, float t, List<FxStamp> o)
+        {
+            const float run = 0.3f, burn = 0.45f;
+            float R = Math.Max(16, c.Size), wide = Math.Clamp(c.Width, 20, 300), half = wide / 2;
+            float front = R * Out(U(t, 0, run));
+            FxLayers.Light(o, FxRamp.Fire, Math.Min(120, R * 1.2f), 0.85f * U(run + burn + 0.2f - t, 0, 0.3f), Cos(c.Dir) * front * 0.6f, Sin(c.Dir) * front * 0.6f, 1);
+            // Rows of flame standing where the front reached, the newest the tallest, each burning down.
+            for (int row = 0; row < 3; row++)
+            {
+                float far = R * (0.35f + 0.3f * row), reached = run * (float)Math.Pow((far / R), 1.6f) * 0.6f;
+                float own = t - reached;
+                if (own < 0 || own >= burn) continue;
+                int n = Math.Clamp((int)(wide * far / 57.3f / 14), 3, 11);
+                for (int i = 0; i < n; i++)
+                {
+                    float dir = c.Dir - half + wide * (i + 0.5f) / n + 4 * (Rnd(c.Seed, i + row * 16, 75) - 0.5f);
+                    float left = 1 - own / burn;
+                    int size = 2 * (int)Math.Round((5 + (row == 2 ? 6 : 4) * left + 3 * Rnd(c.Seed, i, 76)) / 2);
+                    Put(o, FxShape.Flame, FxRamp.Fire, size, (int)(t * 14) + i + row, Cos(dir) * far, Sin(dir) * far * 0.95f + size / 2f - 2, Math.Min(1, left * 1.6f));
+                }
+            }
+            // The front itself: a smear of fire running out across the wedge.
+            if (t < run + 0.08f)
+                Put(o, FxShape.Smear, FxRamp.Fire, SkillFxArt.Even(Math.Max(8, front)), 10 * Math.Max(2, (int)Math.Round(wide / 10)), 0, 0, t < run ? 0.85f : 0.85f * (run + 0.08f - t) / 0.08f, c.Dir - half);
+            FxLayers.Embers(o, FxRamp.Fire, 8, t, 0.05f, R, c.Seed, 0, 0, wide, c.Dir, 0.5f);
+            if (In(t, 0.1f, 1.1f))
+                Put(o, FxShape.Scorch, FxRamp.Smoke, SkillFxArt.Step4(Math.Min(96, R * 0.9f)), 4 + (c.Seed & 3), Cos(c.Dir) * R * 0.55f, Sin(c.Dir) * R * 0.5f, 0.7f * U(1.1f - t, 0, 0.4f), 0, true);
+            return 1.1f;
+        }
+
+        static float Fissure(in BossContext c, float t, List<FxStamp> o)
+        {
+            const float run = 0.2f, life = 1.1f;
+            float L = Math.Max(24, c.Size), dx = Cos(c.Dir), dy = Sin(c.Dir);
+            int pieces = Math.Clamp((int)(L / 18), 3, 12);
+            float seg = L / pieces;
+            FxLayers.Light(o, FxRamp.Fire, Math.Min(110, L * 0.6f), 0.8f * U(life - t, 0, 0.5f), dx * L / 2, dy * L / 2, 1);
+            for (int i = 0; i < pieces; i++)
+            {
+                float along = (i + 0.5f) * seg, reached = run * (i + 0.5f) / pieces, own = t - reached;
+                if (own < 0) continue;
+                float bx = dx * along, by = dy * along;
+                // The crack opening, glowing, then cooling dull.
+                int cooled = own < 0.35f ? 0 : own < 0.75f ? 1 : 2;
+                if (t < life)
+                    Put(o, FxShape.Crack, FxRamp.Fire, SkillFxArt.Step4(seg + 4), SkillFxArt.SplitFrame(i + c.Seed, cooled), bx, by, 0.95f * U(life - t, 0, 0.35f), c.Dir + 10 * (Rnd(c.Seed, i, 77) - 0.5f), true);
+                // Every other piece spurts lava up and drops it back.
+                if ((i & 1) == 0 && own < 0.5f)
+                {
+                    float p = own / 0.5f, up = 4 * (16 + 10 * Rnd(c.Seed, i, 78)) * p * (1 - p);
+                    Gobbet(o, 5 - 2 * p, p, t, i, bx + 3 * (Rnd(c.Seed, i, 79) - 0.5f), by + up, 1);
+                    Gobbet(o, 3, Math.Min(1, p + 0.2f), t, i + 7, bx - 4 + 8 * Rnd(c.Seed, i, 80), by + up * 0.6f, 0.9f);
+                }
+                if ((i & 1) == 1 && own < 0.45f)
+                {
+                    int size = 2 * (int)Math.Round((4 + 6 * (1 - own / 0.45f)) / 2);
+                    Put(o, FxShape.Flame, FxRamp.Fire, size, (int)(t * 14) + i, bx, by + size / 2f - 2, 1);
+                }
+            }
+            FxLayers.Embers(o, FxRamp.Fire, 6, t, 0.05f, 20, c.Seed, dx * L * 0.5f, dy * L * 0.5f);
+            return life;
         }
 
         // ---- the bosses with no effects of their own ----

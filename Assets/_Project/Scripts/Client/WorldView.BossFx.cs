@@ -72,6 +72,9 @@ namespace Game.Client
             // The general's fire called down where he pointed, and the volley's burning arrows.
             if (boss == "mad_general" && (attack == "hellfire" || attack == "meteors"))
                 _bossDraws.Add((BossFx.ShardDrop, new BossContext { Size = hazard.Size * Ppu, Progress = progress, Count = attack == "meteors" ? 2 : 1, Ramp = FxRamp.Fire }, at));
+            // The lava titan's meteors and its fire rain: a ball of fire coming down over its growing shadow.
+            if (boss == "lava_titan" && (attack == "meteor" || attack == "fire_rain"))
+                _bossDraws.Add((BossFx.ShardDrop, new BossContext { Size = hazard.Size * Ppu, Progress = progress, Count = 1, Ramp = FxRamp.Fire }, at));
         }
 
         // A few bits thrown one way in what the ramp is made of (BossFx.Cinders): what Kick's square dots were, for the

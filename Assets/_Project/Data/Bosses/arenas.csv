@@ -1,7 +1,7 @@
 boss,arena,appear,entrance,seconds,again,title
 cave_warden,Ruin,Wait,Awaken,4.2,1.4,무너진 신전의 파수꾼
 crystal_queen,Nest,Descend,Cocoon,3.6,1.4,수정 둥지의 여왕
-lava_titan,Caldera,Lurk,,2.2,1,끓는 분지의 거인
+lava_titan,Caldera,Lurk,Erupt,4.0,1.2,끓는 분지의 거인
 void_lord,Altar,Summon,Rift,3.8,1.2,제단이 부른 것
 tide_serpent,Flooded,Lurk,Surface,3.6,1.2,잠긴 홀의 주인
 antlion,Pit,Lurk,Ambush,3.8,1.3,모래 구덩이의 턱

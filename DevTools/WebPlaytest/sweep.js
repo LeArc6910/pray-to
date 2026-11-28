@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu title testground hunt harvest zones towns time basics first firstphone hour bag combat hero roll weapons arts bosses patterns veineater samurai knight warden antlion serpent voidlord wraith queen general spider arenas world farm life npc factory defense gear skills skillfx layers monsterfx hazards bossfx hits shots blast mobwarn map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
+// Sections: menu title testground hunt harvest zones towns time basics first firstphone hour bag combat hero roll weapons arts bosses patterns veineater samurai knight warden antlion serpent titan voidlord wraith queen general spider arenas world farm life npc factory defense gear skills skillfx layers monsterfx hazards bossfx hits shots blast mobwarn map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -1470,6 +1470,65 @@ async function wraith(browser) {
   check(!/crown_wraith:[1-9]/.test(after.bosses || ''), `쓰러뜨리면 체력 0 (${(after.bosses || '').split(' ')[0]})`);
   await game.wait(2400);
   await game.shot('wraith-gone', '왕관이 바래 사라진 뒤');
+  await game.context.close();
+}
+
+// ---------------------------------------------------------------- 용암 거인 (2026-11-28, Docs/Bosses.md)
+// A giant of black basalt with lava in its seams: every attack has its own wind-up of the whole body (both fists heaved
+// overhead before the slam, an arm drawn back ablaze before the fire wave, the arms raised in a V before the meteors,
+// hunched over its swelling heart before the bursts, a fist raised from a crouch before the eruption, a hand swung back
+// low before the lava trail, the arms crossed before the heat ring, a foot lifted before the cross, risen white hot
+// before the fire rain). Only the fire rain (불비) shows a warning sign. It comes in from under the lava of its caldera.
+// A picture mid wind-up and one just as the blow lands, for each attack, its entrance and its phases.
+async function titan(browser) {
+  note('\n## 용암 거인 (PC)\n');
+  const game = await open(browser, run, Profiles.pc, url);
+  await game.startSolo();
+  await game.wait(1200);
+  await game.send('equip void_sword void_helmet void_armor void_boots; heal');
+  await game.send('heal; goto boss lava_titan');
+  await game.wait(700);
+  await game.shot('titan-entrance', '입장: 용암 속에 잠겨 거품만 보인다');
+  const woke = await game.until(t => has(t.banner, '용암 거인') || has(t.entrance, '용암 거인'), 8000, game.texts);
+  check(!!woke, `끓는 분지에서 깨면 "용암 거인" 이름 카드나 배너 (${woke ? woke.banner || woke.entrance : '없음'})`);
+  await game.wait(1400);
+  await game.shot('titan-erupt', '입장: 주먹이 용암을 뚫고 나와 몸을 끌어올린다');
+  await game.wait(1200);
+  await game.shot('titan-kindle', '입장: 식은 금에 심장부터 불이 번진다');
+  await game.wait(2000);
+  await game.shot('titan-awake', '깨어난 용암 거인');
+  // [attack, name, telegraph seconds, strong, marked]
+  const uses = [
+    ['slam', '내려찍기(두 주먹을 머리 위로)', 0.9, false, true],
+    ['fire_wave', '불꽃 휩쓸기(불붙은 팔을 뒤로 당김)', 0.8, false, true],
+    ['meteor', '유성 낙하(두 팔을 V로 들고 심장이 타오름)', 1.2, false, true],
+    ['magma_ring', '용암 고리(심장을 끌어안고 웅크림)', 0.5, false, false],
+    ['eruption', '분화(웅크려 한 주먹을 높이)', 1.0, false, true],
+    ['lava_trail', '용암 줄기(낮게 숙여 손을 뒤로)', 0.8, false, true],
+    ['heat_ring', '열기 고리(팔을 가슴 앞에 엇갈림)', 1.1, false, true],
+    ['lava_cross', '용암 십자(한 발을 높이)', 1.1, false, true],
+    ['fire_rain', '불비(필살기, 경고, 하얗게 달아올라 솟음)', 1.4, true, true],
+  ];
+  for (const [attack, name, telegraph, strong, marked] of uses) {
+    await game.send('heal; clear');
+    await game.wait(1500);
+    await game.send(`heal; boss lava_titan use ${attack}`);
+    await game.wait(Math.round(telegraph * 700));
+    const s = await game.state();
+    if (marked) check((s.marksShown || 0) > 0, `${name}: 전조 동안 바닥 표시가 보인다 (표시 ${s.marksShown})`);
+    check(!!s.warningSign === strong, `${name}: 경고 표지 ${strong ? '있음' : '없음'} (${s.warningSign})`);
+    await game.shot(`titan-${attack}`, `${name} 전조`);
+    await game.wait(Math.round(telegraph * 300) + 160);
+    await game.shot(`titan-${attack}-hit`, `${name} 떨어진 순간`);
+  }
+  await game.send('heal; clear; boss lava_titan hurt 0.36');
+  await game.wait(800);
+  await game.shot('titan-phase2', '2페이즈 포효(팔을 펼치고 불꽃이 솟음)');
+  await game.send('heal; clear; boss lava_titan hurt 0.33');
+  await game.wait(2500);
+  const last = await game.state();
+  check((last.bosses || '').includes('lava_titan') && (last.bosses || '').includes(':p3:'), `체력을 깎으면 3페이즈 (${last.bosses})`);
+  await game.shot('titan-phase3', '3페이즈(금이 하얗게 달고 불꽃이 커짐)');
   await game.context.close();
 }
 
@@ -3254,6 +3313,9 @@ const BossBlows = {
   // The crown wraith's own lightning (2026-11-28): the claws, the bolts, the spear, the ring and the shared blow.
   wraith: ['cone -8 2.6 3.4 110 0 F crown_wraith grasp', 'circle -2.2 3 1.5 0 0 F crown_wraith lightning_fall', 'share 3 3.2 1.8 0 0 F crown_wraith deep_share',
     'circle 7 3.2 1.4 0 0 F crown_wraith storm_brand', 'line -8 -3.4 8 1.2 0 F crown_wraith soul_lance', 'ring 5 -2.4 3.4 1.4 0 F crown_wraith crown_ring'],
+  // The lava titan's own fire (2026-11-28): lava bursting out of the floor, the wall of fire, the split floor, the band.
+  titan: ['circle -7 3 2.2 0 0 F lava_titan slam', 'cone -3.6 2.4 3.8 110 0 F lava_titan fire_wave', 'circle 2.6 3.2 2.2 0 0 F lava_titan eruption',
+    'circle 7 3.2 1.5 0 0 F lava_titan fire_rain', 'line -8 -3.4 9 1.6 0 F lava_titan lava_cross', 'ring 5 -2.4 3.4 1.4 0 F lava_titan heat_ring'],
   // F3: the stone bosses' own attacks by their own names (E6 looked at them only as the warden's).
   vein: ['cone -8 2.6 3.6 120 0 F vein_eater claw', 'circle -2.6 3 1.5 0 0 F vein_eater cave_in', 'circle 2.4 2.6 2.6 0 0 F vein_eater burrow',
     'circle -6 -2.8 3.2 0 0 F vein_eater quake', 'circle 0.4 -3.4 1.2 0 0 F vein_eater spike_line', 'ring 5.6 -2.2 3.6 1.4 0 F vein_eater collapse_ring'],
@@ -3270,7 +3332,7 @@ async function bossfx(browser) {
   await game.send('goto wild');
   await clearRoom(game, 12, 7);
   await game.send('monsters hold; heal; face 1 0');
-  const Names = { queen: '수정 거미 여왕', general: '장군 모르그', stone: '돌 보스(수호자의 공격으로)', antlion: '개미귀신', serpent: '물살 뱀', voidlord: '공허의 군주', wraith: '왕관의 망령', elements: '용암·공허·물·망령', vein: '광맥 포식자(제 공격 이름으로)', knight: '흑철 기사 발두인(제 공격 이름으로)' };
+  const Names = { queen: '수정 거미 여왕', general: '장군 모르그', stone: '돌 보스(수호자의 공격으로)', antlion: '개미귀신', serpent: '물살 뱀', titan: '용암 거인', voidlord: '공허의 군주', wraith: '왕관의 망령', elements: '용암·공허·물·망령', vein: '광맥 포식자(제 공격 이름으로)', knight: '흑철 기사 발두인(제 공격 이름으로)' };
   for (const [key, blows] of Object.entries(BossBlows)) {
     if (key === 'queen' || key === 'general') {
       // What falls onto the warnings before the blow.
@@ -5082,6 +5144,7 @@ const OwnEntrances = [
   ['crystal_queen', 3.6, 1.4, '결정 고치에 금빛이 번지다 깨지고, 다리를 펴고 일어나 왕관을 빛낸다'],
   ['antlion', 3.8, 1.3, '굴 바닥에 턱 끝만 내놓고 숨어 모래를 튕기다 솟아올라 턱을 닫는다'],
   ['tide_serpent', 3.6, 1.2, '물속에 잠겨 물결만 보이다 머리를 내밀고, 볏을 펴며 솟아올라 포효한다'],
+  ['lava_titan', 4.0, 1.2, '용암 속에서 주먹이 먼저 나오고 몸을 끌어올려 솟구친 뒤, 식은 금에 심장부터 불이 번지며 포효한다'],
   ['crown_wraith', 3.8, 1.2, '바닥에 놓인 녹슨 왕관이 떠오르고 벼락을 맞아, 안개에서 몸이 모여 팔을 펴고 포효한다'],
   ['void_lord', 3.8, 1.2, '제단 바닥에 균열이 열리고 얼음 왕관부터 솟아 눈을 밝히고, 망토를 펼치며 떠올라 포효한다'],
   ['mad_general', 3.8, 1.1, '꽂아 둔 대검 앞에 무릎 꿇었다가 일어나 칼을 뽑아 들고 포효한다'],
@@ -9211,7 +9274,7 @@ async function towns(browser) {
   }
 }
 
-const Sections = { menu, title, testground, hunt, harvest, zones, towns, time, basics, first, firstphone, hour, bag, combat, hero, roll, weapons, arts, bosses, patterns, veineater, samurai, knight, warden, antlion, serpent, voidlord, wraith, queen, general, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, layers, monsterfx, hazards, bossfx, hits, shots, blast, mobwarn, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
+const Sections = { menu, title, testground, hunt, harvest, zones, towns, time, basics, first, firstphone, hour, bag, combat, hero, roll, weapons, arts, bosses, patterns, veineater, samurai, knight, warden, antlion, serpent, titan, voidlord, wraith, queen, general, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, layers, monsterfx, hazards, bossfx, hits, shots, blast, mobwarn, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

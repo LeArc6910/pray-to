@@ -84,6 +84,9 @@ namespace Game.Core
         // Only its rusted crown lying on the floor in a little mist: the crown rises, lightning strikes it, the body
         // gathers out of the mist under it and it spreads its arms with a roar (the crown wraith).
         Manifest,
+        // Under the lava of its caldera with only bubbles showing: a crusted fist breaking the surface, heaving itself
+        // up and out, its seams lit from its heart outward, and a roar (the lava titan).
+        Erupt,
     }
 
     public sealed class ArenaDefinition

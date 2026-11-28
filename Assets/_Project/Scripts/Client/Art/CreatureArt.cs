@@ -931,8 +931,22 @@ namespace Game.Client
                 BossPose.Roar => CrystalQueenArt.ScreechRise + frame % 4,
                 _ => frame,
             }, 1),
-            // The lava titan: the warden's build in black basalt, its seams and core burning.
-            "lava_titan" => Warden(Rgba.Hex("#4A3A36"), frame, view, pose, molten: true),
+            // The lava titan of the caldera (2026-11-28): its own picture posed in code (LavaTitanPose in WorldView).
+            "lava_titan" => LavaTitanArt.Draw(view, pose switch
+            {
+                BossPose.Windup => LavaTitanPose.Heave,
+                BossPose.Strike => LavaTitanPose.Smash,
+                BossPose.Charge => LavaTitanPose.Rush,
+                BossPose.Roar => LavaTitanPose.Roar,
+                _ => LavaTitanPose.Idle,
+            }, pose switch
+            {
+                BossPose.Windup => LavaTitanArt.FramesOf(LavaTitanPose.Heave) - 1,
+                BossPose.Strike => LavaTitanArt.StrikeFrame(LavaTitanPose.Smash),
+                BossPose.Charge => frame,
+                BossPose.Roar => LavaTitanArt.RoarRise + frame % 4,
+                _ => frame,
+            }, 1),
             // The void lord of the abyss (2026-11-28): its own picture posed in code (VoidLordPose in WorldView).
             "void_lord" => VoidLordArt.Draw(view, pose switch
             {

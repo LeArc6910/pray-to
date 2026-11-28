@@ -3325,6 +3325,11 @@ namespace Game.Client
                 AnimateSerpent(body, facing, dead, moving);
                 return;
             }
+            if (body.Kind == BodyKind.Boss && body.Id == "lava_titan")
+            {
+                AnimateLavaTitan(body, facing, dead, moving);
+                return;
+            }
             if (body.Kind == BodyKind.Boss && body.Id == "void_lord")
             {
                 AnimateVoidLord(body, facing, dead, moving);

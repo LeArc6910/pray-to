@@ -33,6 +33,27 @@ def cut_background(im, tol=48):
         if x < w - 1: stack.append((x + 1, y))
         if y > 0: stack.append((x, y - 1))
         if y < h - 1: stack.append((x, y + 1))
+    # HOLES=<pixels>: background shut in by the body (between the legs, inside an arm) of at least that many pixels
+    # goes too (the lava titan, 2026-11-28).
+    holes = int(os.environ.get("HOLES", "0"))
+    if holes > 0:
+        seen = bytearray(w * h)
+        for sy in range(h):
+            for sx in range(w):
+                if m[sx, sy] == 0 or seen[sy * w + sx] or not near(px[sx, sy]):
+                    continue
+                region, stack = [], [(sx, sy)]
+                seen[sy * w + sx] = 1
+                while stack:
+                    x, y = stack.pop()
+                    region.append((x, y))
+                    for nx, ny in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
+                        if 0 <= nx < w and 0 <= ny < h and not seen[ny * w + nx] and m[nx, ny] and near(px[nx, ny]):
+                            seen[ny * w + nx] = 1
+                            stack.append((nx, ny))
+                if len(region) >= holes:
+                    for x, y in region:
+                        m[x, y] = 0
     out = im.convert("RGBA")
     out.putalpha(mask.filter(ImageFilter.MinFilter(3)))
     return out
