@@ -1842,9 +1842,9 @@ async function forces(browser) {
       s = await game.state();
       check(s.bossChasing && s.bossAway, `둔덕 습격: 땅속에서 쫓아온다 (쫓음 ${s.bossChasing}, 숨음 ${s.bossAway})`);
       await game.shot('forces-mound-run', '둔덕 습격: 모래 둔덕이 쫓아온다');
-      // It stops 0.8 s before it bursts (a 2 s wind-up): look in the stop, before the burst.
-      await game.wait(850);
-      s = await game.state();
+      // It stops 0.8 s before it bursts (a 2 s wind-up): look in the stop, before the burst (waited for, not timed:
+      // a fixed wait with the command's delay came after the burst).
+      s = (await game.until(t => (t.marksShown || 0) > 0 && t.bossChasing, 1500)) || await game.state();
       check((s.marksShown || 0) > 0, `둔덕이 멈춘 자리에 표시 (표시 ${s.marksShown})`);
       await game.shot('forces-mound-stop', '둔덕이 멈춘 자리: 0.8초 뒤 솟는다');
       await game.wait(1500);

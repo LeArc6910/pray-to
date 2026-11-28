@@ -131,6 +131,12 @@ namespace Game.Client
             var home = _client.Arenas.OrderBy(a => Vec2.Distance(a, front)).First();
             float reach = _client.ArenaRadius + 0.5f;
             float off = Vec2.Dot(home - front, wave.Direction);
+            // Waiting to move, it starts past the arena's edge: it rises just inside it, where it will come from.
+            if (progress <= 0 && off > reach - 1)
+            {
+                front += wave.Direction * (off - (reach - 1));
+                off = reach - 1;
+            }
             if (Mathf.Abs(off) >= reach) return false;
             float chord = Mathf.Sqrt(reach * reach - off * off);
             float middle = Vec2.Dot(home - front, side);
