@@ -138,6 +138,19 @@ namespace Game.Client
         ThreadCut,
         ThreadSnap,
         Tunnel,
+        // R4a (2026-11-29, Docs/Bosses.md "R4a 그림"): a planted crystal ringing in its turn (a clear bell half a
+        // second long, played at a pitch for each place in the order; Chime is the crystal monsters' short one); a
+        // crystal bursting; an egg's shell cracking; an egg breaking open and the young one out of it; Morg's banner
+        // driven into the ground (a thud, then the cloth); the banner coming down; the horn that opens his
+        // interlude (a second, two notes); the rain of arrows falling (0.8 s).
+        CrystalChime,
+        CrystalShatter,
+        EggCrack,
+        EggHatch,
+        BannerPlant,
+        BannerFall,
+        WarHorn,
+        ArrowRain,
     }
 
     // A monster's kind of voice (2026-11-09): what it sounds like when it notices someone, attacks and is struck.
@@ -714,6 +727,100 @@ namespace Game.Client
                     parts.Add(Noise(0.1f, 0.4f, 0.5f, 0.1f, attack: 0.06f, decay: 2.2f, seed: 125));
                     parts.Add(Noise(0.06f, 0.22f, 0.3f, 0.7f, attack: 0.01f, decay: 4, seed: 126));
                     Crackle(parts, 0.05f, 0.3f, 6, 0.3f, 127);
+                    level = 0.65f;
+                    break;
+                case Sound.CrystalChime:
+                    // 0.5 s: the strike, then the note with its octave and a bell's high partial, a soft body under it.
+                    parts.Add(Noise(0, 0.02f, 0.25f, 0.95f, attack: 0.0005f, decay: 8, seed: 131));
+                    parts.Add(Tone(Wave.Sine, 0, 0.5f, 1320, 1318, 0.6f, attack: 0.002f, decay: 3.2f, vibrato: 0.003f, vibratoRate: 5));
+                    parts.Add(Tone(Wave.Sine, 0, 0.42f, 2640, 2636, 0.26f, attack: 0.002f, decay: 4));
+                    parts.Add(Tone(Wave.Sine, 0, 0.3f, 3643, 3638, 0.16f, attack: 0.001f, decay: 5));
+                    parts.Add(Tone(Wave.Triangle, 0, 0.36f, 660, 659, 0.2f, attack: 0.004f, decay: 3.5f));
+                    parts.Add(Tone(Wave.Sine, 0.04f, 0.46f, 1984, 1976, 0.1f, attack: 0.05f, decay: 2.5f));
+                    level = 0.45f;
+                    break;
+                case Sound.CrystalShatter:
+                    // The crack, the body giving way, and the pieces ringing as they scatter, each lower and later.
+                    parts.Add(Noise(0, 0.05f, 1, 0.95f, attack: 0.0005f, decay: 5, seed: 132));
+                    parts.Add(Noise(0, 0.16f, 0.6f, 0.6f, attack: 0.001f, decay: 4, seed: 133));
+                    parts.Add(Tone(Wave.Sine, 0, 0.12f, 170, 70, 0.5f, attack: 0.001f, decay: 4));
+                    for (int i = 0; i < 7; i++)
+                    {
+                        float pitch = 4200 - i * 330 + i % 2 * 240;
+                        parts.Add(Tone(Wave.Sine, 0.015f + i * 0.045f + i % 3 * 0.012f, 0.16f, pitch, pitch * 0.97f, 0.3f - i * 0.03f, attack: 0.001f, decay: 5));
+                    }
+                    parts.Add(Noise(0.08f, 0.4f, 0.2f, 0.97f, attack: 0.02f, decay: 3, seed: 134));
+                    Crackle(parts, 0.04f, 0.3f, 6, 0.3f, 135);
+                    level = 0.7f;
+                    break;
+                case Sound.EggCrack:
+                    // A dry shell giving: two ticks and a short creak between them.
+                    parts.Add(Noise(0, 0.025f, 0.9f, 0.85f, attack: 0.0005f, decay: 7, seed: 136));
+                    parts.Add(Tone(Wave.Triangle, 0.01f, 0.07f, 1150, 760, 0.35f, attack: 0.002f, decay: 4, vibrato: 0.06f, vibratoRate: 60));
+                    parts.Add(Noise(0.075f, 0.04f, 1, 0.7f, attack: 0.0005f, decay: 6, seed: 137));
+                    parts.Add(Tone(Wave.Sine, 0.075f, 0.06f, 2400, 2000, 0.18f, attack: 0.001f, decay: 6));
+                    level = 0.45f;
+                    break;
+                case Sound.EggHatch:
+                    // The shell bursting, something wet coming out of it, and the young one's quick chitter.
+                    parts.Add(Noise(0, 0.06f, 1, 0.85f, attack: 0.0005f, decay: 5, seed: 138));
+                    Crackle(parts, 0.01f, 0.14f, 4, 0.5f, 139);
+                    parts.Add(Tone(Wave.Sine, 0.03f, 0.2f, 230, 95, 0.55f, attack: 0.01f, decay: 3));
+                    parts.Add(Noise(0.04f, 0.22f, 0.5f, 0.16f, attack: 0.02f, decay: 3, seed: 140));
+                    parts.Add(Tone(Wave.Sine, 0.05f, 0.1f, 3000, 2500, 0.14f, attack: 0.001f, decay: 6));
+                    for (int i = 0; i < 6; i++)
+                        parts.Add(Tone(Wave.Square, 0.24f + i * 0.038f, 0.022f, 1350 + i % 3 * 260, 1750 + i % 2 * 300, 0.22f, attack: 0.001f, decay: 4));
+                    level = 0.6f;
+                    break;
+                case Sound.BannerPlant:
+                    // The pole driven in (a thud in the ground and the knock of the wood), then the cloth cracking out twice.
+                    parts.Add(Tone(Wave.Sine, 0, 0.3f, 128, 40, 1, attack: 0.002f, decay: 3.5f));
+                    parts.Add(Noise(0, 0.12f, 0.8f, 0.22f, attack: 0.001f, decay: 5, seed: 141));
+                    parts.Add(Tone(Wave.Triangle, 0, 0.07f, 330, 210, 0.5f, attack: 0.001f, decay: 5));
+                    parts.Add(Noise(0.14f, 0.13f, 0.5f, 0.55f, attack: 0.035f, decay: 4, seed: 142));
+                    parts.Add(Noise(0.15f, 0.03f, 0.35f, 0.9f, attack: 0.02f, decay: 5, seed: 143));
+                    parts.Add(Noise(0.3f, 0.22f, 0.4f, 0.5f, attack: 0.05f, decay: 3.5f, seed: 144));
+                    parts.Add(Noise(0.33f, 0.03f, 0.25f, 0.9f, attack: 0.015f, decay: 5, seed: 145));
+                    level = 0.8f;
+                    break;
+                case Sound.BannerFall:
+                    // The pole breaking, the cloth coming down through the air, and it all landing.
+                    parts.Add(Noise(0, 0.05f, 1, 0.8f, attack: 0.0005f, decay: 5, seed: 146));
+                    parts.Add(Tone(Wave.Saw, 0, 0.1f, 560, 130, 0.5f, attack: 0.001f, decay: 4));
+                    parts.Add(Tone(Wave.Triangle, 0.05f, 0.06f, 300, 170, 0.35f, attack: 0.001f, decay: 5));
+                    parts.Add(Noise(0.08f, 0.32f, 0.45f, 0.5f, attack: 0.2f, decay: 1.5f, seed: 147));
+                    parts.Add(Tone(Wave.Sine, 0.38f, 0.22f, 105, 42, 0.9f, attack: 0.003f, decay: 4));
+                    parts.Add(Noise(0.38f, 0.16f, 0.6f, 0.3f, attack: 0.002f, decay: 4, seed: 148));
+                    parts.Add(Tone(Wave.Triangle, 0.43f, 0.06f, 260, 180, 0.3f, attack: 0.001f, decay: 5));
+                    level = 0.75f;
+                    break;
+                case Sound.WarHorn:
+                    // A second: a low note swelling, then the fourth above it held and dying away, breath in both.
+                    parts.Add(Tone(Wave.Saw, 0, 0.36f, 143, 147, 0.5f, attack: 0.1f, decay: 0.6f, vibrato: 0.006f, vibratoRate: 5));
+                    parts.Add(Tone(Wave.Triangle, 0, 0.36f, 147, 147, 0.5f, attack: 0.08f, decay: 0.5f));
+                    parts.Add(Tone(Wave.Square, 0, 0.36f, 294, 294, 0.1f, attack: 0.12f, decay: 0.8f));
+                    parts.Add(Tone(Wave.Saw, 0.32f, 0.68f, 192, 196, 0.6f, attack: 0.06f, decay: 1.5f, vibrato: 0.008f, vibratoRate: 5.5f));
+                    parts.Add(Tone(Wave.Triangle, 0.32f, 0.68f, 196, 196, 0.55f, attack: 0.05f, decay: 1.3f));
+                    parts.Add(Tone(Wave.Square, 0.32f, 0.6f, 392, 392, 0.12f, attack: 0.1f, decay: 2));
+                    parts.Add(Tone(Wave.Sine, 0.32f, 0.68f, 98, 98, 0.35f, attack: 0.05f, decay: 1.4f));
+                    parts.Add(Noise(0, 1, 0.12f, 0.3f, attack: 0.1f, decay: 1.2f, seed: 149));
+                    level = 0.8f;
+                    break;
+                case Sound.ArrowRain:
+                    // 0.8 s: the flight coming down (whistles falling in pitch, a hiss swelling) and the heads striking.
+                    parts.Add(Noise(0, 0.6f, 0.4f, 0.93f, attack: 0.3f, decay: 1.5f, seed: 150));
+                    for (int i = 0; i < 12; i++)
+                    {
+                        float at = i * 0.045f + i % 3 * 0.013f;
+                        float pitch = 2500 + i % 4 * 260 - i * 30;
+                        parts.Add(Tone(Wave.Sine, at, 0.13f, pitch, pitch * 0.52f, 0.2f, attack: 0.03f, decay: 2));
+                    }
+                    for (int i = 0; i < 10; i++)
+                    {
+                        float at = 0.26f + i * 0.05f + i % 2 * 0.014f;
+                        parts.Add(Noise(at, 0.035f, 0.6f - i * 0.03f, 0.4f, attack: 0.0005f, decay: 6, seed: 151 + i));
+                        parts.Add(Tone(Wave.Triangle, at, 0.04f, 250 + i % 3 * 50, 150, 0.3f, attack: 0.001f, decay: 6));
+                    }
                     level = 0.65f;
                     break;
                 case Sound.Sting:

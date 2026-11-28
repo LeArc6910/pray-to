@@ -6,7 +6,7 @@ namespace Game.Client
     // tide serpent's wall of water (a band to lay side by side, and the curled head where it stops at the gap), the
     // silk mother's thread, the wake the serpent leaves when it hunts under water, and the grains that show a pull or a
     // push. The water is SerpentArt's, the silk GroundArt's web, the sand AntlionArt's. WorldView.Forces places them.
-    static class ForceArt
+    static partial class ForceArt
     {
         // Frames the wall, the thread and the wake turn through, a loop; the grain has GrainFrames.
         public const int Frames = 4;

@@ -13,7 +13,7 @@ namespace Game.Client
     // set with obsidian and teal crystal, its light beating, cracked as it is eaten), the wall of cherry petals and the
     // curtain of web that close the forgotten shrine's floor in. R3 ("R3 그림"): the antlion's sand funnel (Pit) and the
     // tide serpent's shallows over the rim (Shallows). WorldView.Ground places them.
-    static class GroundArt
+    static partial class GroundArt
     {
         // Frames each kind turns through, a loop.
         public const int Frames = 4;

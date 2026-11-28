@@ -12,6 +12,15 @@
 - **로컬 확인**: 로컬 세션이 읽고 체크한다
 
 
+## 2026-11-29 01:45 보스 재설계 R4a 그림·소리(수정, 알, 군기, 환영 창병, 호령 표적, 빛 고리)
+
+- **바뀐 것**: R4a(수정 거미 여왕·모르그, `Docs/BossRedesign.md` 5.3·5.5)의 도트 그림과 소리만. `GroundArt.Crystal(장, lit)`·`Egg(장, cracks)`·`Banner(장)`과 발 줄 상수 `CrystalPivot`·`EggPivot`·`BannerPivot`(`GroundArt.R4a.cs`), `ForceArt.Phalanx(길이, 장)`·`PhalanxEnd(장)`·`Target(장)`·`Chime(장)`(`ForceArt.R4a.cs`), 소리 여덟(`CrystalChime`·`CrystalShatter`·`EggCrack`·`EggHatch`·`BannerPlant`·`BannerFall`·`WarHorn`·`ArrowRain`). `GroundArt`·`ForceArt`는 파일을 나누려고 `partial`로 바꿨다. 미리보기 `--only r4a`(`R4aPreview.cs`), `Docs/Bosses.md` "R4a 그림", `Docs/Commands.md`
+- **이름 하나가 다르다**: 맡긴 이름 `Sound.Chime`은 수정 몬스터의 짧은 종소리로 이미 있어서 새 소리는 `Sound.CrystalChime`이다. 화면 연결에서 이 이름으로 부른다
+- **확인**: `dotnet build DevTools/UnityCompileCheck` 오류 0, `--only r4a` 사진(색·흑백)을 열어 보고 고침(빛난 수정이 흰 덩어리 → 면과 분홍 테두리 남김, 깃발 문양 뼈색, 창병을 뒤에서 본 모습으로 다시 그리고 사이에 옅은 띠). `dotnet test`와 WebGL 컴파일 확인은 돌리지 않았다(그림·소리 코드만 바뀜)
+- **요청 대조**: 그림 여섯(수정·알·군기·대열과 끝·표적·빛 고리) ○ · 소리 여덟 ○(`Chime` → `CrystalChime`) · 미리보기·문서 ○ · 화면 연결(WorldView·Playtest)·규칙 — (부모 묶음에서)
+- **로컬에서 할 일**: 명령 한 줄을 다시 돌린다(새 파일 `GroundArt.R4a.cs`·`ForceArt.R4a.cs`의 `.meta`가 생긴다). 소리는 화면에 연결된 뒤 들어 본다
+- **로컬 확인**: [ ]
+
 ## 2026-11-29 01:10 보스 필살기 기획안 (문서만)
 
 - **바뀐 것**: 사람 요청 "2페이즈 필살기 없는 애들은 기획안 작성하고, 모든 3페이즈 필살기는 엄청 화려하게(공격 방식은 크게 바꾸지 않고 이펙트 강화로도). 이것도 기획안". 새 문서 `Docs/BossFinishers.md`: 지금 필살기 표, 2페이즈 필살기가 없는 아홉 보스의 새 필살기(3페이즈를 미리 가르치는 작은 판, 피하는 법이 겹치지 않게, 드는 틀 표시), 3페이즈 필살기 공용 연출 틀(기 모으기·발동·여운, 큰 이름 카드, 보스 색 어둡게, 카메라 물러서기, 멈춤·번쩍임, 여운 흔적 6초, 한도 160조각·빛 5개, 읽기 우선), 열두 보스 필살기마다 연출 표, 묶음 F1~F3. `Docs/NextTasks.md` 한 줄
