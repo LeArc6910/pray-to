@@ -169,13 +169,8 @@ namespace Game.Client
             // R3, the dive: a V of ripples spreading back from where it swims under (placeholder until its own picture).
             if (attack.Chases)
             {
-                if (puff && since >= MoundDive)
-                {
-                    var back = -ahead;
-                    var left = new Vector3(-ahead.y, ahead.x, 0);
-                    Chips(feet + ahead * 0.5f, back + left * 0.7f, FxRamp.Mist, 1, 14, 10);
-                    Chips(feet + ahead * 0.5f, back - left * 0.7f, FxRamp.Mist, 1, 14, 10);
-                }
+                if (since < Time.deltaTime * 1.5f) Hear(Sound.Tunnel, feet, 0.7f);
+                if (puff && since >= MoundDive) Wake(feet, view.Facing);
                 return;
             }
             float progress = Mathf.Clamp01(since / TelegraphOf(body, attack));

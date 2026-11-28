@@ -177,6 +177,7 @@ namespace Game.Client
             // R3: the mound running after its target throws sand up off its back.
             if (view.BossState == BossState.Telegraph && attack != null && attack.Chases)
             {
+                if (since < Time.deltaTime * 1.5f) Hear(Sound.Tunnel, feet, 0.8f);
                 if (puff && since >= MoundDive) Chips(feet, Vector3.up - ahead * 0.6f, FxRamp.Dust, 2, 12, 60);
                 return;
             }

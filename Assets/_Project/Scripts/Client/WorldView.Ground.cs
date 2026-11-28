@@ -100,9 +100,8 @@ namespace Game.Client
                     mark.Fill.color = new Color(GroundLavaColor.r, GroundLavaColor.g, GroundLavaColor.b, (1 - set) * 0.25f * fade);
                     break;
                 case HazardShape.Pit:
-                    // A sand pit (R3): its funnel turns slowly; the first of a fight (harmless) is dimmer.
+                    // A sand pit (R3): its funnel runs in by itself (GroundArt); the first of a fight (harmless) is dimmer.
                     mark.Edge.color = new Color(1, 1, 1, fade * (hazard.Harmful ? 1 : 0.7f));
-                    mark.Edge.transform.localRotation = Quaternion.Euler(0, 0, -Time.time * 25);
                     mark.Fill.color = new Color(SandDarkColor.r, SandDarkColor.g, SandDarkColor.b, fade * 0.15f);
                     break;
                 case HazardShape.Water:
@@ -282,7 +281,7 @@ namespace Game.Client
             }
         }
 
-        // A standing sand pit: the ground picture of a pit its size, turning slowly, under everyone.
+        // A standing sand pit: the ground picture of a pit its size, under everyone.
         void DrawPitProp(PropState prop)
         {
             if (!_propSprites.TryGetValue(prop.Id, out var sprite))
@@ -296,7 +295,6 @@ namespace Game.Client
             int frame = Mathf.FloorToInt(Time.time * 4 + prop.Id) % GroundArt.Frames;
             sprite.sprite = GroundSprite(HazardShape.Pit, false, prop.Radius * 2, prop.Radius * 2, prop.Id, frame);
             sprite.transform.localPosition = new Vector3(prop.Position.X, prop.Position.Y, 0);
-            sprite.transform.localRotation = Quaternion.Euler(0, 0, -Time.time * 20);
             float grown = Mathf.Clamp01((Time.time - _propsKnown[prop.Id].Born) / 0.6f);
             sprite.transform.localScale = Vector3.one * (0.3f + 0.7f * grown);
         }
