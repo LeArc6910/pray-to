@@ -354,9 +354,12 @@ namespace Game.Client
         public static HeroGear Held(ItemBase item)
         {
             if (item == null || item.Slot != ItemSlot.Weapon) return HeroGear.None;
-            var kind = item.IsPickaxe ? HeroWeapon.Pick : (item.Tags & SkillTag.Ranged) != 0 ? HeroWeapon.Bow : (item.Tags & SkillTag.Magic) != 0 ? HeroWeapon.Staff : HeroWeapon.Sword;
+            // The kind's own shape, swung with the motions of the weapon it borrows them from (Docs/Weapons.md 묶음 B).
+            string id = item.Kind?.Id;
+            var kind = item.IsPickaxe ? HeroWeapon.Pick : id != null ? HeroGear.MotionOf(id)
+                : (item.Tags & SkillTag.Ranged) != 0 ? HeroWeapon.Bow : (item.Tags & SkillTag.Magic) != 0 ? HeroWeapon.Staff : HeroWeapon.Sword;
             var (metal, stone, stoneDark) = GearColors(item);
-            return new HeroGear(kind, item.Id, metal.Light, metal.Main, metal.Shade, stone, stoneDark);
+            return new HeroGear(kind, item.Id, metal.Light, metal.Main, metal.Shade, stone, stoneDark, HeroGear.ShapeOf(id));
         }
 
         public static PixelImage Gear(ItemBase item)

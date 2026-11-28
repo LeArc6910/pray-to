@@ -45,8 +45,9 @@ namespace Game.Client
     // The weapon as the hero's picture needs it: its kind and the colours of its icon (ItemArt.Held).
     readonly struct HeroGear
     {
-        public HeroGear(HeroWeapon kind, string key, Rgba light, Rgba main, Rgba shade, Rgba gem, Rgba gemDark)
+        public HeroGear(HeroWeapon kind, string key, Rgba light, Rgba main, Rgba shade, Rgba gem, Rgba gemDark, string shape = "")
         {
+            Shape = shape ?? "";
             Kind = kind;
             Key = key;
             Light = light;
@@ -57,6 +58,10 @@ namespace Game.Client
         }
 
         public HeroWeapon Kind { get; }
+        // The weapon's kind (weapon_kinds.csv, Docs/Weapons.md) when it is drawn otherwise than its motions' weapon:
+        // a dagger or greatsword swung like a sword, a spear thrust like a staff, a hammer swung like a pick, a crossbow
+        // shot like a bow, a boomerang thrown with a sword's swings, a wand or orb as a staff. Empty for the four of old.
+        public string Shape { get; }
         // Names the colours, for a sprite's key.
         public string Key { get; }
         public Rgba Light { get; }
@@ -73,6 +78,24 @@ namespace Game.Client
             var metal = Ramp.Of("#B4BECC");
             return kind == HeroWeapon.None ? None : new HeroGear(kind, "plain_" + kind, metal.Light, metal.Main, metal.Shade, Rgba.Hex("#C88CFF"), Rgba.Hex("#7E46D0"));
         }
+
+        // A plain iron one of a weapon kind by its id (weapon_kinds.csv), for previews.
+        public static HeroGear PlainKind(string kind)
+        {
+            var metal = Ramp.Of("#B4BECC");
+            return new HeroGear(MotionOf(kind), "plain_" + kind, metal.Light, metal.Main, metal.Shade, Rgba.Hex("#C88CFF"), Rgba.Hex("#7E46D0"), ShapeOf(kind));
+        }
+
+        // Whose motions a kind borrows (Docs/Weapons.md, 묶음 B: until each has its own).
+        public static HeroWeapon MotionOf(string kind) => kind switch
+        {
+            "bow" or "crossbow" => HeroWeapon.Bow,
+            "staff" or "wand" or "orb" or "spear" => HeroWeapon.Staff,
+            "pickaxe" or "hammer" => HeroWeapon.Pick,
+            _ => HeroWeapon.Sword,
+        };
+
+        public static string ShapeOf(string kind) => kind is "sword" or "bow" or "staff" or "pickaxe" or null ? "" : kind;
     }
 
     // The player's hero (2026-11-19, the person: "draw the hero with RD too, and add motions by weapon"). The head and
@@ -1950,6 +1973,7 @@ namespace Game.Client
                 var b = At(to, toAcross);
                 Thin(image, a.X, a.Y, b.X, b.Y, color);
             }
+            if (Shaped(image, gear, pose, At, Thick, Fine)) return;
             switch (gear.Kind)
             {
                 case HeroWeapon.Sword:
@@ -2032,6 +2056,145 @@ namespace Game.Client
                     Dot(image, belly.X, belly.Y, GripRed);
                     break;
                 }
+            }
+        }
+
+        // The kinds drawn otherwise than their motions' weapon (HeroGear.Shape, Docs/Weapons.md 묶음 B). Along is from the
+        // hand out the way the weapon points, across to its side, in the rig's weapon units.
+        static bool Shaped(PixelImage image, HeroGear gear, Pose pose, Func<float, float, (float X, float Y)> at,
+            Action<float, float, float, Rgba, float> thick, Action<float, float, float, float, Rgba> fine)
+        {
+            (float X, float Y) At(float along, float across = 0) => at(along, across);
+            void Thick(float from, float to, float radius, Rgba color, float across = 0) => thick(from, to, radius, color, across);
+            void Bar((float X, float Y) a, (float X, float Y) b, float radius, Rgba color) => Line(image, a.X, a.Y, b.X, b.Y, radius, color);
+            void Stone((float X, float Y) c, float rim, float size)
+            {
+                Line(image, c.X, c.Y, c.X, c.Y, rim, gear.Main);
+                Line(image, c.X, c.Y, c.X, c.Y, size, pose.Glow > 0.5f ? gear.Gem.Mix(White, 0.5f) : gear.Gem);
+                Dot(image, c.X - 0.6f, c.Y - 0.6f, White);
+                Dot(image, c.X + 0.6f, c.Y + 0.6f, gear.GemDark);
+                if (pose.Glow <= 0.25f) return;
+                float far = rim + (pose.Glow > 0.75f ? 1.6f : 1f);
+                foreach (var (dx, dy) in new[] { (1f, 0f), (-1f, 0f), (0f, 1f), (0f, -1f) })
+                    Dot(image, c.X + dx * far, c.Y + dy * far, gear.Gem.Mix(White, 0.35f));
+            }
+            switch (gear.Shape)
+            {
+                case "dagger":
+                {
+                    // A short blade, a small guard.
+                    Thick(1.8f, 7, 0.65f, gear.Main);
+                    fine(1.8f, 0.4f, 7.2f, 0.15f, gear.Light);
+                    var tip = At(7.6f);
+                    Dot(image, tip.X, tip.Y, gear.Light);
+                    Thick(-1.6f, 1, 0.6f, GripRed);
+                    fine(1.3f, -1.8f, 1.3f, 1.8f, Gold);
+                    return true;
+                }
+                case "greatsword":
+                {
+                    // A long broad blade, a wide guard and a long grip.
+                    Thick(3, 15, 1.15f, gear.Main);
+                    fine(3, 0.75f, 15.2f, 0.3f, gear.Light);
+                    fine(3, -0.95f, 14, -0.95f, gear.Shade);
+                    var tip = At(15.8f);
+                    Dot(image, tip.X, tip.Y, gear.Light);
+                    Thick(-4, 2, 0.7f, GripRed);
+                    var pommel = At(-4.6f);
+                    Dot(image, pommel.X, pommel.Y, GoldDark);
+                    Bar(At(2.3f, -3.6f), At(2.3f, 3.6f), 0.6f, Gold);
+                    return true;
+                }
+                case "spear":
+                {
+                    // A long haft and a leaf of a head.
+                    Thick(-6, 11, 0.55f, WoodDark);
+                    fine(-6, 0.3f, 11, 0.3f, Wood);
+                    var tip = At(14.6f);
+                    Bar(At(11, -1.2f), tip, 0.55f, gear.Main);
+                    Bar(At(11, 1.2f), tip, 0.55f, gear.Main);
+                    Thick(10.6f, 13.8f, 0.85f, gear.Main);
+                    fine(11, 0.4f, 14, 0.1f, gear.Light);
+                    Dot(image, tip.X, tip.Y, gear.Light);
+                    var collar = At(10.4f);
+                    Dot(image, collar.X, collar.Y, GoldDark);
+                    return true;
+                }
+                case "hammer":
+                {
+                    // A handle and a block of a head across its end.
+                    Thick(-3.5f, 8, 0.65f, WoodDark);
+                    fine(-3.5f, 0.3f, 8, 0.3f, Wood);
+                    Bar(At(9.2f, -3.2f), At(9.2f, 3.2f), 1.7f, gear.Main);
+                    var a = At(10.4f, -3.2f);
+                    var b = At(10.4f, 3.2f);
+                    Thin(image, a.X, a.Y, b.X, b.Y, gear.Light);
+                    var end = At(8.2f, 3.4f);
+                    Dot(image, end.X, end.Y, gear.Shade);
+                    end = At(8.2f, -3.4f);
+                    Dot(image, end.X, end.Y, gear.Shade);
+                    return true;
+                }
+                case "crossbow":
+                {
+                    // A stock along the shot, the prod across its front, the string drawn back to the latch.
+                    Thick(-3, 5.5f, 0.65f, WoodDark);
+                    fine(-3, 0.3f, 5.5f, 0.3f, Wood);
+                    var tipA = At(4.3f, -5.2f);
+                    var tipB = At(4.3f, 5.2f);
+                    var front = At(5.8f);
+                    Bar(tipA, front, 0.6f, gear.Main);
+                    Bar(front, tipB, 0.6f, gear.Main);
+                    var latch = At(1.4f);
+                    Thin(image, tipA.X, tipA.Y, latch.X, latch.Y, String);
+                    Thin(image, tipB.X, tipB.Y, latch.X, latch.Y, String);
+                    Dot(image, tipA.X, tipA.Y, gear.Light);
+                    Dot(image, tipB.X, tipB.Y, gear.Light);
+                    if (pose.Arrow > 0.5f)
+                    {
+                        var head = At(8);
+                        Thin(image, latch.X, latch.Y, head.X, head.Y, Wood);
+                        Dot(image, head.X, head.Y, gear.Light);
+                    }
+                    var grip = At(-1.5f, 1.2f);
+                    Dot(image, grip.X, grip.Y, GripRed);
+                    return true;
+                }
+                case "throwing":
+                {
+                    // A boomerang: two arms bent at the elbow, held by one of them.
+                    var elbow = At(5.5f, 0.6f);
+                    Bar(At(-0.5f), elbow, 0.8f, gear.Main);
+                    Bar(elbow, At(3.6f, 5.6f), 0.8f, gear.Main);
+                    fine(-0.5f, -0.5f, 5.3f, 0, gear.Light);
+                    var end = At(3.6f, 5.6f);
+                    Dot(image, end.X, end.Y, gear.Shade);
+                    var grip = At(0.2f);
+                    Dot(image, grip.X, grip.Y, GripRed);
+                    return true;
+                }
+                case "wand":
+                {
+                    // A short rod and a small stone in a metal cup.
+                    Thick(-1.5f, 6, 0.5f, WoodDark);
+                    fine(-1.5f, 0.25f, 6, 0.25f, Wood);
+                    var cup = At(6.2f);
+                    Dot(image, cup.X, cup.Y, gear.Main);
+                    Stone(At(7.4f), 1.1f, 0.6f);
+                    return true;
+                }
+                case "orb":
+                {
+                    // A short grip and a big stone sphere in its metal ring, floating a little off it.
+                    Thick(-1, 2.6f, 0.55f, WoodDark);
+                    var ring = At(3.2f);
+                    Bar(At(3.2f, -1.4f), At(3.2f, 1.4f), 0.5f, gear.Main);
+                    Dot(image, ring.X, ring.Y, gear.Shade);
+                    Stone(At(5.8f), 2.3f, 1.8f);
+                    return true;
+                }
+                default:
+                    return false;
             }
         }
 
