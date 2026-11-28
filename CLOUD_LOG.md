@@ -12,6 +12,14 @@
 - **로컬 확인**: 로컬 세션이 읽고 체크한다
 
 
+## 2026-11-29 02:30 R4a 남은 화면·웹 점검 구역
+
+- **바뀐 것**: 사용량이 기준 아래라 앞 항목에서 멈춘 것을 마저 했다. 호령 표적 발밑 과녁(`ForceArt.Target`), 수정 빛 고리(`ForceArt.Chime`), 일제 사격 화살비 소리(`ArrowRain`) 연결(`WorldView.Order.cs`), 막간 남은 초 띠(보스 막대 밑 "막간 · 알을 모두 깨라 · 12초", `GameRoot.DrawInterlude`), Playtest 상태 값 더함, 웹 점검 새 구역 `sweep.js --only order`, PlayMode 장면 `TheQueenLightsHerCrystalsAndMorgHoldsHisInterlude`(사진 `queen-resonance`·`queen-eggs`·`general-legion`). 문서 `Docs/Bosses.md`·`Docs/Commands.md`
+- **확인**: Unity·WebGL 컴파일 오류 0. 웹 점검은 배포 뒤 다음 항목에
+- **요청 대조**: 막간 남은 초 띠 ○ · 표적·빛 고리·화살비 소리 연결 ○ · sweep 구역 ○ · PlayMode 장면 ○ · 빛의 실·군기 둘레 부하 강화·여왕 매달린 자세 —(부모가 빼도 된다고 함) · 모르그 40% 놓침 봇 1(0) —(그대로 두고 사람에게 물음)
+- **로컬에서 할 일**: 명령 한 줄(PlayMode 장면 사진 셋)
+- **로컬 확인**: [ ]
+
 ## 2026-11-29 02:10 보스 재설계 R4a: 수정 거미 여왕·모르그(순서·막간)
 
 - **바뀐 것**: `Docs/BossRedesign.md` R4의 앞 절반. 공용 틀 T8 순서(새 모양 `order` 수정이 하나씩 빛난 뒤 같은 순서로 터짐, `bands` 띠가 하나씩 떨어짐)와 막간(`bosses.csv` 새 열 `interlude`: `eggs`·`legion`, `BossState.Interlude`), 새 모양 `beam`(수정에서 꺾이는 광선)·`mark`(따라다니다 멈추는 표적), 대상 `banner`, 물체 수정·알·군기(`pool` `crystal`·`banner`, 부술 수 있음, 군기를 부수면 1.5초 비틀거림), `wave`의 `angle`. 여왕(수정 꽂기·공명 순서·꺾이는 왕관의 빛·「왕관의 별자리」·덮치기가 수정에 박힘·알 막간, 뺌 다섯)과 모르그(군기 꽂기·불길 호령이 군기 둘레·환영 창진 벽·호령 표적·「불화살 일제 사격」·군단 막간). 코드 `World.BossOrder.cs`, 화면 `WorldView.Order.cs`(수정 빛·종소리·막간 글, 바닥 표시는 같이 채워 순서를 숨김), Fable 그림 연결(수정·알·군기·창병 대열), Playtest 명령 `boss <id> interlude`와 상태, 봇(`BossSim`: 알·군기 먼저, 띠, 먼저 오는 벽만, 쓰러진 페이즈 적기). 통신 판 0.124.0. 문서 `Docs/Bosses.md` "순서·막간", `Docs/BossRedesign.md` 8 진행 줄, `Docs/Commands.md`

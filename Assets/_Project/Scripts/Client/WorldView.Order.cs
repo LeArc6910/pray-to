@@ -48,6 +48,85 @@ namespace Game.Client
             CrystalsLitSeen = Mathf.Max(lit, _orderLights.Count == 0 ? 0 : CrystalsLitSeen);
         }
 
+        // ---- What the order, the marks and the bands put on the floor (Fable's pictures, ForceArt.R4a.cs) ----
+
+        // For the playtests: targets drawn under marked players, chime rings now, and volleys heard.
+        public int TargetsShown { get; private set; }
+        public int RingsShown { get; private set; }
+        public int VolleysHeard { get; private set; }
+
+        readonly Dictionary<int, SpriteRenderer> _targets = new Dictionary<int, SpriteRenderer>();
+        readonly Dictionary<int, (SpriteRenderer Ring, float Born)> _rings = new Dictionary<int, (SpriteRenderer, float)>();
+        readonly HashSet<int> _volleys = new HashSet<int>();
+        readonly HashSet<int> _marksSeen = new HashSet<int>();
+        float _volleyAt = -10;
+
+        // A marked player's target turns at their feet; a crystal's light rings out; a volley of bands rains down.
+        void DrawOrderFx()
+        {
+            _marksSeen.Clear();
+            foreach (var view in _client.Hazards())
+            {
+                var hazard = view.State;
+                var attack = AttackOf(hazard)?.ForPhase(_bossPhaseInView);
+                if (attack == null) continue;
+                var at = new Vector3(hazard.Position.X, hazard.Position.Y, 0);
+                if (attack.Shape == AttackShape.Mark)
+                {
+                    _marksSeen.Add(hazard.Id);
+                    if (!_targets.TryGetValue(hazard.Id, out var target))
+                    {
+                        target = Renderer(_root.transform, "Target", null, Color.white);
+                        target.sortingOrder = DarkOrder + 14;
+                        _targets[hazard.Id] = target;
+                    }
+                    int frame = Mathf.FloorToInt(Time.time * 8) % ForceArt.Frames;
+                    target.sprite = Sprites.Centered($"fx/target/{frame}", () => ForceArt.Target(frame));
+                    target.transform.localPosition = at;
+                    target.transform.localScale = Vector3.one * (hazard.Size * 2 * Sprites.PixelsPerUnit / ForceArt.TargetSize);
+                }
+                else if (attack.Shape == AttackShape.Bands && _volleys.Add(hazard.Id) && Time.time - _volleyAt > 2)
+                {
+                    // Once for the volley, as its bands are laid.
+                    _volleyAt = Time.time;
+                    VolleysHeard++;
+                    Hear(Sound.ArrowRain, at, 0.9f);
+                }
+            }
+            foreach (int id in _targets.Keys.Where(id => !_marksSeen.Contains(id)).ToList())
+            {
+                Object.Destroy(_targets[id].gameObject);
+                _targets.Remove(id);
+            }
+            TargetsShown = _targets.Count;
+            if (_volleys.Count > 64) _volleys.Clear();
+            // Each light rings once, spreading and fading over its four frames.
+            foreach (var (spot, since) in _orderLights)
+            {
+                int key = Mathf.RoundToInt(spot.X * 100) * 7919 + Mathf.RoundToInt(spot.Y * 100);
+                if (since < 0 || since > LightSeconds || _rings.ContainsKey(key)) continue;
+                var ring = Renderer(_root.transform, "Chime", null, new Color(0.75f, 0.95f, 1f));
+                ring.sortingOrder = DarkOrder + 15;
+                ring.transform.localPosition = new Vector3(spot.X, spot.Y + 0.6f, 0);
+                _rings[key] = (ring, Time.time);
+            }
+            foreach (var key in _rings.Keys.ToList())
+            {
+                var (ring, born) = _rings[key];
+                float age = Time.time - born;
+                if (age > LightSeconds * 1.5f)
+                {
+                    Object.Destroy(ring.gameObject);
+                    _rings.Remove(key);
+                    continue;
+                }
+                int frame = Mathf.Min(ForceArt.Frames - 1, Mathf.FloorToInt(age / LightSeconds * ForceArt.Frames));
+                ring.sprite = Sprites.Centered($"fx/chime/{frame}", () => ForceArt.Chime(frame));
+                ring.transform.localScale = Vector3.one * 1.6f;
+            }
+            RingsShown = _rings.Count;
+        }
+
         // How long a crystal stays lit after its turn.
         const float LightSeconds = 0.45f;
 

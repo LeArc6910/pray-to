@@ -168,6 +168,7 @@ namespace Game.Client
             var bosses = _client.Others().Where(e => e.Kind == EntityKind.Boss && !e.IsDead).ToList();
             DrawEdge(bosses);
             ReadLights();
+            DrawOrderFx();
             DrawProps();
             DrawRage(bosses);
         }

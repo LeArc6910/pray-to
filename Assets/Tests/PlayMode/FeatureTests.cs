@@ -869,6 +869,41 @@ namespace Game.Client.Tests
             Assert.IsTrue(_root.Playing);
         }
 
+        // R4a (Docs/Bosses.md 순서·막간, 2026-11-28): the crystal queen's crystals lighting one by one while their marks
+        // fill together, her egg interlude named under the boss bar; Morg's legion interlude behind his banner.
+        [UnityTest, Category(Screens.Category)]
+        public IEnumerator TheQueenLightsHerCrystalsAndMorgHoldsHisInterlude()
+        {
+            yield return Start();
+            Toughen();
+            var queen = World.Bosses.FirstOrDefault(b => b.Definition.Id == "crystal_queen");
+            Assert.IsNotNull(queen, "No crystal queen.");
+            Player.Position = queen.Home + new Vec2(0, -4);
+            Player.Corrections++;
+            yield return new WaitForSecondsRealtime(7f);
+            Assert.IsTrue(World.ForceAttack(queen, "resonance"), "The resonance can be forced once she fights.");
+            yield return new WaitForSecondsRealtime(0.5f);
+            Assert.Greater(World.Props.Count(p => p.Kind == PropKind.Crystal), 1, "Crystals stand for the order.");
+            yield return Screens.Take("queen-resonance");
+            yield return new WaitForSecondsRealtime(3f);
+            Assert.IsTrue(World.ForceInterlude(queen));
+            yield return new WaitForSecondsRealtime(1f);
+            Assert.AreEqual(5, World.Props.Count(p => p.Kind == PropKind.Egg));
+            Assert.IsNotNull(GameRoot.InterludeShown, "The interlude is named under the boss bar.");
+            yield return Screens.Take("queen-eggs");
+
+            var morg = World.Bosses.FirstOrDefault(b => b.Definition.Id == "mad_general");
+            Assert.IsNotNull(morg, "No Morg.");
+            Player.Position = morg.Home + new Vec2(0, -4);
+            Player.Corrections++;
+            yield return new WaitForSecondsRealtime(7f);
+            Assert.IsTrue(World.ForceInterlude(morg));
+            yield return new WaitForSecondsRealtime(2.2f);
+            Assert.AreEqual(1, World.Props.Count(p => p.Kind == PropKind.Banner && p.Owner == morg.Id));
+            yield return Screens.Take("general-legion");
+            Assert.IsTrue(_root.Playing);
+        }
+
         // The lava titan (Docs/Bosses.md 용암 거인, 2026-11-28): under the lava of its caldera with only bubbles
         // showing, heaving itself out, then mid wind-up of its slam (both fists overhead) and of its fire rain (risen
         // white hot, the warning sign).

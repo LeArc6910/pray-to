@@ -1182,8 +1182,8 @@ M3에서 만든 보스전 규칙과 시트 작성법이다. 코드는 `Assets/_P
 
 - **봇으로 잡을 수 있는지**(알맞음: 철 여섯 벌, 보스 레벨 + 2(여왕 14, 모르그 17), 전사 + 화염 마법사, 반응 0.5초, `--build`, 600초, 시드 1~5, 잡은 판(쓰러짐 없이), 전 → 뒤): 여왕 늘 구름 5(4) → 5(5)(받은 피해 228~513 → 0~132), 40% 놓침 5(3) → 5(4). 모르그 늘 구름 4(4) → 5(4), 40% 놓침 4(1) → 1(0)(2·3페이즈와 막간에 고루 쓰러짐, 첫 시안 벽 셋·넷 90° 엇갈림은 늘 구름도 2(1)이라 줄였다). 봇(`BossSim`)은 알·군기를 먼저 부수고, 띠는 다음 띠 안이면 방금 떨어진 띠로(첫 띠면 다음 띠로), 벽은 먼저 오는 하나만 본다. 쓰러진 페이즈를 적는다(`쓰러진 페이즈:`)
 - `--hits` 어긋남 0(공명 순서 느린 360, 호령 표적 느린 360, 환영 창진 연속 돌진 180, 별자리·일제 사격 필살기)
-- 화면: 수정·알·군기 그림(Fable, 아래 "R4a 그림"), 수정·군기는 솟고, 알은 맞으면 금, 사라지면 깨짐·쓰러짐 소리. 모르그의 벽은 창병 대열(`ForceArt.Phalanx`). Playtest 명령 `boss <id> interlude`, 상태 `crystals`·`eggs`·`banners`·`…Shown`·`crystalsLit`·`chimes`·`orderMarks`·`interlude`
-- **안 한 것**: 빛의 실(수정 격자를 바꿈, 수정 사이 실), 군기 둘레 부하 강화, 막간 남은 초 띠(보스 막대 밑), 표적 그림(`ForceArt.Target`)·빛 고리(`ForceArt.Chime`)·화살비 소리 연결, 여왕 매달린 자세, 웹 점검 구역(`sweep.js`)과 PlayMode 장면 — 7일 사용량 경고가 떠서 멈췄다(2026-11-28)
+- 화면: 수정·알·군기 그림(Fable, 아래 "R4a 그림"), 수정·군기는 솟고, 알은 맞으면 금, 사라지면 깨짐·쓰러짐 소리. 수정이 빛날 때 빛 고리(`ForceArt.Chime`)와 종소리, 표적이 된 사람 발밑에 과녁(`ForceArt.Target`), 일제 사격에 화살비 소리. 모르그의 벽은 창병 대열(`ForceArt.Phalanx`). 막간은 보스 막대 밑에 "막간 · 알을 모두 깨라 · 12초"처럼 남은 초와 줄어드는 줄. Playtest 명령 `boss <id> interlude`, 상태 `crystals`·`eggs`·`banners`·`…Shown`·`crystalsLit`·`chimes`·`orderMarks`·`bands`·`interlude`·`interludeShown`·`targetsShown`·`ringsShown`·`volleysHeard`. 웹 점검 구역 `sweep.js --only order`, PlayMode 장면 `TheQueenLightsHerCrystalsAndMorgHoldsHisInterlude`
+- **안 한 것**: 빛의 실(수정 격자를 바꿈, 수정 사이 실), 군기 둘레 부하 강화, 여왕 매달린 자세(부모 세션이 빼도 된다고 함)
 
 ### R4a 그림
 

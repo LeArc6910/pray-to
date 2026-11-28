@@ -3043,6 +3043,11 @@ namespace Game.Client
                 json.Field("chimes", root.ChimesHeard);
                 json.Field("orderMarks", world.Hazards.Count(h => h.Order > 0));
                 json.Field("interlude", fighting != null && fighting.State == BossState.Interlude);
+                json.Field("interludeShown", GameRoot.InterludeShown ?? "");
+                json.Field("targetsShown", root.TargetsShown);
+                json.Field("ringsShown", root.RingsShown);
+                json.Field("volleysHeard", root.VolleysHeard);
+                json.Field("bands", world.Hazards.Count(h => h.Order > 0 && h.Shape == HazardShape.Line));
                 json.Field("bossChasing", fighting != null && fighting.State == BossState.Telegraph && fighting.Attack != null && fighting.Attack.Chases);
                 json.Field("wading", player.Afflictions.Wading);
                 json.Field("snared", player.Afflictions.Snared);

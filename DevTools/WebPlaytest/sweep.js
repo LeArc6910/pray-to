@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu title testground hunt harvest zones towns time basics first firstphone hour bag combat hero roll weapons arts bosses patterns tempo ground props forces veineater samurai knight warden antlion serpent titan voidlord wraith queen general spider arenas world farm life npc factory defense gear skills skillfx layers monsterfx hazards bossfx hits shots blast mobwarn map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
+// Sections: menu title testground hunt harvest zones towns time basics first firstphone hour bag combat hero roll weapons arts bosses patterns tempo ground props forces order veineater samurai knight warden antlion serpent titan voidlord wraith queen general spider arenas world farm life npc factory defense gear skills skillfx layers monsterfx hazards bossfx hits shots blast mobwarn map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -1935,6 +1935,111 @@ async function forces(browser) {
       s = await game.state();
       check(s.threads >= 1 && s.threadsShown >= 1, `실 잇기: 실이 보스와 이어진다 (실 ${s.threads}, 그림 ${s.threadsShown})`);
       await game.shot('forces-thread', '실 잇기: 6칸보다 멀어지면 끌려간다, 세 대 베면 끊긴다');
+    }
+    await game.context.close();
+  }
+}
+
+// ---------------------------------------------------------------- 순서·막간 (R4a, 2026-11-28, Docs/Bosses.md)
+// The crystal queen's crystals lighting one by one (the marks fill together; the order is only in the lights), the
+// crystal she plants, her crown's light, the egg interlude (named with its seconds under the boss bar) and her
+// constellation; Morg's banner, his marked volley (a target at the player's feet), his phantom ranks, the legion
+// interlude and his volley of bands. Pictures are taken while each is still coming.
+async function order(browser) {
+  for (const profile of [Profiles.pc, Profiles.phone]) {
+    const pc = profile === Profiles.pc;
+    note(`\n## 순서·막간 (${pc ? 'PC' : '휴대폰'})\n`);
+    const game = await open(browser, run, profile, url);
+    await game.startSolo();
+    await game.wait(1200);
+    await game.send('xp 2000000; equip void_sword void_helmet void_armor void_boots; heal');
+    await game.send('heal; goto boss crystal_queen');
+    await game.until(t => has(t.banner, '수정 거미 여왕') || has(t.entrance, '수정 거미 여왕'), 8000, game.texts);
+    await game.wait(4500);
+    let s;
+    await game.send('heal; clear; boss crystal_queen use resonance');
+    s = (await game.until(t => t.crystalsLit >= 1, 1500)) || await game.state();
+    check(s.crystals >= 2 && s.crystalsShown >= 2 && s.orderMarks >= 2 && s.crystalsLit >= 1,
+      `공명 순서: 수정이 하나씩 빛난다 (수정 ${s.crystals}, 그림 ${s.crystalsShown}, 표시 ${s.orderMarks}, 빛 ${s.crystalsLit})`);
+    await game.shot(pc ? 'order-chime' : 'order-chime-phone', '공명 순서: 빛나는 수정(바닥 표시는 같이 찬다)');
+    await game.wait(2500);
+    if (pc) {
+      s = await game.state();
+      check(s.chimes >= 2, `수정마다 종소리 (${s.chimes})`);
+      await game.send('heal; clear; boss crystal_queen hurt 0.36');
+      await game.until(t => t.bossPhase === 2, 4000);
+      await game.wait(2500);
+      await game.send('heal; clear; boss crystal_queen use web_quake');
+      await game.wait(1800);
+      s = await game.state();
+      check(s.crystals >= 1, `수정 꽂기: 수정이 선다 (${s.crystals})`);
+      await game.send('heal; boss crystal_queen use venom_share');
+      await game.wait(450);
+      await game.shot('order-beam', '왕관의 빛: 수정에 닿으면 꺾인다');
+      await game.wait(1500);
+    }
+    await game.send(pc ? 'heal; clear; boss crystal_queen hurt 0.33' : 'heal; clear; boss crystal_queen hurt 0.69');
+    await game.until(t => t.bossPhase === 3, 4000);
+    s = (await game.until(t => t.interlude && t.eggsShown >= 5, 4000)) || await game.state();
+    check(s.interlude && s.eggs === 5 && s.eggsShown === 5 && has(s.interludeShown, '알'),
+      `알 막간: 알 다섯, 보스 막대 밑 안내 (막간 ${s.interlude}, 알 ${s.eggs}, 그림 ${s.eggsShown}, "${s.interludeShown}")`);
+    await game.shot(pc ? 'order-eggs' : 'order-eggs-phone', '알 막간: 12초 안에 알 다섯을 깬다');
+    if (pc) {
+      s = (await game.until(t => !t.interlude, 14000)) || await game.state();
+      check(!s.interlude, `막간이 끝난다 (${s.interlude})`);
+      await game.wait(1500);
+      await game.send('heal; clear; boss crystal_queen use shard_hail');
+      await game.wait(1200);
+      s = await game.state();
+      check(s.warningSign && s.crystalsLit >= 1, `「왕관의 별자리」: 경고 표지와 빛 (표지 ${s.warningSign}, 빛 ${s.crystalsLit})`);
+      await game.shot('order-constellation', '필살 「왕관의 별자리」: 수정이 차례로 빛난다');
+      await game.wait(4000);
+    }
+
+    await game.send('heal; clear; goto boss mad_general');
+    await game.until(t => has(t.banner, '모르그') || has(t.entrance, '모르그'), 8000, game.texts);
+    await game.wait(4500);
+    await game.send('heal; clear; boss mad_general hurt 0.36');
+    await game.until(t => t.bossPhase === 2, 4000);
+    await game.wait(2500);
+    if (pc) {
+      await game.send('heal; clear; boss mad_general use flame_ring');
+      await game.wait(1700);
+      s = await game.state();
+      check(s.banners >= 1 && s.bannersShown >= 1, `군기 꽂기: 군기가 선다 (${s.banners}, 그림 ${s.bannersShown})`);
+      await game.shot('order-banner', '군기 꽂기: 부수면 모르그가 비틀거린다');
+      await game.send('heal; clear; boss mad_general use marked_volley');
+      await game.wait(400);
+      s = await game.state();
+      check(s.targetsShown >= 1, `호령 표적: 발밑 과녁 (${s.targetsShown})`);
+      await game.shot('order-mark', '호령 표적: 따라오다 멈춘다, 걸어 나간다');
+      await game.wait(1500);
+    }
+    await game.send('heal; clear; boss mad_general use dark_cross');
+    await game.wait(450);
+    s = await game.state();
+    check(s.waves >= 1 && s.wavesShown >= 1, `환영 창진: 창병 대열과 틈 (벽 ${s.waves}, 그림 ${s.wavesShown})`);
+    await game.shot(pc ? 'order-ranks' : 'order-ranks-phone', '환영 창진: 시작할 자리와 초록 틈');
+    if (pc) {
+      await game.wait(1300);
+      await game.shot('order-ranks-run', '환영 창진: 창병이 아레나를 가로지른다');
+    }
+    await game.wait(3000);
+    await game.send('heal; clear; boss mad_general hurt 0.33');
+    await game.until(t => t.bossPhase === 3, 4000);
+    s = (await game.until(t => t.interlude && t.waves >= 1, 5000)) || await game.state();
+    check(s.interlude && s.banners >= 1 && has(s.interludeShown, '군기'),
+      `군단 막간: 군기와 돌격, 안내 (막간 ${s.interlude}, 군기 ${s.banners}, 벽 ${s.waves}, "${s.interludeShown}")`);
+    await game.shot(pc ? 'order-legion' : 'order-legion-phone', '군단 막간: 군기를 부수면 끝난다');
+    if (pc) {
+      s = (await game.until(t => !t.interlude, 17000)) || await game.state();
+      check(!s.interlude, `막간이 끝난다 (${s.interlude})`);
+      await game.wait(1500);
+      await game.send('heal; clear; boss mad_general use meteors');
+      await game.wait(600);
+      s = await game.state();
+      check(s.warningSign && s.bands >= 5 && s.volleysHeard >= 1, `「불화살 일제 사격」: 띠 다섯과 화살비 소리 (표지 ${s.warningSign}, 띠 ${s.bands}, 소리 ${s.volleysHeard})`);
+      await game.shot('order-volley', '필살 「불화살 일제 사격」: 방금 떨어진 띠로 들어간다');
     }
     await game.context.close();
   }
@@ -9692,7 +9797,7 @@ async function towns(browser) {
   }
 }
 
-const Sections = { menu, title, testground, hunt, harvest, zones, towns, time, basics, first, firstphone, hour, bag, combat, hero, roll, weapons, arts, bosses, patterns, tempo, ground, props, forces, veineater, samurai, knight, warden, antlion, serpent, titan, voidlord, wraith, queen, general, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, layers, monsterfx, hazards, bossfx, hits, shots, blast, mobwarn, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
+const Sections = { menu, title, testground, hunt, harvest, zones, towns, time, basics, first, firstphone, hour, bag, combat, hero, roll, weapons, arts, bosses, patterns, tempo, ground, props, forces, order, veineater, samurai, knight, warden, antlion, serpent, titan, voidlord, wraith, queen, general, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, layers, monsterfx, hazards, bossfx, hits, shots, blast, mobwarn, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

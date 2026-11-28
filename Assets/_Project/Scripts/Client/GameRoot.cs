@@ -116,6 +116,9 @@ namespace Game.Client
         // R3: threads, walls of water and drags drawn now.
         internal int ThreadsShown => _view?.ThreadsShown ?? 0;
         internal int CrystalsLit => _view?.CrystalsLit ?? 0;
+        internal int TargetsShown => _view?.TargetsShown ?? 0;
+        internal int RingsShown => _view?.RingsShown ?? 0;
+        internal int VolleysHeard => _view?.VolleysHeard ?? 0;
         internal int ChimesHeard => _view?.ChimesHeard ?? 0;
         internal int WavesShown => _view?.WavesShown ?? 0;
         internal int DragsShown => _view?.DragsShown ?? 0;
@@ -3019,6 +3022,48 @@ namespace Game.Client
             UiSkin.Bar(new Rect(x, top + titleHeight, width, 18), share, "", boss: true);
             if (Event.current.type == EventType.Repaint) BossBarShown = new Rect(x, top, width, titleHeight + 18);
             DrawFinisherName(boss, new Rect(x, top + titleHeight + 18 + 4, width, 0));
+            DrawInterlude(boss, new Rect(x, top + titleHeight + 18 + 4, width, 0));
+        }
+
+        // The interlude named under the boss bar with what to do and the seconds it has left (R4a), and for the
+        // playtests what was drawn.
+        internal static string InterludeShown { get; private set; }
+        static float _interludeSince = -1;
+        static GUIStyle _interlude;
+
+        static void DrawInterlude(EntityView boss, Rect under)
+        {
+            var interlude = boss.Boss.Interlude;
+            bool on = interlude != null && boss.BossState == BossState.Interlude;
+            if (!on)
+            {
+                _interludeSince = -1;
+                if (Event.current.type == EventType.Repaint) InterludeShown = null;
+                return;
+            }
+            if (_interludeSince < 0) _interludeSince = Time.time;
+            int left = Mathf.Max(0, Mathf.CeilToInt(interlude.Seconds - (Time.time - _interludeSince)));
+            string task = interlude.Kind == InterludeKind.Eggs ? "알을 모두 깨라" : "군기를 부숴라";
+            var words = new GUIContent($"막간 · {task} · {left}초");
+            if (Event.current.type == EventType.Repaint) InterludeShown = words.text;
+            _interlude ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, wordWrap = true };
+            Ui.Text(_interlude, 14, bold: true);
+            float width = Mathf.Min(under.width, _interlude.CalcSize(words).x + 36);
+            float height = Mathf.Max(24, _interlude.CalcHeight(words, width));
+            var band = new Rect(under.x + (under.width - width) / 2, under.y, width, height);
+            var previous = GUI.color;
+            if (Event.current.type == EventType.Repaint)
+            {
+                GUI.color = new Color(0.08f, 0.05f, 0.12f, 0.78f * previous.a);
+                GUI.DrawTexture(band, Texture2D.whiteTexture);
+                GUI.color = new Color(0.75f, 0.6f, 1f, previous.a);
+                GUI.DrawTexture(new Rect(band.x, band.yMax - 2, band.width * Mathf.Clamp01(left / Mathf.Max(1, interlude.Seconds)), 2), Texture2D.whiteTexture);
+            }
+            GUI.color = new Color(0, 0, 0, 0.9f * previous.a);
+            GUI.Label(new Rect(band.x + 1, band.y + 1, band.width, band.height), words, _interlude);
+            GUI.color = new Color(0.95f, 0.88f, 1f, previous.a);
+            GUI.Label(band, words, _interlude);
+            GUI.color = previous;
         }
 
         // Where a finisher's name was drawn in the last repaint (zero when none), and the name, for the playtests.
