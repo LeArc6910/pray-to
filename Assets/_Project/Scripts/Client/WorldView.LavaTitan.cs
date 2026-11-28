@@ -93,16 +93,16 @@ namespace Game.Client
             }
             else if (body.BossState == BossState.Telegraph && attack != null)
             {
-                float progress = Mathf.Clamp01(since / Mathf.Max(0.1f, attack.Telegraph));
+                float progress = Mathf.Clamp01(since / TelegraphOf(body, attack));
                 var blow = LavaTitanBlowOf(attack);
                 var windUp = LavaTitanArt.WindUpOf(blow);
                 int strike = LavaTitanArt.StrikeFrame(blow);
                 float swing = strike * LavaTitanArt.FrameSeconds(blow, 0);
-                float wound = 1 - Mathf.Min(0.5f, swing / Mathf.Max(0.1f, attack.Telegraph));
+                float wound = 1 - Mathf.Min(0.5f, swing / TelegraphOf(body, attack));
                 if (progress < wound) (pose, frame) = (windUp, Through(windUp, progress / wound));
                 else
                 {
-                    int f = LavaTitanBlowFrame(blow, (progress - wound) * attack.Telegraph);
+                    int f = LavaTitanBlowFrame(blow, (progress - wound) * TelegraphOf(body, attack));
                     (pose, frame) = (blow, f < 0 ? strike - 1 : Mathf.Min(strike - 1, f));
                 }
             }
@@ -163,7 +163,7 @@ namespace Game.Client
             if (puff && Random.value < (view.Phase >= 3 ? 0.6f : 0.25f))
                 Chips(feet + new Vector3(Random.Range(-0.7f, 0.7f), 1.9f, 0), Vector3.up, FxRamp.Fire, 1, 10, 30);
             if (view.BossState != BossState.Telegraph || attack == null || attack.Shape == AttackShape.Summon) return;
-            float progress = Mathf.Clamp01(since / Mathf.Max(0.1f, attack.Telegraph));
+            float progress = Mathf.Clamp01(since / TelegraphOf(body, attack));
             switch (LavaTitanArt.WindUpOf(LavaTitanBlowOf(attack)))
             {
                 case LavaTitanPose.Heave:

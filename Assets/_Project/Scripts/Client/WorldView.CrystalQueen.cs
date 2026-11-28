@@ -84,7 +84,7 @@ namespace Game.Client
             }
             else if (body.BossState == BossState.Telegraph && attack != null)
             {
-                float progress = Mathf.Clamp01(since / Mathf.Max(0.1f, attack.Telegraph));
+                float progress = Mathf.Clamp01(since / TelegraphOf(body, attack));
                 if (attack.Shape == AttackShape.Charge)
                 {
                     (pose, frame) = (CrystalQueenPose.Crouch, Through(CrystalQueenPose.Crouch, progress));
@@ -96,11 +96,11 @@ namespace Game.Client
                     float strikeAt = QueenStrikeAt(attack);
                     int strike = CrystalQueenArt.StrikeFrame(blow);
                     float swing = strike * CrystalQueenArt.FrameSeconds(blow, 0);
-                    float wound = strikeAt - Mathf.Min(0.5f * strikeAt, swing / Mathf.Max(0.1f, attack.Telegraph));
+                    float wound = strikeAt - Mathf.Min(0.5f * strikeAt, swing / TelegraphOf(body, attack));
                     if (progress < wound) (pose, frame) = (windUp, Through(windUp, progress / wound));
                     else
                     {
-                        int f = QueenBlowFrame(blow, (progress - wound) * attack.Telegraph);
+                        int f = QueenBlowFrame(blow, (progress - wound) * TelegraphOf(body, attack));
                         if (strikeAt >= 1) (pose, frame) = (blow, f < 0 ? strike - 1 : Mathf.Min(strike - 1, f));
                         else if (f >= 0) (pose, frame) = (blow, f);
                     }
@@ -190,7 +190,7 @@ namespace Game.Client
             var ahead = new Vector3(view.Facing.X, view.Facing.Y, 0);
             if (view.BossState == BossState.Telegraph && attack != null)
             {
-                float progress = Mathf.Clamp01(since / Mathf.Max(0.1f, attack.Telegraph));
+                float progress = Mathf.Clamp01(since / TelegraphOf(body, attack));
                 var windUp = attack.Shape == AttackShape.Charge ? CrystalQueenPose.Crouch : CrystalQueenArt.WindUpOf(QueenBlowOf(attack));
                 switch (windUp)
                 {

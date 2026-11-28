@@ -2956,6 +2956,15 @@ namespace Game.Client
                 // Projectiles drawn in their skill's own look (not the plain orb or arrow).
                 json.Field("skillShots", root.SkillShotsDrawn);
                 json.Field("warningSign", root.WarningShown);
+                // The boss in the fight: its phase, the attack it is on with that phase's telegraph and how many runs are
+                // left of it (2026-11-28, Docs/BossRedesign.md 4.2), and a finisher's name under the boss bar.
+                var fighting = world.Bosses.Where(b => !b.IsDead && b.State != BossState.Dormant).OrderBy(b => Vec2.Distance(b.Position, player.Position)).FirstOrDefault();
+                json.Field("bossPhase", fighting?.Phase ?? 0);
+                json.Field("bossState", fighting?.State.ToString() ?? "");
+                json.Field("bossAttack", fighting?.Attack?.Id ?? "");
+                json.Field("bossTelegraph", fighting?.Attack?.Telegraph ?? 0);
+                json.Field("finisher", GameRoot.FinisherName ?? "");
+                json.Field("finisherShown", GameRoot.FinisherShown.width > 0);
                 // What the silk mother's blows left on the floor: webs and pools of venom (in the world, and drawn), and
                 // whether the player is caught in a web (2026-11-13).
                 json.Field("pools", world.Hazards.Count(h => h.Lingers));

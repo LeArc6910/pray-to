@@ -73,7 +73,7 @@ namespace Game.Client
             }
             else if (body.BossState == BossState.Telegraph && attack != null)
             {
-                float progress = Mathf.Clamp01(since / Mathf.Max(0.1f, attack.Telegraph));
+                float progress = Mathf.Clamp01(since / TelegraphOf(body, attack));
                 switch (attack.Shape)
                 {
                     case AttackShape.Charge:
@@ -96,9 +96,9 @@ namespace Game.Client
                         var windUp = blow == KnightPose.Sweep ? KnightPose.Wind : KnightPose.Raise;
                         int strike = KnightArt.StrikeFrame(blow);
                         float swing = strike * KnightArt.FrameSeconds(blow, 0);
-                        float wound = 1 - Mathf.Min(0.5f, swing / Mathf.Max(0.1f, attack.Telegraph));
+                        float wound = 1 - Mathf.Min(0.5f, swing / TelegraphOf(body, attack));
                         if (progress < wound) (pose, frame) = (windUp, Through(windUp, progress / wound));
-                        else (pose, frame) = (blow, Mathf.Min(strike - 1, Mathf.FloorToInt((progress - wound) * attack.Telegraph / KnightArt.FrameSeconds(blow, 0))));
+                        else (pose, frame) = (blow, Mathf.Min(strike - 1, Mathf.FloorToInt((progress - wound) * TelegraphOf(body, attack) / KnightArt.FrameSeconds(blow, 0))));
                         break;
                     }
                 }
@@ -172,7 +172,7 @@ namespace Game.Client
             var feet = body.Position;
             if (view.BossState == BossState.Telegraph && attack != null)
             {
-                float progress = Mathf.Clamp01(since / Mathf.Max(0.1f, attack.Telegraph));
+                float progress = Mathf.Clamp01(since / TelegraphOf(body, attack));
                 if (puff && progress > 0.5f)
                 {
                     // Pebbles skipping on the floor round its feet.

@@ -55,7 +55,11 @@ namespace Game.Client
             if (body.BossState != view.BossState || body.BossAttack != view.BossAttack)
             {
                 // A charge that runs again winds up straight out of the last run (World.StartTelegraph, again).
-                if (view.BossState == BossState.Telegraph) body.BossAgain = body.BossState == BossState.Charge;
+                // So does a blow that comes again at once (boost repeat): a moment's rest, the same attack, its next wind-up.
+                if (view.BossState == BossState.Telegraph)
+                    body.BossAgain = body.BossState == BossState.Charge
+                        || body.BossState == BossState.Recover && body.BossAttack != null && view.BossAttack != null
+                           && body.BossAttack.Base == view.BossAttack.Base && view.BossAttack.Repeat > 0 && Time.time - body.BossSince < World.RepeatGap + 0.2f;
                 body.BossSince = Time.time;
             }
             body.BossState = view.BossState;
@@ -159,7 +163,7 @@ namespace Game.Client
             }
             else if (body.BossState == BossState.Telegraph && attack != null)
             {
-                float progress = Mathf.Clamp01(since / Mathf.Max(0.1f, attack.Telegraph));
+                float progress = Mathf.Clamp01(since / TelegraphOf(body, attack));
                 switch (attack.Shape)
                 {
                     case AttackShape.Cone:
@@ -173,9 +177,9 @@ namespace Game.Client
                         var blow = BlowOf(attack.Shape);
                         var windUp = attack.Shape == AttackShape.Cone ? VeinPose.Rear : attack.Shape == AttackShape.Burst ? VeinPose.Lift : VeinPose.Slam;
                         int strike = VeinEaterArt.StrikeFrame(blow);
-                        float wound = 1 - Mathf.Min(0.5f, strike * VeinEaterArt.FrameSeconds(blow, 0) / Mathf.Max(0.1f, attack.Telegraph));
+                        float wound = 1 - Mathf.Min(0.5f, strike * VeinEaterArt.FrameSeconds(blow, 0) / TelegraphOf(body, attack));
                         if (progress < wound) (pose, frame) = (windUp, Through(windUp, progress / wound));
-                        else (pose, frame) = (blow, Mathf.Min(strike - 1, Mathf.FloorToInt((progress - wound) * attack.Telegraph / VeinEaterArt.FrameSeconds(blow, 0))));
+                        else (pose, frame) = (blow, Mathf.Min(strike - 1, Mathf.FloorToInt((progress - wound) * TelegraphOf(body, attack) / VeinEaterArt.FrameSeconds(blow, 0))));
                         break;
                     }
                     case AttackShape.Charge:
@@ -295,7 +299,7 @@ namespace Game.Client
 
             if (view.BossState == BossState.Telegraph && attack != null)
             {
-                float progress = Mathf.Clamp01(since / Mathf.Max(0.1f, attack.Telegraph));
+                float progress = Mathf.Clamp01(since / TelegraphOf(body, attack));
                 switch (attack.Shape)
                 {
                     case AttackShape.Charge:
@@ -514,7 +518,7 @@ namespace Game.Client
         const float PullFrom = 0.6f;
 
         // How long this wind-up lasts: a charge that runs again (the triple draw) takes less (World.AgainTelegraph).
-        static float TelegraphOf(Body body, BossAttack attack) => Mathf.Max(0.1f, attack.Telegraph * (body.BossAgain ? World.AgainTelegraph : 1));
+        static float TelegraphOf(Body body, BossAttack attack) => Mathf.Max(0.1f, body.BossAgain ? attack.AgainSeconds : attack.Telegraph);
 
         // Cuts across (a cross, a crescent wave, the petals) come down from overhead; everything else is drawn from the
         // scabbard.
@@ -821,7 +825,7 @@ namespace Game.Client
             else body.Echoing = false;
             // The ultimate's wind-up dims the room.
             bool gathering = view.BossState == BossState.Telegraph && attack != null && attack.Warning == AttackWarning.Strong;
-            Dim(gathering ? 0.5f * Mathf.Clamp01(since / Mathf.Max(0.1f, attack.Telegraph)) : 0);
+            Dim(gathering ? 0.5f * Mathf.Clamp01(since / TelegraphOf(body, attack)) : 0);
             if (view.BossState == BossState.Charge)
             {
                 if (!body.Dashing)

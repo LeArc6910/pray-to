@@ -2998,6 +2998,47 @@ namespace Game.Client
             float share = boss.MaxHealth > 0 ? Mathf.Clamp01(boss.Health / boss.MaxHealth) : 0;
             UiSkin.Bar(new Rect(x, top + titleHeight, width, 18), share, "", boss: true);
             if (Event.current.type == EventType.Repaint) BossBarShown = new Rect(x, top, width, titleHeight + 18);
+            DrawFinisherName(boss, new Rect(x, top + titleHeight + 18 + 4, width, 0));
+        }
+
+        // Where a finisher's name was drawn in the last repaint (zero when none), and the name, for the playtests.
+        internal static Rect FinisherShown { get; private set; }
+        internal static string FinisherName { get; private set; }
+
+        static GUIStyle _finisher;
+
+        // A finisher (warn strong) is named while it winds up, under the boss bar, like a spell card (2026-11-28,
+        // Docs/BossRedesign.md 4.2): 「오의 천섬」 in gold on a dark band, beating with the warning sign.
+        static void DrawFinisherName(EntityView boss, Rect under)
+        {
+            bool on = boss.BossState == BossState.Telegraph && boss.BossAttack != null && boss.BossAttack.Warning == AttackWarning.Strong;
+            if (Event.current.type == EventType.Repaint)
+            {
+                FinisherShown = Rect.zero;
+                FinisherName = on ? boss.BossAttack.Name : null;
+            }
+            if (!on) return;
+            _finisher ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, wordWrap = true };
+            Ui.Text(_finisher, 15, bold: true);
+            var words = new GUIContent($"「{boss.BossAttack.Name}」");
+            float width = Mathf.Min(under.width, _finisher.CalcSize(words).x + 40);
+            float height = Mathf.Max(26, _finisher.CalcHeight(words, width));
+            var band = new Rect(under.x + (under.width - width) / 2, under.y, width, height);
+            float beat = Mathf.Abs(Mathf.Sin(Time.time * 9));
+            var previous = GUI.color;
+            if (Event.current.type == EventType.Repaint)
+            {
+                GUI.color = new Color(0.12f, 0.02f, 0.02f, 0.75f * previous.a);
+                GUI.DrawTexture(band, Texture2D.whiteTexture);
+                GUI.color = new Color(1f, 0.35f, 0.2f, (0.5f + 0.5f * beat) * previous.a);
+                GUI.DrawTexture(new Rect(band.x, band.yMax - 2, band.width, 2), Texture2D.whiteTexture);
+                FinisherShown = band;
+            }
+            GUI.color = new Color(0, 0, 0, 0.9f * previous.a);
+            GUI.Label(new Rect(band.x + 1, band.y + 1, band.width, band.height), words, _finisher);
+            GUI.color = new Color(1f, 0.82f + 0.12f * beat, 0.45f, previous.a);
+            GUI.Label(band, words, _finisher);
+            GUI.color = previous;
         }
     }
 }

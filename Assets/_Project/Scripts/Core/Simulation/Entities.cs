@@ -803,6 +803,10 @@ namespace Game.Core
         internal Vec2 LandAt { get; set; }
         // Charges still to come after this one (an attack with count runs that many in a row).
         internal int ChargesLeft { get; set; }
+        // A blow coming again straight after itself (boost repeat): how many more, and whether the next is due when this
+        // rest ends (World.UpdateBoss).
+        internal int RepeatsLeft { get; set; }
+        internal bool RepeatNext { get; set; }
         // Coming in for the first time in this world (the whole entrance) or again (the short one).
         public bool EntersAgain { get; internal set; }
         // Ticks into its rush-and-stop gait while it closes in (BossDefinition.Bursts).

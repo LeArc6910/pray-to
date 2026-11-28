@@ -93,16 +93,16 @@ namespace Game.Client
             }
             else if (body.BossState == BossState.Telegraph && attack != null)
             {
-                float progress = Mathf.Clamp01(since / Mathf.Max(0.1f, attack.Telegraph));
+                float progress = Mathf.Clamp01(since / TelegraphOf(body, attack));
                 var blow = SerpentBlowOf(attack);
                 var windUp = SerpentArt.WindUpOf(blow);
                 int strike = SerpentArt.StrikeFrame(blow);
                 float swing = strike * SerpentArt.FrameSeconds(blow, 0);
-                float wound = 1 - Mathf.Min(0.5f, swing / Mathf.Max(0.1f, attack.Telegraph));
+                float wound = 1 - Mathf.Min(0.5f, swing / TelegraphOf(body, attack));
                 if (progress < wound) (pose, frame) = (windUp, Through(windUp, progress / wound));
                 else
                 {
-                    int f = SerpentBlowFrame(blow, (progress - wound) * attack.Telegraph);
+                    int f = SerpentBlowFrame(blow, (progress - wound) * TelegraphOf(body, attack));
                     (pose, frame) = (blow, f < 0 ? strike - 1 : Mathf.Min(strike - 1, f));
                 }
             }
@@ -157,7 +157,7 @@ namespace Game.Client
             var ahead = new Vector3(view.Facing.X, view.Facing.Y, 0);
             var head = feet + new Vector3(0, 2.2f, 0);
             if (view.BossState != BossState.Telegraph || attack == null || attack.Shape == AttackShape.Summon) return;
-            float progress = Mathf.Clamp01(since / Mathf.Max(0.1f, attack.Telegraph));
+            float progress = Mathf.Clamp01(since / TelegraphOf(body, attack));
             switch (SerpentArt.WindUpOf(SerpentBlowOf(attack)))
             {
                 case SerpentPose.Coil:

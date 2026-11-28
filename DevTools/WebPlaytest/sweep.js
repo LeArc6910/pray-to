@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu title testground hunt harvest zones towns time basics first firstphone hour bag combat hero roll weapons arts bosses patterns veineater samurai knight warden antlion serpent titan voidlord wraith queen general spider arenas world farm life npc factory defense gear skills skillfx layers monsterfx hazards bossfx hits shots blast mobwarn map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
+// Sections: menu title testground hunt harvest zones towns time basics first firstphone hour bag combat hero roll weapons arts bosses patterns tempo veineater samurai knight warden antlion serpent titan voidlord wraith queen general spider arenas world farm life npc factory defense gear skills skillfx layers monsterfx hazards bossfx hits shots blast mobwarn map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -893,6 +893,53 @@ async function patterns(browser) {
     await game.wait(1200);
     await game.shot(`pattern-${attack}-land`, `${name}이 떨어진 자리`);
   }
+  await game.context.close();
+}
+
+// ---------------------------------------------------------------- 페이즈 템포와 강화 (2026-11-28, Docs/BossRedesign.md R1)
+// A later phase winds up quicker and its attacks come stronger (bosses.csv tempo, boss_attacks.csv boost); a finisher is
+// named under the boss bar while it winds up. The samurai: its iai in phase 1 and 3, the triple draw become five in
+// phase 3, and the last finisher's name.
+async function tempo(browser) {
+  note('\n## 페이즈 템포와 강화 (PC)\n');
+  const game = await open(browser, run, Profiles.pc, url);
+  await game.startSolo();
+  await game.wait(1200);
+  await game.send('equip void_sword void_helmet void_armor void_boots; heal');
+  await game.send('heal; goto boss shrine_samurai');
+  await game.until(t => has(t.banner, '시구레') || has(t.entrance, '시구레'), 8000, game.texts);
+  await game.wait(2500);
+  await game.send('heal; boss shrine_samurai use iai');
+  await game.wait(150);
+  let s = await game.state();
+  check(s.bossPhase === 1 && Math.abs(s.bossTelegraph - 0.9) < 0.01, `1페이즈 거합 베기의 예고는 시트 그대로 0.9초 (페이즈 ${s.bossPhase}, ${s.bossTelegraph})`);
+  await game.wait(2500);
+  await game.send('heal; boss shrine_samurai hurt 0.7');
+  await game.until(t => t.bossPhase === 3, 4000);
+  await game.wait(3000);
+  await game.send('heal; boss shrine_samurai use iai');
+  await game.wait(150);
+  s = await game.state();
+  check(s.bossPhase === 3 && Math.abs(s.bossTelegraph - 0.9 * 0.75) < 0.01, `3페이즈 거합 베기의 예고는 0.675초 (페이즈 ${s.bossPhase}, ${s.bossTelegraph})`);
+  await game.wait(2500);
+  // The five-fold draw: count how often the boss winds up again before it rests.
+  await game.send('heal; boss shrine_samurai use sanren');
+  let charges = 0, last = '';
+  const end = Date.now() + 6000;
+  while (Date.now() < end) {
+    const t = await game.state();
+    if (t.bossState === 'Charge' && last !== 'Charge') charges++;
+    last = t.bossState;
+    if (t.bossState === 'Recover' && charges > 0) break;
+    await game.wait(40);
+  }
+  check(charges === 5, `3페이즈 오연 발도: 돌진 다섯 번 (${charges})`);
+  await game.wait(2000);
+  await game.send('heal; boss shrine_samurai use ougi');
+  await game.wait(600);
+  s = await game.state();
+  check(s.finisher === '오의 천섬' && s.finisherShown, `필살기 이름 띠: 「오의 천섬」 (${s.finisher}, 보임 ${s.finisherShown})`);
+  await game.shot('tempo-finisher', '오의 천섬의 이름 띠(보스 막대 밑)');
   await game.context.close();
 }
 
@@ -9284,7 +9331,7 @@ async function towns(browser) {
   }
 }
 
-const Sections = { menu, title, testground, hunt, harvest, zones, towns, time, basics, first, firstphone, hour, bag, combat, hero, roll, weapons, arts, bosses, patterns, veineater, samurai, knight, warden, antlion, serpent, titan, voidlord, wraith, queen, general, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, layers, monsterfx, hazards, bossfx, hits, shots, blast, mobwarn, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
+const Sections = { menu, title, testground, hunt, harvest, zones, towns, time, basics, first, firstphone, hour, bag, combat, hero, roll, weapons, arts, bosses, patterns, tempo, veineater, samurai, knight, warden, antlion, serpent, titan, voidlord, wraith, queen, general, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, layers, monsterfx, hazards, bossfx, hits, shots, blast, mobwarn, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

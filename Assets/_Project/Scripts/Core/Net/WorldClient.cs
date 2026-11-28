@@ -59,7 +59,7 @@ namespace Game.Core
             int attack = kind == EntityKind.Monster && monster != null ? (phase & Protocol.PhaseMask) >> World.EnemyAttackShift : 0;
             MonsterAttack = attack >= 1 && attack <= monster.Attacks.Count ? monster.Attacks[attack - 1] : null;
             bool entering = kind == EntityKind.Boss && (BossState)(state & 0x0F) == BossState.Enter;
-            BossAttack = kind == EntityKind.Boss && boss != null && !entering ? AttackAt(boss, (phase & Protocol.PhaseMask) >> World.BossAttackShift) : null;
+            BossAttack = kind == EntityKind.Boss && boss != null && !entering ? AttackAt(boss, (phase & Protocol.PhaseMask) >> World.BossAttackShift)?.ForPhase(Phase) : null;
             EntersAgain = entering && (phase & Protocol.PhaseMask) >> World.BossAttackShift == World.EntranceAgain;
             Status = (byte)(phase >> 6);
             DropBase = dropBase;

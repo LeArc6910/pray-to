@@ -23,6 +23,14 @@ namespace Game.Client
             // --only spider: just that boss's motions (gif, frame strips, continuity report), for working on them; --only hero
             // the player's.
             // --only flat: every tile drawn flat on the object layer, and the rails as they join (out/flat/, FlatPreview).
+            // How plainly each boss's plain blow shows in its wind-up alone (out/anim/tells.txt, Docs/BossRedesign.md 9).
+            if (args.Length == 2 && args[0] == "--only" && args[1] == "tells")
+            {
+                string anim = Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out", "anim");
+                Directory.CreateDirectory(anim);
+                TellsCheck.Write(anim);
+                return 0;
+            }
             if (args.Length == 2 && args[0] == "--only" && args[1] == "lint")
             {
                 // --only lint: just the pixel slips' counts and out/lint.md (ArtLint), without drawing the sheets.

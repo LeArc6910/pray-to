@@ -54,6 +54,8 @@ dotnet run --project DevTools/CoreSandbox -- --traps 1,2,3
 dotnet run --project DevTools/ArtPreview
 # 보스 하나의 움직임만 다시(anim/의 GIF, 프레임표, 연속성 보고서. general, warden, antlion, serpent, titan, voidlord, wraith, crystal_queen, spider, knight, samurai, vein_eater. serpent·wraith는 전체 패턴 serpent_patterns.gif·crown_wraith_patterns.gif도. voidlord는 공허의 군주, 전체 패턴 void_lord_patterns.gif도). hero는 주인공의 무기별 모션(hero_*), entrances는 여섯 보스의 입장만, arenas는 아레나 그림만(arenas.png, arenas_unlit.png, arenas_world.png, arenas/), skillfx는 스킬 이펙트만(skillfx/의 클래스별 프레임표·GIF, Docs/SkillEffects.md), monsterfx는 일반 몬스터의 예고와 이펙트만(monsterfx/의 종별 프레임표·GIF, Docs/Combat.md 몬스터의 공격 시트)
 dotnet run --project DevTools/ArtPreview -- --only spider
+# 보스 평타의 전조 세기: 쉬는 자세와 전조의 실루엣 변화(out/anim/tells.txt, Docs/BossRedesign.md 9절)
+dotnet run --project DevTools/ArtPreview -- --only tells
 # 몸의 틈 점검: 모든 보스·몬스터의 모든 프레임에서 몸 안에 생긴 투명한 틈(anim/gaps.txt, gaps_<이름>.png, Docs/Bosses.md 몸의 틈)
 dotnet run --project DevTools/ArtPreview -- --only gaps
 # 몇 프레임만 틈을 빨갛게 나란히(anim/gaps_frames.png, 고치기 전후 보기)

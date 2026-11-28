@@ -96,16 +96,16 @@ namespace Game.Client
             }
             else if (body.BossState == BossState.Telegraph && attack != null)
             {
-                float progress = Mathf.Clamp01(since / Mathf.Max(0.1f, attack.Telegraph));
+                float progress = Mathf.Clamp01(since / TelegraphOf(body, attack));
                 var blow = WraithBlowOf(attack);
                 var windUp = CrownWraithArt.WindUpOf(blow);
                 int strike = CrownWraithArt.StrikeFrame(blow);
                 float swing = strike * CrownWraithArt.FrameSeconds(blow, 0);
-                float wound = 1 - Mathf.Min(0.5f, swing / Mathf.Max(0.1f, attack.Telegraph));
+                float wound = 1 - Mathf.Min(0.5f, swing / TelegraphOf(body, attack));
                 if (progress < wound) (pose, frame) = (windUp, Through(windUp, progress / wound));
                 else
                 {
-                    int f = WraithBlowFrame(blow, (progress - wound) * attack.Telegraph);
+                    int f = WraithBlowFrame(blow, (progress - wound) * TelegraphOf(body, attack));
                     (pose, frame) = (blow, f < 0 ? strike - 1 : Mathf.Min(strike - 1, f));
                 }
             }
@@ -164,7 +164,7 @@ namespace Game.Client
             }
             body.Echoing = false;
             if (view.BossState != BossState.Telegraph || attack == null || attack.Shape == AttackShape.Summon) return;
-            float progress = Mathf.Clamp01(since / Mathf.Max(0.1f, attack.Telegraph));
+            float progress = Mathf.Clamp01(since / TelegraphOf(body, attack));
             switch (CrownWraithArt.WindUpOf(WraithBlowOf(attack)))
             {
                 case CrownWraithPose.Clutch:

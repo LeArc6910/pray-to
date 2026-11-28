@@ -140,24 +140,24 @@ namespace Game.Core
         public AttackShape Shape { get; }
         public AttackTarget Target { get; }
         // Seconds of warning before it lands.
-        public float Telegraph { get; }
-        public int Damage { get; }
+        public float Telegraph { get; private set; }
+        public int Damage { get; private set; }
         // Circle radius, or projectile radius for a burst.
-        public float Radius { get; }
+        public float Radius { get; private set; }
         // Cone, line and charge length in tiles from the boss's centre.
-        public float Length { get; }
+        public float Length { get; private set; }
         // Cone width in degrees, or the fan a burst spreads over (0 means all the way round).
-        public float Angle { get; }
+        public float Angle { get; private set; }
         // Line and charge width in tiles.
-        public float Width { get; }
+        public float Width { get; private set; }
         // Circles per target, projectiles in a burst, or monsters summoned.
-        public int Count { get; }
+        public int Count { get; private set; }
         // How far extra circles scatter around their target, or how far from the boss summons appear.
-        public float Spread { get; }
+        public float Spread { get; private set; }
         // Projectile or charge speed in tiles per second.
-        public float Speed { get; }
+        public float Speed { get; private set; }
         // Seconds the boss rests after the attack lands.
-        public float Cooldown { get; }
+        public float Cooldown { get; private set; }
         public int Weight { get; }
         public MonsterDefinition Summon { get; }
         // How plainly it is announced (warn column: blank, none or strong).
@@ -185,6 +185,128 @@ namespace Game.Core
         public bool GoesAway => Shape == AttackShape.Burrow || Shape == AttackShape.Leap;
 
         public bool InPhase(int phase) => Phases.Count == 0 || Phases.Contains(phase);
+
+        // ---- Phases made harder (2026-11-28, Docs/BossRedesign.md 4.2): the attack as a later phase uses it, built
+        // when the sheet is read: its telegraph shorter by the boss's tempo (bosses.csv tempo) and its boost
+        // (boss_attacks.csv boost) on top. The engine and the screen both read the phase's copy, so a wind-up drawn
+        // for it lasts as long as the host's. The copies keep the sheet attack as their Base (its place in the list). ----
+
+        // The attack as the sheet has it; itself for the sheet's own.
+        public BossAttack Base => _base ?? this;
+        BossAttack _base;
+        // The phase this copy is for (0 for the sheet's own).
+        public int ForPhaseNumber { get; private set; }
+        // How many more times it comes straight after itself (boost repeat), each wound up in less time (Again) and
+        // hitting softer (RepeatShare). A charge runs again by its count instead.
+        public int Repeat { get; private set; }
+        // How much of its telegraph a run after the first takes (World.AgainTelegraph unless a boost says).
+        public float Again { get; private set; } = DefaultAgain;
+        public const float DefaultAgain = 0.5f;
+        // What a repeated blow hits for, of the first's (Docs/Difficulty.md: a blow that follows at once is a share).
+        public const float RepeatShare = 0.6f;
+        // The shortest telegraphs a phase may bring an attack down to: an ordinary one, a strong one (the person's
+        // finishers), and a run after the first. One already shorter keeps its own.
+        public const float LeastTelegraph = 0.5f;
+        public const float LeastStrongTelegraph = 1.2f;
+        public const float LeastAgainTelegraph = 0.3f;
+
+        BossAttack[] _phases;
+
+        // The copy a phase uses; itself when the boss has no copy for it.
+        public BossAttack ForPhase(int phase) =>
+            _phases != null && phase >= 1 && phase < _phases.Length && _phases[phase] != null ? _phases[phase] : this;
+
+        // A run after the first: the same, wound up in less time and hitting for a share (Repeat).
+        public BossAttack RepeatForm { get; private set; }
+
+        // Seconds a run after the first winds up for, the same on the host and the screen. A charge's later run is
+        // quick (a share of a hit, Docs/Difficulty.md); a repeated blow lands no sooner after the last than a roll is
+        // ready again (World.RollCooldownSeconds), so each one can be rolled through.
+        public float AgainSeconds => Shape == AttackShape.Charge
+            ? Math.Max(Telegraph * Again, Math.Min(Telegraph, LeastAgainTelegraph))
+            : Math.Max(Telegraph * Again, World.RollCooldownSeconds - RepeatGapSeconds);
+
+        // The pause between a blow and its repeat: the follow-through, then the next wind-up (World.UpdateBoss).
+        public const float RepeatGapSeconds = 0.15f;
+
+        BossAttack Copy()
+        {
+            var copy = (BossAttack)MemberwiseClone();
+            copy.RepeatForm = null;
+            return copy;
+        }
+
+        // Builds every phase's copy: telegraph by tempo (phase 1 keeps the sheet's), then the boost for that phase.
+        // Speeds of shots, charges and trails go up with the move tempo.
+        internal void BuildPhases(int phaseCount, IReadOnlyList<float> telegraphTempo, IReadOnlyList<float> moveTempo, IReadOnlyDictionary<int, IReadOnlyList<Boost>> boosts)
+        {
+            _phases = new BossAttack[phaseCount + 1];
+            for (int phase = 1; phase <= phaseCount; phase++)
+            {
+                var copy = phase == 1 ? this : Copy();
+                copy._base = this;
+                copy.ForPhaseNumber = phase;
+                float floor = Warning == AttackWarning.Strong ? LeastStrongTelegraph : LeastTelegraph;
+                float tempo = phase - 1 < telegraphTempo.Count ? telegraphTempo[phase - 1] : 1;
+                float move = phase - 1 < moveTempo.Count ? moveTempo[phase - 1] : 1;
+                if (copy != this)
+                {
+                    copy.Telegraph = Math.Max(Telegraph * tempo, Math.Min(Telegraph, floor));
+                    if (Speed > 0) copy.Speed = Speed * move;
+                }
+                if (boosts.TryGetValue(phase, out var list))
+                {
+                    foreach (var boost in list) boost.Apply(copy);
+                    if (copy.Telegraph < Math.Min(Telegraph, floor)) copy.Telegraph = Math.Min(Telegraph, floor);
+                }
+                if (copy.Repeat > 0)
+                {
+                    var again = copy.Copy();
+                    again.Telegraph = copy.AgainSeconds;
+                    again.Damage = Math.Max(1, (int)MathF.Round(copy.Damage * RepeatShare));
+                    again.Repeat = 0;
+                    copy.RepeatForm = again;
+                }
+                _phases[phase] = copy;
+            }
+        }
+
+        // One change a phase makes to an attack (boost column, "count+1", "tele*0.8", "repeat=2").
+        public readonly struct Boost
+        {
+            public Boost(string field, char op, float value)
+            {
+                Field = field;
+                Op = op;
+                Value = value;
+            }
+
+            public string Field { get; }
+            public char Op { get; }
+            public float Value { get; }
+
+            public static readonly string[] Fields = { "count", "repeat", "tele", "again", "radius", "length", "angle", "width", "spread", "speed", "cooldown" };
+
+            float On(float now) => Op == '+' ? now + Value : Op == '*' ? now * Value : Value;
+
+            internal void Apply(BossAttack a)
+            {
+                switch (Field)
+                {
+                    case "count": a.Count = Math.Max(0, (int)MathF.Round(On(a.Count))); break;
+                    case "repeat": a.Repeat = Math.Max(0, (int)MathF.Round(On(a.Repeat))); break;
+                    case "tele": a.Telegraph = On(a.Telegraph); break;
+                    case "again": a.Again = On(a.Again); break;
+                    case "radius": a.Radius = On(a.Radius); break;
+                    case "length": a.Length = On(a.Length); break;
+                    case "angle": a.Angle = On(a.Angle); break;
+                    case "width": a.Width = On(a.Width); break;
+                    case "spread": a.Spread = On(a.Spread); break;
+                    case "speed": a.Speed = On(a.Speed); break;
+                    case "cooldown": a.Cooldown = On(a.Cooldown); break;
+                }
+            }
+        }
 
         // How close the boss must get to its target before starting; cones, lines and charges need to reach.
         public float Range => Shape switch
@@ -290,6 +412,12 @@ namespace Game.Core
         public ArenaDefinition Arena { get; internal set; }
 
         internal void Add(BossAttack attack) => _attacks.Add(attack);
+
+        // How much shorter its telegraphs are in each phase (bosses.csv tempo "0.85|0.75" for phases 2 and 3;
+        // Docs/BossRedesign.md 4.2), and how much faster it walks, charges and shoots.
+        public IReadOnlyList<float> TelegraphTempo { get; internal set; } = DefaultTelegraphTempo;
+        public static readonly IReadOnlyList<float> DefaultTelegraphTempo = new[] { 1f, 0.85f, 0.75f };
+        public static readonly IReadOnlyList<float> MoveTempo = new[] { 1f, 1.1f, 1.2f };
     }
 
     public sealed class BossData
@@ -376,7 +504,7 @@ namespace Game.Core
                         Whole(row, "potion_count"),
                         row["material"],
                         Whole(row, "material_count"),
-                        row["element"].Length == 0 ? SkillTag.None : BossElement(row["element"])) { Level = Whole(row, "level"), Place = row["place"].Length == 0 ? null : row["place"], Bursts = Gait(row["gait"]) });
+                        row["element"].Length == 0 ? SkillTag.None : BossElement(row["element"])) { Level = Whole(row, "level"), Place = row["place"].Length == 0 ? null : row["place"], Bursts = Gait(row["gait"]), TelegraphTempo = Tempo(row["tempo"]) });
                 });
             }
             return bosses;
@@ -394,6 +522,7 @@ namespace Game.Core
                 return;
             }
             var follows = new List<(BossAttack, BossDefinition, string, int)>();
+            var boosts = new Dictionary<BossAttack, IReadOnlyDictionary<int, IReadOnlyList<BossAttack.Boost>>>();
 
             foreach (var row in table.Rows)
             {
@@ -433,6 +562,7 @@ namespace Game.Core
                         pool.Kind,
                         pool.Seconds);
                     Validate(attack);
+                    boosts[attack] = Boosts(row["boost"], boss.PhaseCount, shape);
                     boss.Add(attack);
                     if (row["follow"].Length > 0) follows.Add((attack, boss, row["follow"], row.Line));
                 });
@@ -458,6 +588,57 @@ namespace Game.Core
                     errors.Add($"{AttacksFile} {line}행: {e.Message}");
                 }
             }
+            BuildPhases(bosses, boosts);
+        }
+
+        // Every phase's copy of every attack, once all are read (BossAttack.BuildPhases).
+        static void BuildPhases(List<BossDefinition> bosses, Dictionary<BossAttack, IReadOnlyDictionary<int, IReadOnlyList<BossAttack.Boost>>> boosts)
+        {
+            var none = new Dictionary<int, IReadOnlyList<BossAttack.Boost>>();
+            foreach (var boss in bosses)
+                foreach (var attack in boss.Attacks)
+                    attack.BuildPhases(boss.PhaseCount, boss.TelegraphTempo, BossDefinition.MoveTempo, boosts.TryGetValue(attack, out var b) ? b : none);
+        }
+
+        // tempo column: the telegraph factor of phases 2 and 3 ("0.85|0.75"), blank for the usual.
+        static IReadOnlyList<float> Tempo(string cell)
+        {
+            if (cell.Length == 0) return BossDefinition.DefaultTelegraphTempo;
+            var parts = SplitList(cell).Select(t => SheetValues.ParseDecimal(t, "tempo")).ToList();
+            if (parts.Count == 0 || parts.Any(t => t <= 0.3f || t > 1))
+                throw new FormatException("tempo는 2·3페이즈의 예고 배수를 0.3~1 사이로 적습니다. 예: 0.85|0.75");
+            return new[] { 1f }.Concat(parts).ToList();
+        }
+
+        // boost column: "2:count+1 tele*0.8;3:count=5 repeat=1" (changes apart by spaces, phases by ;). Each phase from 2 on; each change is a field, + * or =,
+        // and a number (BossAttack.Boost.Fields).
+        static IReadOnlyDictionary<int, IReadOnlyList<BossAttack.Boost>> Boosts(string cell, int phaseCount, AttackShape shape)
+        {
+            var result = new Dictionary<int, IReadOnlyList<BossAttack.Boost>>();
+            if (cell.Length == 0) return result;
+            foreach (var part in cell.Split(';'))
+            {
+                var halves = part.Split(new[] { ':' }, 2);
+                if (halves.Length != 2) throw new FormatException($"boost는 페이즈:바꿀 것으로 적습니다. 예: 2:count+1 tele*0.8;3:repeat=1('{part}')");
+                int phase = SheetValues.ParseNumber(halves[0].Trim(), "boost");
+                if (phase < 2 || phase > phaseCount) throw new FormatException($"boost의 페이즈는 2~{phaseCount}입니다(1페이즈는 시트 그대로).");
+                if (result.ContainsKey(phase)) throw new FormatException($"boost에 {phase}페이즈가 두 번 있습니다.");
+                var list = new List<BossAttack.Boost>();
+                foreach (var change in halves[1].Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    string text = change.Trim();
+                    int at = text.IndexOfAny(new[] { '+', '*', '=' });
+                    if (at <= 0) throw new FormatException($"boost의 '{text}'는 count+1, tele*0.8, repeat=1처럼 적습니다.");
+                    string field = text.Substring(0, at);
+                    if (!BossAttack.Boost.Fields.Contains(field))
+                        throw new FormatException($"boost의 '{field}'는 {string.Join(", ", BossAttack.Boost.Fields)} 중 하나여야 합니다.");
+                    if (field == "repeat" && (shape == AttackShape.Charge || shape == AttackShape.Spiral || shape == AttackShape.Summon))
+                        throw new FormatException("repeat는 돌진(count로), 나선, 부르기에는 쓰지 않습니다.");
+                    list.Add(new BossAttack.Boost(field, text[at], SheetValues.ParseDecimal(text.Substring(at + 1).Trim(), "boost")));
+                }
+                result[phase] = list;
+            }
+            return result;
         }
 
         // The gap a follow-up lands after the first (follow column): past a roll's unhurt ticks with the host's slack

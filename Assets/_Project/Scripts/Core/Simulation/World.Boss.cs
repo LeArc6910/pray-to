@@ -186,7 +186,7 @@ namespace Game.Core
                         StartTelegraph(boss, target, fighters);
                         break;
                     }
-                    MoveBoss(boss, (target.Position - boss.Position).Normalized * (boss.Definition.Speed * GaitFactor(boss) * TickSeconds));
+                    MoveBoss(boss, (target.Position - boss.Position).Normalized * (boss.Definition.Speed * MoveTempo(boss.Phase) * GaitFactor(boss) * TickSeconds));
                     break;
 
                 case BossState.Telegraph:
@@ -212,7 +212,20 @@ namespace Game.Core
                         Volley(boss, boss.Attack, boss.VolleyAngle);
                         _events.Add(new SimEvent(SimEventType.Attack, boss.Id, direction: Vec2.FromAngle(boss.VolleyAngle)));
                     }
-                    if (--boss.StateTicks <= 0) ChooseAttack(boss, fighters);
+                    if (--boss.StateTicks > 0) break;
+                    if (boss.State == BossState.Recover && boss.RepeatNext && boss.Attack != null)
+                    {
+                        // The same blow again at once (boost repeat), wound up in less time and hitting for a share.
+                        boss.RepeatNext = false;
+                        boss.RepeatsLeft--;
+                        var phased = boss.Attack.Base.ForPhase(boss.Phase);
+                        boss.Attack = phased.RepeatForm ?? phased;
+                        var next = PickTarget(boss, phased.Target, fighters);
+                        boss.TargetId = next.Id;
+                        StartTelegraph(boss, next, fighters, repeat: true);
+                        break;
+                    }
+                    ChooseAttack(boss, fighters);
                     break;
             }
         }
@@ -222,8 +235,15 @@ namespace Game.Core
         // attacks; and from phase 2 it sometimes lays a second area attack at once on someone else, from phase 3
         // often. ----
 
-        // How much shorter the rest after an attack is in each phase.
-        static float Tempo(int phase) => phase >= 3 ? 0.7f : phase == 2 ? 0.85f : 1f;
+        // How much shorter the rest after an attack is in each phase (2026-11-28: 0.85 · 0.7 → 0.75 · 0.6, with the
+        // telegraphs shortened too: BossAttack.ForPhase, Docs/BossRedesign.md 4.2).
+        static float Tempo(int phase) => phase >= 3 ? 0.6f : phase == 2 ? 0.75f : 1f;
+
+        // How much faster the boss walks in each phase (its charges and shots: BossAttack.ForPhase).
+        static float MoveTempo(int phase) => BossDefinition.MoveTempo[Math.Max(0, Math.Min(BossDefinition.MoveTempo.Count, phase) - 1)];
+
+        // The pause between a blow and its repeat (boost repeat): the follow-through, then the next wind-up.
+        public const float RepeatGap = BossAttack.RepeatGapSeconds;
 
         // The chance a phase lays a second area attack with the one chosen.
         static float DoubleChance(int phase) => phase >= 3 ? 0.5f : phase == 2 ? 0.25f : 0f;
@@ -249,8 +269,10 @@ namespace Game.Core
                 var fresh = choices.Where(a => FirstPhase(a) == boss.Phase).ToList();
                 if (fresh.Count > 0) choices = fresh;
             }
-            boss.Attack = _random.PickWeighted(choices, a => PhaseWeight(a, boss.Phase));
+            boss.Attack = _random.PickWeighted(choices, a => PhaseWeight(a, boss.Phase)).ForPhase(boss.Phase);
             boss.VolleysLeft = 0;
+            boss.RepeatsLeft = 0;
+            boss.RepeatNext = false;
             boss.GaitTicks = 0;
             boss.TargetId = PickTarget(boss, boss.Attack.Target, fighters).Id;
             boss.State = BossState.Approach;
@@ -282,8 +304,10 @@ namespace Game.Core
             var attack = boss.Definition.Attacks.FirstOrDefault(a => a.Id == attackId);
             var fighters = Fighters(boss);
             if (attack == null || fighters.Count == 0 || boss.State == BossState.Dormant || boss.IsDead) return false;
-            boss.Attack = attack;
+            boss.Attack = attack.ForPhase(boss.Phase);
             boss.VolleysLeft = 0;
+            boss.RepeatsLeft = 0;
+            boss.RepeatNext = false;
             var target = PickTarget(boss, attack.Target, fighters);
             boss.TargetId = target.Id;
             StartTelegraph(boss, target, fighters);
@@ -305,14 +329,19 @@ namespace Game.Core
 
         // Marks where the attack will land. Circles stay where their target stood, so moving away dodges them. A charge
         // that runs again (count) winds up the later runs in less time (again).
-        void StartTelegraph(Boss boss, Player target, List<Player> fighters, bool again = false)
+        void StartTelegraph(Boss boss, Player target, List<Player> fighters, bool again = false, bool repeat = false)
         {
             var attack = boss.Attack;
             var aim = target.Position - boss.Position;
             if (aim.LengthSquared > 1e-6f) boss.Facing = aim.Normalized;
             boss.State = BossState.Telegraph;
-            boss.StateTicks = Ticks(again ? attack.Telegraph * AgainTelegraph : attack.Telegraph);
-            if (!again) boss.ChargesLeft = attack.Shape == AttackShape.Charge ? Math.Max(0, attack.Count - 1) : 0;
+            // A repeat is already its shorter copy (BossAttack.RepeatForm); a charge's later run takes AgainSeconds.
+            boss.StateTicks = Ticks(again ? attack.AgainSeconds : attack.Telegraph);
+            if (!again && !repeat)
+            {
+                boss.ChargesLeft = attack.Shape == AttackShape.Charge ? Math.Max(0, attack.Count - 1) : 0;
+                boss.RepeatsLeft = attack.Repeat;
+            }
             long resolve = Tick + boss.StateTicks;
             int cause = Cause(boss, attack);
             if (AimsRound(attack)) boss.AimStep = (int)(new GameRandom(_forageSeed + (ulong)Tick, stream: 40 + (ulong)boss.Id).NextUInt() % AimSteps);
@@ -320,20 +349,23 @@ namespace Game.Core
             LayHazards(boss, attack, target, fighters, boss.Facing, resolve, cause);
             // Its follow-up (follow column) is marked now too and lands a moment after: one roll does not clear both.
             // Only in the follow-up's own phases (2026-11-28: the rings come from phase 2, so phase 1 lays one pattern).
-            bool follows = attack.FollowUp != null && !again && attack.FollowUp.InPhase(boss.Phase);
+            bool follows = attack.FollowUp != null && !again && !repeat && attack.FollowUp.InPhase(boss.Phase);
             if (follows)
-                LayHazards(boss, attack.FollowUp, target, fighters, boss.Facing, resolve + Ticks(attack.FollowDelay), Cause(boss, attack.FollowUp));
+            {
+                var follow = attack.FollowUp.ForPhase(boss.Phase);
+                LayHazards(boss, follow, target, fighters, boss.Facing, resolve + Ticks(attack.FollowDelay), Cause(boss, follow));
+            }
             if (attack.Shape == AttackShape.Charge) boss.ChargeDirection = boss.Facing;
             if (attack.GoesAway) boss.LandAt = LandingFor(boss, target.Position);
 
             // A later phase sometimes lays another area attack of this phase at once, on someone (else, when there is
             // anyone else), resolving a moment after. Not with a follow-up laid: at most two patterns at once (2026-11-28).
-            if (attack.LaysAreas && !follows && _random.NextFloat() < DoubleChance(boss.Phase))
+            if (attack.LaysAreas && !follows && !again && !repeat && _random.NextFloat() < DoubleChance(boss.Phase))
             {
-                var others = boss.Definition.Attacks.Where(a => a != attack && a.InPhase(boss.Phase) && a.Weight > 0 && a.LaysAreas).ToList();
+                var others = boss.Definition.Attacks.Where(a => a != attack.Base && a.InPhase(boss.Phase) && a.Weight > 0 && a.LaysAreas).ToList();
                 if (others.Count > 0)
                 {
-                    var second = _random.PickWeighted(others, a => PhaseWeight(a, boss.Phase));
+                    var second = _random.PickWeighted(others, a => PhaseWeight(a, boss.Phase)).ForPhase(boss.Phase);
                     var victim = fighters.Count > 1 ? fighters.Where(p => p != target).ElementAt(_random.Next(fighters.Count - 1)) : target;
                     var toward = victim.Position - boss.Position;
                     var facing = toward.LengthSquared > 1e-6f ? toward.Normalized : boss.Facing;
@@ -358,8 +390,8 @@ namespace Game.Core
             return at < Ticks(BurstSeconds) ? BurstRush : BurstRest;
         }
 
-        // How much of its telegraph a charge's later runs take.
-        public const float AgainTelegraph = 0.5f;
+        // How much of its telegraph a charge's later runs take (an attack's boost may say otherwise: BossAttack.Again).
+        public const float AgainTelegraph = BossAttack.DefaultAgain;
 
         // Where a burrow or leap aimed at a spot can come down: on open ground inside the arena.
         Vec2 LandingFor(Boss boss, Vec2 spot)
@@ -499,6 +531,13 @@ namespace Game.Core
                     break;
             }
             boss.State = BossState.Recover;
+            if (boss.RepeatsLeft > 0)
+            {
+                // A blow that comes again (boost repeat): a moment's follow-through, then its next wind-up (UpdateBoss).
+                boss.RepeatNext = true;
+                boss.StateTicks = Ticks(RepeatGap);
+                return;
+            }
             // A quicker phase rests less, but never so little that a spiral's later volleys go unfired.
             boss.StateTicks = Math.Max(Ticks(attack.Cooldown * Tempo(boss.Phase)), boss.VolleysLeft * Ticks(SpiralSeconds) + 1);
         }
@@ -586,7 +625,7 @@ namespace Game.Core
             boss.Position = position;
         }
 
-        void DamageBoss(Boss boss, int source, int amount, bool critical, int cause = 0, SkillTag tags = SkillTag.None)
+        internal void DamageBoss(Boss boss, int source, int amount, bool critical, int cause = 0, SkillTag tags = SkillTag.None)
         {
             boss.Health -= amount;
             _events.Add(new SimEvent(SimEventType.Hit, source, boss.Id, amount, critical, cause: cause, tags: tags));
@@ -615,6 +654,8 @@ namespace Game.Core
             var definition = boss.Definition;
             boss.Phase = phase;
             boss.Attack = null;
+            boss.RepeatsLeft = 0;
+            boss.RepeatNext = false;
             boss.OpensPhase = true;
             boss.State = BossState.Roar;
             boss.StateTicks = Ticks(definition.Roar);
@@ -665,7 +706,7 @@ namespace Game.Core
         {
             for (int i = 0; i < boss.Definition.Attacks.Count; i++)
             {
-                if (boss.Definition.Attacks[i] == attack) return i + 1;
+                if (boss.Definition.Attacks[i] == attack.Base) return i + 1;
             }
             return 0;
         }

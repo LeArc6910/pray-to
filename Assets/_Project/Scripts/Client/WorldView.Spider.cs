@@ -118,7 +118,7 @@ namespace Game.Client
             }
             else if (body.BossState == BossState.Telegraph && attack != null)
             {
-                float telegraph = Mathf.Max(0.1f, body.BossAgain ? attack.Telegraph * World.AgainTelegraph : attack.Telegraph);
+                float telegraph = TelegraphOf(body, attack);
                 float progress = Mathf.Clamp01(since / telegraph);
                 switch (attack.Shape)
                 {
@@ -255,7 +255,7 @@ namespace Game.Client
 
             if (view.BossState == BossState.Telegraph && attack != null)
             {
-                float telegraph = Mathf.Max(0.1f, body.BossAgain ? attack.Telegraph * World.AgainTelegraph : attack.Telegraph);
+                float telegraph = TelegraphOf(body, attack);
                 float progress = Mathf.Clamp01(since / telegraph);
                 bool strong = attack.Warning == AttackWarning.Strong;
                 switch (attack.Shape)
