@@ -104,6 +104,7 @@ namespace Game.Client
         internal string BadgeShown => _view?.BadgeShown ?? "";
         internal float HeldFill => _view?.HeldFill ?? -1;
         internal bool HeldBlinked => _view != null && _view.HeldBlinked;
+        internal string HeldWhy => _view?.HeldWhy ?? "";
         internal int HelmetsDropped => _view?.HelmetsDropped ?? 0;
         internal int PoolsShown => _view?.PoolsShown ?? 0;
         // Ordinary monsters' marks, pools, one-off effects, pieces and shots as drawn (WorldView.MonsterFx).

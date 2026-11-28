@@ -2975,6 +2975,7 @@ namespace Game.Client
                 json.Field("badge", root.BadgeShown);
                 json.Field("heldFill", root.HeldFill);
                 json.Field("heldBlinked", root.HeldBlinked);
+                json.Field("heldWhy", root.HeldWhy);
                 json.Field("helmets", root.HelmetsDropped);
                 json.Field("finisher", GameRoot.FinisherName ?? "");
                 json.Field("finisherShown", GameRoot.FinisherShown.width > 0);

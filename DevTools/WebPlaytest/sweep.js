@@ -937,23 +937,27 @@ async function tempo(browser) {
   check(s.bossAttack === 'iai' && s.bossWait >= 0.5 * 0.4 - 0.03, `3페이즈 거합은 예고보다 늦게 떨어진다(더 기다림 ${s.bossWait.toFixed(2)}초, 0.2~0.5)`);
   await game.wait(Math.round((s.bossTelegraph + 0.05) * 1000));
   s = await game.state();
-  check(s.heldFill >= 0.99 && s.heldBlinked, `늦은 거합의 표시는 예고 길이에 다 차고 깜박이며 기다린다(채움 ${s.heldFill}, 깜박임 ${s.heldBlinked})`);
+  check(s.heldFill >= 0.99 && s.heldBlinked, `늦은 거합의 표시는 예고 길이에 다 차고 깜박이며 기다린다(채움 ${s.heldFill}, 깜박임 ${s.heldBlinked}, ${s.heldWhy})`);
   await game.shot('tempo-late', '늦은 거합: 표시가 다 찬 뒤 깜박이며 기다린다');
   await game.wait(900);
   s = await game.state();
   check(s.cues > cues, `내려치기 직전 단서(Cue)가 화면에 왔다 (${cues} → ${s.cues})`);
   await game.wait(2000);
   // The noto counter: the blossom over it while it waits; struck, it answers at once.
+  // (The stance is 1.3 s in phase 3: struck first, pictured after.)
   await game.send('heal; boss shrine_samurai use noto');
-  await game.wait(500);
+  await game.wait(300);
   s = await game.state();
   check(s.bossAttack === 'noto' && s.badge === 'sakura', `납도 자세 위에 벚꽃 표지 (${s.bossAttack}, ${s.badge})`);
-  await game.shot('tempo-noto', '납도 반격 자세와 벚꽃 표지');
   await game.send('heal; boss shrine_samurai strike');
   await game.wait(100);
   s = await game.state();
-  check(s.bossCountered, `납도 자세에 때리면 반격한다 (${s.bossCountered})`);
+  check(s.bossCountered, `납도 자세에 때리면 반격한다 (${s.bossCountered}, ${s.bossState})`);
   await game.shot('tempo-counter', '납도 반격: 사방 일섬 셋');
+  await game.wait(2500);
+  await game.send('heal; boss shrine_samurai use noto');
+  await game.wait(300);
+  await game.shot('tempo-noto', '납도 반격 자세와 벚꽃 표지');
   await game.wait(2500);
   // The five-fold draw (last: it may fell the player): four more runs to come as the first winds up.
   await game.send('heal; boss shrine_samurai use sanren');

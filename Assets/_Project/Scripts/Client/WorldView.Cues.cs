@@ -19,6 +19,8 @@ namespace Game.Client
         public string BadgeShown { get; private set; } = "";
         public float HeldFill { get; private set; } = -1;
         public bool HeldBlinked { get; private set; }
+        // The last boss mark weighed for a late blow: attack, phase, hold, its ticks and its telegraph's (for the sweep).
+        public string HeldWhy { get; private set; } = "";
 
         // Seconds into a wind-up as it is drawn: a late blow's runs to CueSeconds short of its telegraph and stays there
         // until the cue, then on; anything else as it is. A repeat (BossAgain) comes on its own beat.
@@ -34,7 +36,9 @@ namespace Game.Client
         // charge's later run) is as it was.
         float HeldProgress(HazardState hazard, float progress)
         {
-            var attack = AttackOf(hazard)?.ForPhase(_bossPhaseInView);
+            var sheet = AttackOf(hazard);
+            var attack = sheet?.ForPhase(_bossPhaseInView);
+            if (sheet != null) HeldWhy = $"{sheet.Id}:p{_bossPhaseInView}:h{attack.Hold}:d{hazard.Duration}:t{World.Ticks(attack.Telegraph)}";
             if (attack == null || attack.Hold <= 0) return progress;
             float seconds = progress * hazard.Duration / World.TicksPerSecond;
             if (hazard.Duration <= World.Ticks(attack.Telegraph) + 1) return progress;
