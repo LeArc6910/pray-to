@@ -15,6 +15,15 @@
 
 로컬 세션의 고르기 페이지(`.claude/launch.json`의 `art-review`, 포트 8766)에서 세트마다 하나: 초상화의 화풍(LoRA 세기와 도트 정도), 마을 도트의 방향, 몬스터 아홉의 후보, 설치물을 둘지. "다 별로"와 "지금 그대로"도 고를 수 있다.
 
+## 사람이 고른 것 (2026-11-29)
+
+고른 그림(1024px 원본)은 `F:\Comfy-Desktop\pray-to-drafts6-11-29\`, 시안 전부는 그 안의 `all\`에 있다(저장소 밖, 같은 프롬프트·시드로 다시 그려도 같다). 이름은 `<접두>_<id>_<시드>`이고 `comfy.py t2i`의 `LORA`는 초상화 `pb_` 0.8, 나머지 1.0.
+
+- **초상화 화풍**: 도트 LoRA 0.8(`pb_`), **줄이지 않은 그림 그대로**(256px·160px로 줄인 도트 느낌은 고르지 않았다). 넷 모두 같았다: 촌장 `pb_chief_3`, 미나 `pb_mina_3`, 대장장이 `pb_blacksmith_2`, 상인 `pb_merchant_3`. 나머지 17명은 이 화풍·같은 프롬프트 틀(`p_*.txt`)로 새로 그린다
+- **마을 도트**: 촌장 `s_chief_1`, 미나 `s_mina_1`, 대장장이 `s_blacksmith_3`(모두 24px 줄인 모습을 보고 골랐다). 나머지는 같은 틀(`s_*.txt`)로
+- **몬스터**(모두 게임 크기로 줄인 모습을 보고): 균사 어미 `m_mycelium_mother_3`, 갓 거인 `m_cap_giant_3`, 눈 거인 `m_yeti_3`, 큰 모래 지렁이 `m_great_worm_1`, 신전 수호 석상 `m_temple_guardian_1`, 정동 골렘 `m_geode_golem_3`, 잿불 대장장이 `m_forge_keeper_1`, 공허의 문지기 `m_gate_warden_1`, 용암 투석꾼 `m_magma_hurler_1`
+- **설치물**: 여섯 모두 지금 그대로
+
 ## 고른 뒤 할 일
 
 - 초상화: 고른 화풍으로 21명(`PortraitArt.People`) 정면 → Qwen-Image-Edit로 표정 여섯(`Expression`). 게임에 넣는 크기와 그리기(지금은 42×52를 정수배)는 코드를 바꿔야 한다: 그림이 있으면 그 그림, 없으면 지금 `PortraitArt`
