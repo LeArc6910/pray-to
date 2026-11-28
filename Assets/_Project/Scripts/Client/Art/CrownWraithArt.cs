@@ -557,6 +557,24 @@ namespace Game.Client
         // One frame. Faces right; WorldView flips it for the left.
         public static PixelImage Draw(BossView view, CrownWraithPose pose, int frame, int phase) => Render(view, pose, frame, phase, out _);
 
+        // One of its false selves (R4b, Docs/Bosses.md "R4b 그림"): the same picture in the same pose, same size and
+        // footing, but the crown a dull grey with rust on it and no light, the eyes faint and the body a little
+        // thinner. Only the true one's crown is gold and shining; that is how to tell them apart.
+        public static PixelImage DrawFalse(BossView view, CrownWraithPose pose, int frame, int phase = 1) => Render(view, pose, frame, phase, out _, true);
+
+        // The true crown's gold (dark to light, by how light the drawn crown's pixel is) and the false one's grey.
+        static readonly Rgba[] CrownGold = { new Rgba(74, 40, 6), new Rgba(168, 104, 14), new Rgba(240, 180, 36), new Rgba(255, 228, 92), new Rgba(255, 252, 204) };
+        static readonly Rgba[] CrownDull = { new Rgba(26, 28, 34), new Rgba(62, 64, 72), new Rgba(96, 96, 102), new Rgba(128, 126, 128), new Rgba(150, 148, 146) };
+        static readonly Rgba CrownRust = new Rgba(104, 62, 44);
+        static readonly Rgba CrownShine = new Rgba(255, 214, 72);
+
+        static Rgba Along(Rgba[] ramp, float t)
+        {
+            t = System.Math.Max(0, System.Math.Min(1, t)) * (ramp.Length - 1);
+            int k = System.Math.Min(ramp.Length - 2, (int)t);
+            return ramp[k].Mix(ramp[k + 1], t - k);
+        }
+
         // Where the head, the first hand and the body are in a frame (picture pixels): for the preview's check that
         // nothing jumps from one frame to the next.
         public struct Joints
@@ -577,10 +595,16 @@ namespace Game.Client
             return u * u * (3 - 2 * u);
         }
 
-        static PixelImage Render(BossView view, CrownWraithPose pose, int frame, int phase, out Joints joints)
+        static PixelImage Render(BossView view, CrownWraithPose pose, int frame, int phase, out Joints joints, bool fake = false)
         {
             var data = ViewOf(view);
             var p = PoseOf(pose, frame);
+            // A false one's crown never sparks, whatever the phase.
+            if (fake)
+            {
+                phase = 1;
+                p.CrownSpark = 0;
+            }
             // From the second phase its crown sparks now and then (in the last, never stops), so the roar that brings the
             // wider blows reads as a change in it too (Docs/Bosses.md 페이즈 배치).
             if (phase >= 3) p.CrownSpark = System.Math.Max(p.CrownSpark, 0.35f * p.Form);
@@ -638,6 +662,8 @@ namespace Game.Client
             // The crown: lifted off the head, or fallen to the floor (lying where the body stood, a little tilted).
             float fallen = p.Fallen;
             int crownTop = int.MaxValue, crownLeft = int.MaxValue, crownRight = -1;
+            float gilt = System.Math.Max(0, System.Math.Min(1, p.Form)) * (1 - System.Math.Max(0, System.Math.Min(1, fallen)));
+            var crownPixels = new List<(int X, int Y)>();
             for (int y = 0; y < 64; y++)
                 for (int x = 0; x < 64; x++)
                 {
@@ -650,7 +676,14 @@ namespace Game.Client
                         px += (floorX - px) * fallen;
                         py += (floorY - py) * fallen;
                     }
-                    Put(px, py, image[x, y], x, y, true);
+                    // The true crown is gold once the body has gathered under it (rusted while it lies on the floor);
+                    // a false one's is grey with rust.
+                    var metal = image[x, y];
+                    float light = (metal.R * 0.4f + metal.G * 0.45f + metal.B * 0.15f) / 150f;
+                    if (fake) metal = PixelNoise.Hash(x, y, 104) % 5 == 0 && light > 0.3f ? CrownRust : Along(CrownDull, light);
+                    else metal = metal.Mix(Along(CrownGold, light * 1.08f), gilt);
+                    Put(px, py, metal, x, y, true);
+                    crownPixels.Add((R(px) + shake, R(py)));
                     crownTop = System.Math.Min(crownTop, R(py));
                     crownLeft = System.Math.Min(crownLeft, R(px));
                     crownRight = System.Math.Max(crownRight, R(px));
@@ -711,7 +744,8 @@ namespace Game.Client
             if (data.Reach[1] <= 0) hands[1] = hands[0];
 
             float glow = System.Math.Max(0, System.Math.Min(1, p.Glow + (phase >= 3 ? 0.3f : phase == 2 ? 0.15f : 0)));
-            var eye = phase >= 3 ? EyeHot.Mix(Storm, 0.5f) : glow < 0.5f ? EyeDim.Mix(EyeLit, glow * 2) : EyeLit.Mix(EyeHot, (glow - 0.5f) * 2);
+            if (fake) glow *= 0.25f;
+            var eye = fake ? EyeDim.Mix(Mist, 0.35f + 0.3f * glow) : phase >= 3 ? EyeHot.Mix(Storm, 0.5f) : glow < 0.5f ? EyeDim.Mix(EyeLit, glow * 2) : EyeLit.Mix(EyeHot, (glow - 0.5f) * 2);
             for (int y = 0; y < 64; y++)
                 for (int x = 0; x < 64; x++)
                 {
@@ -754,6 +788,38 @@ namespace Game.Client
                         if (c.A == 0) continue;
                         canvas[x, y] = c.Mix(Ghost, p.Fade * 0.65f).WithAlpha(R(c.A * (1 - p.Fade * 0.8f)));
                     }
+
+            // A false one: paler and a little see-through all over, but for its crown, which stays plain to see.
+            if (fake)
+            {
+                var keep = new HashSet<(int, int)>(crownPixels);
+                for (int y = 0; y < Height; y++)
+                    for (int x = 0; x < Width; x++)
+                    {
+                        var c = canvas[x, y];
+                        if (c.A == 0 || keep.Contains((x, y))) continue;
+                        canvas[x, y] = c.Mix(Mist, 0.16f).WithAlpha(R(c.A * 0.88f));
+                    }
+            }
+            // The true crown shines: gold light on the empty pixels round it, and a glint that walks along its top.
+            else if (gilt > 0.6f && p.Fade < 0.5f)
+            {
+                foreach (var (cx, cy) in crownPixels)
+                    foreach (var (ox, oy) in new[] { (1, 0), (-1, 0), (0, -1), (0, 1), (0, -2) })
+                    {
+                        int qx = cx + ox, qy = cy + oy;
+                        if (canvas.Inside(qx, qy) && canvas[qx, qy].A == 0) canvas[qx, qy] = CrownShine.WithAlpha(oy == -2 ? 70 : 130);
+                    }
+                if (crownRight > crownLeft)
+                {
+                    int gx = crownLeft + 1 + (frame * 3 % System.Math.Max(1, crownRight - crownLeft - 1)), gy = int.MaxValue;
+                    foreach (var (cx, cy) in crownPixels)
+                        if (cx == gx + shake) gy = System.Math.Min(gy, cy);
+                    if (gy < int.MaxValue)
+                        foreach (var (ox, oy) in new[] { (0, 0), (0, -1), (1, 0), (-1, 0), (0, 1) })
+                            if (canvas.Inside(gx + shake + ox, gy + oy)) canvas[gx + shake + ox, gy + oy] = ox == 0 && oy == 0 ? EyeHot : BoltCore.WithAlpha(235);
+                }
+            }
 
             // Lightning: crackling in the hands, a spear of it in the first, a ball between them, over the crown.
             for (int k = 0; k < 2; k++)

@@ -151,6 +151,18 @@ namespace Game.Client
         BannerFall,
         WarHorn,
         ArrowRain,
+        // R4b (2026-11-29, Docs/Bosses.md "R4b 그림"): the crown wraith coming apart into three; a false one struck and
+        // gone (glassy, a breath); a whole puddle flashing with lightning; the drowned hand out of the water and
+        // shut; the void lord winding time back (a second, running backward); a beam through a gate (a hum that
+        // bends); one star of the maze falling (a whistle and a small burst); gravity turning over (a low swell).
+        CloneSplit,
+        CloneBreak,
+        PuddleZap,
+        HandGrab,
+        Rewind,
+        GateWarp,
+        StarFall,
+        GravityFlip,
     }
 
     // A monster's kind of voice (2026-11-09): what it sounds like when it notices someone, attacks and is struck.
@@ -822,6 +834,93 @@ namespace Game.Client
                         parts.Add(Tone(Wave.Triangle, at, 0.04f, 250 + i % 3 * 50, 150, 0.3f, attack: 0.001f, decay: 6));
                     }
                     level = 0.65f;
+                    break;
+                case Sound.CloneSplit:
+                    // 0.6 s: a breath drawn in, then one voice sliding apart into three.
+                    parts.Add(Noise(0, 0.22f, 0.5f, 0.85f, attack: 0.18f, decay: 0.5f, seed: 160));
+                    parts.Add(Tone(Wave.Sine, 0.16f, 0.44f, 440, 262, 0.4f, attack: 0.01f, decay: 2.5f, vibrato: 0.012f, vibratoRate: 7));
+                    parts.Add(Tone(Wave.Sine, 0.18f, 0.42f, 440, 554, 0.36f, attack: 0.01f, decay: 2.5f, vibrato: 0.012f, vibratoRate: 9));
+                    parts.Add(Tone(Wave.Triangle, 0.2f, 0.4f, 440, 880, 0.3f, attack: 0.01f, decay: 2.5f, vibrato: 0.012f, vibratoRate: 11));
+                    parts.Add(Noise(0.16f, 0.3f, 0.3f, 0.93f, attack: 0.005f, decay: 4, seed: 161));
+                    level = 0.6f;
+                    break;
+                case Sound.CloneBreak:
+                    // 0.4 s: thin glass giving (high partials that do not agree), and the breath going out of it.
+                    parts.Add(Noise(0, 0.05f, 0.7f, 0.95f, attack: 0.0005f, decay: 7, seed: 162));
+                    parts.Add(Tone(Wave.Sine, 0, 0.3f, 2110, 2090, 0.34f, attack: 0.001f, decay: 5));
+                    parts.Add(Tone(Wave.Sine, 0.012f, 0.26f, 3170, 3130, 0.26f, attack: 0.001f, decay: 6));
+                    parts.Add(Tone(Wave.Sine, 0.03f, 0.22f, 4230, 4200, 0.16f, attack: 0.001f, decay: 6));
+                    parts.Add(Tone(Wave.Sine, 0.05f, 0.35f, 920, 300, 0.22f, attack: 0.03f, decay: 3, vibrato: 0.02f, vibratoRate: 8));
+                    parts.Add(Noise(0.05f, 0.33f, 0.28f, 0.6f, attack: 0.04f, decay: 3.5f, seed: 163));
+                    level = 0.5f;
+                    break;
+                case Sound.PuddleZap:
+                    // 0.45 s: the crack, the buzz through the water, the hiss after.
+                    parts.Add(Noise(0, 0.04f, 0.9f, 0.97f, attack: 0.0005f, decay: 5, seed: 164));
+                    parts.Add(Tone(Wave.Square, 0, 0.34f, 118, 96, 0.34f, attack: 0.002f, decay: 2.2f, vibrato: 0.25f, vibratoRate: 53));
+                    parts.Add(Tone(Wave.Saw, 0, 0.2f, 1900, 420, 0.24f, attack: 0.001f, decay: 4));
+                    Crackle(parts, 0.03f, 0.3f, 7, 0.55f, 165);
+                    parts.Add(Noise(0.1f, 0.35f, 0.3f, 0.5f, attack: 0.02f, decay: 3.5f, seed: 166));
+                    level = 0.6f;
+                    break;
+                case Sound.HandGrab:
+                    // 0.5 s: out of the water (a splash, a gulp from below), then the hand shutting.
+                    parts.Add(Noise(0, 0.22f, 0.7f, 0.45f, attack: 0.004f, decay: 4, seed: 167));
+                    parts.Add(Noise(0.02f, 0.16f, 0.35f, 0.9f, attack: 0.01f, decay: 5, seed: 168));
+                    parts.Add(Tone(Wave.Sine, 0, 0.16f, 150, 320, 0.4f, attack: 0.004f, decay: 3));
+                    parts.Add(Tone(Wave.Sine, 0.2f, 0.12f, 240, 82, 0.6f, attack: 0.002f, decay: 4));
+                    parts.Add(Noise(0.2f, 0.05f, 0.5f, 0.3f, attack: 0.001f, decay: 6, seed: 169));
+                    parts.Add(Noise(0.26f, 0.24f, 0.22f, 0.5f, attack: 0.01f, decay: 4, seed: 170));
+                    level = 0.6f;
+                    break;
+                case Sound.Rewind:
+                    // 1 s: everything backward — notes that swell to their start and stop dead, ticks coming faster,
+                    // the pitch wound up like a tape, and the click it ends on.
+                    parts.Add(Tone(Wave.Triangle, 0, 0.92f, 190, 1250, 0.3f, attack: 0.85f, decay: 0, vibrato: 0.05f, vibratoRate: 15));
+                    parts.Add(Tone(Wave.Saw, 0, 0.92f, 95, 640, 0.14f, attack: 0.88f, decay: 0, vibrato: 0.06f, vibratoRate: 19));
+                    for (int i = 0; i < 4; i++)
+                    {
+                        float at = i * 0.21f;
+                        float pitch = 392 * (float)Math.Pow(1.26, i);
+                        parts.Add(Tone(Wave.Sine, at, 0.2f, pitch, pitch, 0.3f, attack: 0.19f, decay: 0));
+                    }
+                    for (int i = 0; i < 11; i++)
+                    {
+                        float at = 0.9f * (1 - (float)Math.Pow(0.78, i)) / (1 - (float)Math.Pow(0.78, 11));
+                        parts.Add(Tone(Wave.Square, at, 0.018f, i % 2 == 0 ? 2100 : 1500, 1400, 0.16f, attack: 0.0005f, decay: 5));
+                    }
+                    parts.Add(Noise(0.2f, 0.72f, 0.2f, 0.9f, attack: 0.7f, decay: 0, seed: 171));
+                    parts.Add(Noise(0.92f, 0.06f, 0.6f, 0.6f, attack: 0.0005f, decay: 7, seed: 172));
+                    parts.Add(Tone(Wave.Sine, 0.92f, 0.08f, 300, 120, 0.5f, attack: 0.001f, decay: 5));
+                    level = 0.6f;
+                    break;
+                case Sound.GateWarp:
+                    // 0.55 s: a hum that dips going in and lifts coming out, a shimmer over it.
+                    parts.Add(Tone(Wave.Sine, 0, 0.28f, 150, 84, 0.6f, attack: 0.03f, decay: 0.8f, vibrato: 0.04f, vibratoRate: 24));
+                    parts.Add(Tone(Wave.Sine, 0.24f, 0.31f, 84, 190, 0.55f, attack: 0.03f, decay: 2.5f, vibrato: 0.04f, vibratoRate: 24));
+                    parts.Add(Tone(Wave.Triangle, 0, 0.55f, 302, 371, 0.18f, attack: 0.08f, decay: 2, vibrato: 0.03f, vibratoRate: 31));
+                    parts.Add(Tone(Wave.Sine, 0.24f, 0.3f, 1320, 1980, 0.12f, attack: 0.02f, decay: 4));
+                    parts.Add(Noise(0, 0.5f, 0.2f, 0.25f, attack: 0.2f, decay: 2, seed: 173));
+                    level = 0.6f;
+                    break;
+                case Sound.StarFall:
+                    // 0.6 s: the whistle down, the small burst, a glitter after.
+                    parts.Add(Tone(Wave.Sine, 0, 0.3f, 2900, 760, 0.3f, attack: 0.05f, decay: 0.6f, vibrato: 0.01f, vibratoRate: 30));
+                    parts.Add(Tone(Wave.Sine, 0, 0.3f, 4350, 1140, 0.1f, attack: 0.08f, decay: 0.6f));
+                    parts.Add(Noise(0.3f, 0.14f, 0.8f, 0.35f, attack: 0.001f, decay: 5, seed: 174));
+                    parts.Add(Tone(Wave.Sine, 0.3f, 0.2f, 210, 62, 0.7f, attack: 0.002f, decay: 4));
+                    Bell(parts, 0.32f, 0.28f, 1760, 0.2f);
+                    Bell(parts, 0.38f, 0.2f, 2637, 0.12f);
+                    level = 0.6f;
+                    break;
+                case Sound.GravityFlip:
+                    // 0.9 s: the floor's weight going out from under (down), a held breath, and back the other way.
+                    parts.Add(Tone(Wave.Sine, 0, 0.42f, 96, 40, 0.8f, attack: 0.03f, decay: 1.2f));
+                    parts.Add(Tone(Wave.Sine, 0.4f, 0.5f, 40, 124, 0.8f, attack: 0.12f, decay: 2.2f));
+                    parts.Add(Tone(Wave.Triangle, 0.4f, 0.5f, 80, 248, 0.2f, attack: 0.15f, decay: 2.5f, vibrato: 0.03f, vibratoRate: 6));
+                    parts.Add(Noise(0, 0.9f, 0.45f, 0.04f, attack: 0.3f, decay: 1.5f, seed: 175));
+                    parts.Add(Noise(0.4f, 0.12f, 0.3f, 0.2f, attack: 0.002f, decay: 5, seed: 176));
+                    level = 0.7f;
                     break;
                 case Sound.Sting:
                     parts.Add(Noise(0, 0.07f, 0.8f, 0.92f, attack: 0.001f, decay: 7, seed: 67));

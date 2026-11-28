@@ -85,6 +85,8 @@ dotnet run --project DevTools/ArtPreview -- --only ground
 dotnet run --project DevTools/ArtPreview -- --only forces
 # R4a 그림 한 장(out/r4a/sheet.png·_gray): 수정 기둥(빛 0·⅓·⅔·1), 수정 알(금 0·1·2), 빛 고리, 군기, 호령 표적, 환영 창병 대열 토막·끝, 함께 놓은 장면. 소리 crystalchime·crystalshatter·eggcrack·egghatch·bannerplant·bannerfall·warhorn·arrowrain.wav도 같은 폴더에
 dotnet run --project DevTools/ArtPreview -- --only r4a
+# R4b 그림 한 장(out/r4b/sheet.png·_gray, three_small.png): 왕관의 망령 진짜(금 왕관)와 분신(회색 왕관) 나란히, 넋 안개, 익사자의 손 6장, 공간 문, 떨어지는 별, 모래시계 6장, 함께 놓은 장면. 소리 clonesplit·clonebreak·puddlezap·handgrab·rewind·gatewarp·starfall·gravityflip.wav도 같은 폴더에
+dotnet run --project DevTools/ArtPreview -- --only r4b
 # 타격 이펙트(E7): out/hitfx/hits.png·hits_gray.png(줄마다 원소의 보통·강한 타격, 왼쪽에서 맞음), report.txt. 12조각·빛 1개·0.4초를 넘으면 실패. 웹 점검은 sweep.js --only hits
 dotnet run --project DevTools/ArtPreview -- --only hitfx
 # 게임의 UI 스킨만(out/ui/: skin.png 조각 전부, windows.png 지금 화면에 입힌 모습, pixels.png 정수 배 틀, encounters.png·encounters_phone.png 상점·상자·작업대·모루·대화 창, growth.png·growth_phone.png 스킬·특성 트리·캐릭터 창, records.png·records_phone.png 일지·지도, bag_hud.png·bag_hud_phone.png 가방·HUD·쓰러짐 카드·메뉴. Docs/UiRework.md U1~U7)

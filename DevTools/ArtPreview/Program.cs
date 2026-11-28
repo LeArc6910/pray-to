@@ -111,6 +111,12 @@ namespace Game.Client
                 return R4aPreview.Write(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out", "r4a"),
                     TileArt.Ground(TileArt.ArenaIndex(ArenaKind.Nest, 0, 0)), TileArt.Ground(TileArt.ArenaIndex(ArenaKind.Warcamp, 0, 0))) ? 0 : 1;
             }
+            if (args.Length == 2 && args[0] == "--only" && args[1] == "r4b")
+            {
+                // --only r4b: R4b's false wraith, mist, drowned hand, gate, star and hourglass (out/r4b/, R4bPreview).
+                return R4bPreview.Write(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out", "r4b"),
+                    TileArt.Ground(TileArt.ArenaIndex(ArenaKind.Chapel, 0, 0)), TileArt.Ground(TileArt.ArenaIndex(ArenaKind.Altar, 0, 0))) ? 0 : 1;
+            }
             if (args.Length == 2 && args[0] == "--only" && args[1] == "r1b")
             {
                 // --only r1b: the sheathed counter, the helm off and the two marks on one sheet (out/r1b/, R1bPreview).
