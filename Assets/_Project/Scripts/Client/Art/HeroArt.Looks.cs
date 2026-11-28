@@ -172,12 +172,9 @@ namespace Game.Client
                 case Look.Down:
                     Chin(chin, 3, -1);
                     Chin(chin, 8, 1);
-                    Flush(eyes, 2);
-                    Flush(eyes, 9);
                     break;
                 case Look.DownSide:
                     Chin(chin, 8, 1);
-                    Flush(eyes, 9);
                     break;
                 case Look.Side:
                     Chin(chin, 9, 1);
