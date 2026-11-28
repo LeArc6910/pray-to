@@ -5267,6 +5267,9 @@ async function arts(browser) {
       check(!!s, `${name}: 오른쪽 클릭으로도 쓴다`);
 
       await clearRoom(game, 4, 4);
+      // The slimes stand still: a first-level hero falls to them before the eleven have gone round, and a fall cuts an
+      // art off (an orb's well died with its player on the first run, 2026-11-28).
+      await game.send('monsters hold');
       const kinds = [['sword', '검'], ['dagger', '단검'], ['greatsword', '대검'], ['spear', '창'], ['hammer', '망치'], ['bow', '활'], ['crossbow', '석궁'], ['boomerang', '부메랑'], ['staff', '지팡이'], ['wand', '완드'], ['orb', '오브']];
       for (const [kind, label] of kinds) {
         await game.send(`heal; art ready; hero iron_${kind} 1 0; attack off`);
