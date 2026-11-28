@@ -12,6 +12,14 @@ namespace Game.Client
     {
         const string ArtPrefix = "art_";
 
+        // A wand's barrage as the sheet has it (weapon_kinds.csv: art_count, art_arc, shot_speed in pixels a second),
+        // for the tails the effect draws behind its sparks. The sparks themselves are the game's projectiles.
+        const int BarrageShots = 8;
+        const float BarrageArc = 30, BarrageSpeed = 14 * 16;
+
+        // Where a wand's spark ends (WorldView, a Spark shot gone).
+        public const string SparkHit = "art_spark_hit";
+
         // The program for an art at a phase: "art_parry" for the blow, "art_parry_start", "art_parry_blocked".
         public static string ArtId(WeaponArtKind kind, ArtPhase phase) =>
             ArtPrefix + kind.ToString().ToLowerInvariant() + (phase == ArtPhase.Start ? "_start" : phase == ArtPhase.Blocked ? "_blocked" : "");
@@ -27,23 +35,41 @@ namespace Game.Client
                 // ---------------- sword ----------------
                 case "art_parry_start":
                 {
-                    // A guard of steel before the body, pulsing while it holds.
+                    // A guard before the body for as long as it holds: a film of steel thrown up (out from the hand in
+                    // the first moment) in three bands, the outer one breathing, and a glint running along its edge.
                     const float life = 0.4f;
                     if (!In(t, 0, life)) return life;
-                    float pulse = 0.65f + 0.35f * (float)Math.Sin(t * 40);
-                    Put(o, FxShape.Smear, FxRamp.Steel, 13, 110, dx * 2, Body + dy * 2, pulse, face);
-                    Put(o, FxShape.Smear, FxRamp.Steel, 9, 70, dx * 2, Body + dy * 2, 0.5f * pulse, face);
-                    FxLayers.Light(o, FxRamp.Steel, 16, 0.35f, dx * 8, Body, 2);
+                    float up = Out(U(t, 0, 0.08f)), breath = 0.5f + 0.5f * (float)Math.Sin(t * 16);
+                    float gx = dx * 3, gy = Body + dy * 3;
+                    int band = (int)(7 + 6 * up);
+                    Put(o, FxShape.Crescent, FxRamp.Steel, band, 130, gx, gy, 1, face);
+                    Put(o, FxShape.Crescent, FxRamp.Steel, band + 2, 130, gx, gy, 0.85f, face);
+                    Put(o, FxShape.Crescent, FxRamp.Steel, band + 4, 120, gx, gy, 0.6f, face);
+                    Put(o, FxShape.Crescent, FxRamp.Steel, band + 7, 100, gx, gy, 0.25f + 0.3f * breath, face);
+                    if (t < 0.1f) Put(o, FxShape.Glint, FxRamp.Steel, t < 0.05f ? 11 : 7, 1, gx + dx * 15, gy + dy * 15);
+                    else
+                    {
+                        // One glint sliding from one end of the arc to the other, again and again.
+                        float along = face - 55 + 110 * Frac((t - 0.1f) / 0.15f);
+                        Put(o, FxShape.Glint, FxRamp.Steel, 5, 1, gx + Cos(along) * 15, gy + Sin(along) * 15);
+                    }
+                    FxLayers.Light(o, FxRamp.Steel, 22, 0.45f + 0.15f * breath, dx * 10, Body, 2);
                     return life;
                 }
                 case "art_parry_blocked":
                 {
-                    // The blow meets the guard: a gold star and sparks thrown back.
-                    if (In(t, 0, 0.18f)) Put(o, FxShape.Glint, FxRamp.Gold, t < 0.08f ? 11 : 7, 0, dx * 10, Body + dy * 10);
-                    FxLayers.Embers(o, FxRamp.Gold, 8, t, 0, 18, seed, dx * 10, Body + dy * 10, 160, face, 0.24f);
-                    FxLayers.Shock(o, FxRamp.Gold, t, 0, 10, dx * 10, Body + dy * 10, 0.2f);
-                    if (In(t, 0, 0.2f)) FxLayers.Light(o, FxRamp.Gold, 30, 0.8f * (1 - U(t, 0.05f, 0.2f)), dx * 10, Body, 3);
-                    return 0.3f;
+                    // The blow meets the guard: the arc lit gold for a moment, a gold star, a ring and sparks thrown back.
+                    float bx = dx * 14, by = Body + dy * 14;
+                    if (In(t, 0, 0.14f))
+                    {
+                        Put(o, FxShape.Crescent, FxRamp.Gold, 16, 140, dx * 3, Body + dy * 3, 1 - U(t, 0.06f, 0.14f), face);
+                        Put(o, FxShape.Crescent, FxRamp.Gold, 21, 120, dx * 3, Body + dy * 3, 0.6f * (1 - U(t, 0, 0.14f)), face);
+                    }
+                    if (In(t, 0, 0.2f)) Put(o, FxShape.Glint, FxRamp.Gold, t < 0.07f ? 15 : t < 0.13f ? 11 : 7, t < 0.13f ? 2 : 1, bx, by);
+                    FxLayers.Embers(o, FxRamp.Gold, 12, t, 0, 22, seed, bx, by, 170, face, 0.28f);
+                    FxLayers.Shock(o, FxRamp.Gold, t, 0, 14, bx, by, 0.22f);
+                    if (In(t, 0, 0.22f)) FxLayers.Light(o, FxRamp.Gold, 34, 1 - U(t, 0.05f, 0.22f), dx * 10, Body, 3);
+                    return 0.32f;
                 }
                 case "art_parry":
                 {
@@ -144,72 +170,138 @@ namespace Game.Client
                 // ---------------- bow ----------------
                 case "art_backstep":
                 {
-                    // Dust kicked up where the jump began (Length behind the way it shoots), streaks of the leap.
+                    // From where the jump ended (it began Length ahead, the way it shoots): dust kicked up where the
+                    // feet left, the leap's afterimage and streaks between, a skid of dust under the landing, and at
+                    // the bow a flash and the three arrows' first streaks, fanned as the host fans them.
                     float L = c.Length;
-                    Puffs(o, FxRamp.Dust, 4, t, 0, 0.4f, 2, 8, seed, 5, 0.5f, dx * L, dy * L, 3);
-                    if (In(t, 0, 0.22f))
+                    Puffs(o, FxRamp.Dust, 6, t, 0, 0.45f, 3, 11, seed, 8, 0.85f, dx * L, dy * L, 4);
+                    Fly(o, FxShape.Dot, FxRamp.Dust, 2, 2, 6, t, 0, 0.3f, 2, 12, seed, hop: 5, cx: dx * L, cy: dy * L, cone: 120, toward: face);
+                    if (In(t, 0, 0.2f)) Put(o, FxShape.Ghost, FxRamp.Wind, 1, 0, dx * L * 0.55f, dy * L * 0.55f, 0.3f * (1 - U(t, 0, 0.2f)));
+                    if (In(t, 0, 0.26f))
                     {
-                        float u = t / 0.22f;
+                        float u = t / 0.26f;
                         for (int i = 0; i < 4; i++)
                         {
-                            float along = L * (i + 0.5f) / 4, aside = (i - 1.5f) * 4;
-                            Put(o, FxShape.Streak, FxRamp.Wind, 10, 1, dx * along - dy * aside, Body + dy * along + dx * aside, 1 - u, face + 180);
+                            float along = L * (0.35f + 0.65f * (i + Rnd(seed, i, 21)) / 4), aside = (i * 2 % 5 - 2) * 3.5f;
+                            Put(o, FxShape.Streak, FxRamp.Wind, 12 + 4 * (i % 2), 2, dx * along - dy * aside, Body + dy * along + dx * aside, 1 - u * u, face + 180);
                         }
                     }
-                    if (In(t, 0, 0.12f)) Put(o, FxShape.Glint, FxRamp.Wind, 7, 0, dx * 10, Body + dy * 10);
-                    return 0.45f;
+                    Puffs(o, FxRamp.Dust, 3, t, 0.06f, 0.4f, 1, 6, seed + 3, 5, 0.7f, -dx * 2, -dy * 2, 3);
+                    Fly(o, FxShape.Dot, FxRamp.Dust, 1, 2, 4, t, 0.05f, 0.25f, 1, 9, seed + 5, hop: 3, cone: 80, toward: face + 180);
+                    // The shots: fifteen degrees apart (weapon_kinds.csv art_arc), each streak running out with its arrow.
+                    float tipX = dx * 9, tipY = Body + dy * 9;
+                    if (In(t, 0, 0.14f)) Put(o, FxShape.Glint, FxRamp.Wind, t < 0.06f ? 11 : 7, t < 0.06f ? 2 : 1, tipX, tipY);
+                    if (In(t, 0, 0.16f))
+                    {
+                        float u = t / 0.16f, gone = 256 * t;
+                        for (int i = -1; i <= 1; i++)
+                        {
+                            float a = face + i * 15;
+                            Put(o, FxShape.Streak, FxRamp.Wind, 20, 2, tipX + Cos(a) * (gone - 8), tipY + Sin(a) * (gone - 8), 1 - u * u, a);
+                            Put(o, FxShape.Streak, FxRamp.Wind, 12, 1, tipX + Cos(a) * (gone - 24), tipY + Sin(a) * (gone - 24), 0.6f * (1 - u), a);
+                        }
+                    }
+                    FxLayers.Embers(o, FxRamp.Wind, 5, t, 0, 12, seed, tipX, tipY, 60, face, 0.2f);
+                    if (In(t, 0, 0.18f)) FxLayers.Light(o, FxRamp.Wind, 20, 0.6f * (1 - U(t, 0.06f, 0.18f)), tipX, Body, 2);
+                    return 0.5f;
                 }
                 // ---------------- crossbow ----------------
                 case "art_pierce_start":
                 {
-                    // Aiming: a thin red-amber line out the way it will go, a ring closing on the bolt's tip.
+                    // Aiming, half a second that reads: two dashed lines either side of the way it will go, closing
+                    // onto it as the shot comes; the line itself brightening; a reticle closing on the bolt's tip,
+                    // sparks drawn in and a glint that grows. Pale amber: the player's own mark, never an enemy's red.
                     float time = 0.5f, L = c.Length;
                     if (!In(t, 0, time)) return time;
-                    float u = t / time;
-                    for (float along = 10; along < L; along += 10)
-                        Put(o, FxShape.Dot, FxRamp.Danger, 1, 1, dx * along, Body + dy * along, 0.35f + 0.4f * u);
-                    Put(o, FxShape.Edge, FxRamp.Danger, SkillFxArt.Even(22 - 14 * Out(u)), 1, dx * 10, Body + dy * 10, 0.8f);
+                    float u = t / time, apart = 7 * (1 - Out(u));
+                    int walk = (int)(t * 16) & 3;
+                    for (float along = 12; along + 32 <= L + 16; along += 32)
+                    {
+                        float mx = dx * (along + 16), my = Body + dy * (along + 16);
+                        Put(o, FxShape.Tether, FxRamp.Gold, 32, walk, mx, my, 0.35f + 0.65f * u, face);
+                        if (apart < 0.75f) continue;
+                        Put(o, FxShape.Tether, FxRamp.Gold, 32, walk + 2, mx - dy * apart, my + dx * apart, 0.55f, face);
+                        Put(o, FxShape.Tether, FxRamp.Gold, 32, walk + 2, mx + dy * apart, my - dx * apart, 0.55f, face);
+                    }
+                    float tipX = dx * 10, tipY = Body + dy * 10;
+                    Put(o, FxShape.Reticle, FxRamp.Gold, SkillFxArt.Even(28 - 16 * Out(u)), 0, tipX, tipY, 0.6f + 0.4f * u);
+                    Gather(o, FxRamp.Gold, Frac(t / 0.25f) * 0.25f, 0.25f, 16, 5, seed + (int)(t / 0.25f), tipX, tipY);
+                    if (u > 0.5f) Put(o, FxShape.Glint, FxRamp.Gold, u > 0.85f ? 9 : 5, u > 0.85f ? 2 : 1, tipX, tipY);
+                    FxLayers.Light(o, FxRamp.Gold, 12 + 10 * u, 0.3f + 0.4f * u, tipX, Body, 2);
                     return time;
                 }
                 case "art_pierce":
                 {
-                    // The shot: a white-cold line the whole way, sparks at the bow, a light along it.
-                    float L = c.Length;
-                    const float life = 0.32f;
-                    if (In(t, 0, life))
+                    // The shot: a thick white-cold beam the whole way for a moment (the line's true width), thinning
+                    // to a streak that lingers; a burst at the bow, a star where it ends, sparks shed along it.
+                    float L = Math.Max(16, c.Length);
+                    const float life = 0.4f;
+                    int thick = t < 0.08f ? 7 : t < 0.14f ? 5 : t < 0.2f ? 3 : 0;
+                    if (thick > 0)
                     {
-                        float u = t / life, alpha = 1 - u * u;
+                        int ripple = (int)(t * 30) & 3;
+                        for (float along = 6; along < L - 8; along += 32)
+                            Put(o, FxShape.Beam, FxRamp.Cold, thick, ripple, dx * (along + 16), Body + dy * (along + 16), 1, face);
+                    }
+                    if (In(t, 0.14f, life))
+                    {
+                        float alpha = 1 - U(t, 0.2f, life);
                         for (float along = 8; along < L; along += 16)
+                            Put(o, FxShape.Streak, FxRamp.Cold, 16, t < 0.26f ? 2 : 1, dx * along, Body + dy * along, alpha, face);
+                    }
+                    if (In(t, 0.02f, 0.36f))
+                    {
+                        float u = U(t, 0.02f, 0.36f);
+                        for (int i = 0; i < 10; i++)
                         {
-                            Put(o, FxShape.Streak, FxRamp.Cold, 16, 2, dx * along, Body + dy * along, alpha, face);
-                            if (u < 0.4f) Put(o, FxShape.Streak, FxRamp.Cold, 16, 1, dx * along - dy * 3, Body + dy * along + dx * 3, alpha * 0.5f, face);
+                            float along = L * (i + Rnd(seed, i, 22)) / 10, aside = (Rnd(seed, i, 23) < 0.5f ? -1 : 1) * (3 + 7 * Out(u) * (0.5f + 0.5f * Rnd(seed, i, 24)));
+                            Put(o, FxShape.Dot, FxRamp.Cold, 1 + (i & 1), 2, dx * along - dy * aside, Body + dy * along + dx * aside, 1 - u * u);
                         }
                     }
-                    if (In(t, 0, 0.14f)) Put(o, FxShape.Glint, FxRamp.Cold, 9, 0, dx * 8, Body + dy * 8);
-                    FxLayers.Embers(o, FxRamp.Cold, 6, t, 0, 12, seed, dx * 8, Body + dy * 8, 70, face, 0.22f);
-                    if (In(t, 0, 0.25f)) FxLayers.Light(o, FxRamp.Cold, 24, 0.6f * (1 - U(t, 0.1f, 0.25f)), dx * Math.Min(L, 40), Body, 2);
-                    return 0.4f;
+                    float tipX = dx * 9, tipY = Body + dy * 9, endX = dx * L, endY = Body + dy * L;
+                    if (In(t, 0, 0.16f)) Put(o, FxShape.Glint, FxRamp.Cold, t < 0.07f ? 15 : 9, 2, tipX, tipY);
+                    FxLayers.Shock(o, FxRamp.Cold, t, 0, 12, tipX, tipY, 0.2f);
+                    FxLayers.Embers(o, FxRamp.Cold, 8, t, 0, 16, seed, tipX, tipY, 80, face, 0.26f);
+                    if (In(t, 0.01f, 0.2f)) Put(o, FxShape.Glint, FxRamp.Cold, t < 0.1f ? 11 : 7, 1, endX, endY);
+                    FxLayers.Embers(o, FxRamp.Cold, 6, t, 0.02f, 14, seed + 9, endX, endY, 200, face, 0.26f);
+                    if (In(t, 0, 0.28f))
+                    {
+                        float glow = 1 - U(t, 0.08f, 0.28f);
+                        FxLayers.Light(o, FxRamp.Cold, 28, 0.9f * glow, tipX, Body, 3);
+                        FxLayers.Light(o, FxRamp.Cold, 24, 0.6f * glow, dx * L * 0.5f, Body + dy * L * 0.5f, 2);
+                        FxLayers.Light(o, FxRamp.Cold, 22, 0.7f * glow, endX, endY, 2);
+                    }
+                    return life + 0.05f;
                 }
                 // ---------------- boomerang ----------------
                 case "art_whirl_start":
                 {
-                    // The boomerang goes round at the true reach for the whole throw, a trail behind it, the circle
-                    // faintly on the floor.
+                    // The boomerang goes twice round at the true reach for the whole throw: the blade spinning, a long
+                    // smear of sand behind it along its way, the circle on the floor in stepping dashes.
                     float time = c.Length > 0 ? c.Length : 1.5f;
                     if (!In(t, 0, time)) return time;
-                    float turn = face + 720 * t / time;
-                    for (int k = 0; k < 4; k++)
+                    float turn = face + 720 * t / time, fade = Math.Min(1, Math.Min(t / 0.1f, (time - t) / 0.15f));
+                    float bx = Cos(turn) * R, by = Body + Sin(turn) * R;
+                    Put(o, FxShape.Edge, FxRamp.Sand, SkillFxArt.Even(2 * R), 1, 0, 0, 0.3f, 0, true);
+                    Put(o, FxShape.Dashes, FxRamp.Sand, SkillFxArt.Even(2 * R), (int)(t * 10) & 1, 0, 0, 0.75f, 0, true);
+                    Put(o, FxShape.Smear, FxRamp.Sand, (int)R, 140, 0, Body, 0.9f * fade, turn - 70);
+                    for (int k = 1; k <= 3; k++)
                     {
-                        float a = turn - k * 14;
-                        if (k == 0) Put(o, FxShape.Blade, FxRamp.Sand, 9, (int)(t * 20) & 3, Cos(a) * R, Body + Sin(a) * R * 0.85f, 1, t * 900);
-                        else Put(o, FxShape.Dot, FxRamp.Sand, 2, 2, Cos(a) * R, Body + Sin(a) * R * 0.85f, 0.6f - k * 0.14f);
+                        float a = turn - k * 9;
+                        Put(o, FxShape.Blade, FxRamp.Sand, 11, 0, Cos(a) * R, Body + Sin(a) * R, 0.45f - 0.12f * k, t * 1080 - k * 70);
                     }
-                    Put(o, FxShape.Edge, FxRamp.Sand, SkillFxArt.Even(2 * R), 1, 0, 0, 0.18f, 0, true);
+                    Put(o, FxShape.Blade, FxRamp.Sand, 13, 0, bx, by, 1, t * 1080);
+                    Put(o, FxShape.Blade, FxRamp.Sand, 13, 0, bx, by, 1, t * 1080 + 90);
+                    if (((int)(t * 15) & 1) == 0) Put(o, FxShape.Glint, FxRamp.Sand, 5, 1, bx, by);
+                    FxLayers.Embers(o, FxRamp.Sand, 3, Frac(t / 0.15f) * 0.15f, 0, 7, seed + (int)(t / 0.15f), bx, by, 90, turn - 90, 0.15f);
+                    FxLayers.Light(o, FxRamp.Sand, 16, 0.5f, bx, by - Body, 2);
                     return time;
                 }
                 case "art_whirl":
-                    Ring(o, FxRamp.Sand, t, 0, R, 1, 0.06f, 0.18f);
-                    return 0.25f;
+                    // Each of its blows: the circle flashes out to the reach.
+                    Ring(o, FxRamp.Sand, t, 0, R, 2, 0.08f, 0.24f, 0, 0, true);
+                    FxLayers.Shock(o, FxRamp.Sand, t, 0, R / 1.3f, 0, 0, 0.24f, true);
+                    return 0.3f;
                 // ---------------- staff ----------------
                 case "art_wave":
                 {
@@ -228,13 +320,40 @@ namespace Game.Client
                 // ---------------- wand ----------------
                 case "art_barrage_start":
                 {
-                    // Sparks at the wand's tip for the whole barrage.
+                    // The whole barrage from the wand's tip: a fire that stays lit, and for each of the eight sparks
+                    // (weapon_kinds.csv art_count over art_time, fanned out and back inside art_arc as the host fans
+                    // them) a flash at the tip, a tail of flame running out behind it and embers thrown its way.
                     float time = c.Length > 0 ? c.Length : 0.8f;
-                    if (!In(t, 0, time)) return time;
-                    if (((int)(t * 20) & 1) == 0) Put(o, FxShape.Glint, FxRamp.Fire, 5, 0, dx * 9, Body + dy * 9);
-                    FxLayers.Embers(o, FxRamp.Fire, 3, Frac(t / 0.2f) * 0.2f, 0, 8, seed + (int)(t * 5), dx * 9, Body + dy * 9, 70, face, 0.18f);
-                    FxLayers.Light(o, FxRamp.Fire, 14, 0.4f, dx * 9, Body, 2);
-                    return time;
+                    if (!In(t, 0, time + 0.2f)) return time + 0.2f;
+                    float tipX = dx * 9, tipY = Body + dy * 9, kick = 0;
+                    for (int i = 0; i < BarrageShots; i++)
+                    {
+                        float from = i * time / BarrageShots, age = t - from;
+                        if (age < 0 || age >= 0.22f) continue;
+                        float side = (i % 2 == 0 ? 1 : -1) * ((i + 1) / 2) / (float)((BarrageShots + 1) / 2);
+                        float a = face + side * BarrageArc / 2, gone = BarrageSpeed * age;
+                        if (age < 0.1f)
+                        {
+                            float u = age / 0.1f;
+                            Put(o, FxShape.Streak, FxRamp.Fire, 20, u < 0.6f ? 3 : 2, tipX + Cos(a) * (gone - 8), tipY + Sin(a) * (gone - 8), 1 - u * u * u, a);
+                        }
+                        FxLayers.Embers(o, FxRamp.Fire, 3, t, from, 12, seed + i, tipX, tipY, 50, a, 0.2f);
+                        kick = Math.Max(kick, 1 - age / 0.1f);
+                    }
+                    if (t < time)
+                    {
+                        Put(o, FxShape.Flame, FxRamp.Fire, 7, (int)(t * 16) & 3, tipX, tipY + 2);
+                        Put(o, FxShape.Glint, FxRamp.Fire, kick > 0.5f ? 11 : kick > 0 ? 7 : 5, kick > 0.5f ? 2 : 1, tipX, tipY);
+                        FxLayers.Light(o, FxRamp.Fire, 18 + 8 * kick, 0.5f + 0.4f * kick, tipX, Body, 2);
+                    }
+                    return time + 0.2f;
+                }
+                case "art_spark_hit":
+                {
+                    // Where a wand's spark ends: a small star and a few embers.
+                    if (In(t, 0, 0.14f)) Put(o, FxShape.Glint, FxRamp.Fire, t < 0.06f ? 9 : 5, t < 0.06f ? 2 : 1, 0, 0);
+                    FxLayers.Embers(o, FxRamp.Fire, 4, t, 0, 9, seed, 0, 0, 360, 0, 0.2f);
+                    return 0.22f;
                 }
                 // ---------------- orb ----------------
                 case "art_gravity_start":

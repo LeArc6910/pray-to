@@ -67,11 +67,11 @@ namespace Game.Client
                 WeaponArtKind.Charge => new List<Moment> { new(ArtPhase.Start, 0.4f), new(ArtPhase.Start, 1.1f), new(ArtPhase.Strike, 0.08f), new(ArtPhase.Strike, 0.28f) },
                 WeaponArtKind.Dash => new List<Moment> { new(ArtPhase.Strike, 0.02f, reach, 0, reach), new(ArtPhase.Strike, 0.1f, reach, 0, reach), new(ArtPhase.Strike, 0.2f, reach, 0, reach), new(ArtPhase.Strike, 0.35f, reach, 0, reach) },
                 WeaponArtKind.Slam => new List<Moment> { new(ArtPhase.Start, 0.2f), new(ArtPhase.Strike, 0.05f), new(ArtPhase.Strike, 0.25f), new(ArtPhase.Strike, 0.6f) },
-                WeaponArtKind.Backstep => new List<Moment> { new(ArtPhase.Strike, 0.03f, -reach, 0, -reach), new(ArtPhase.Strike, 0.12f, -reach, 0, -reach), new(ArtPhase.Strike, 0.25f, -reach, 0, -reach), new(ArtPhase.Strike, 0.4f, -reach, 0, -reach) },
-                WeaponArtKind.Pierce => new List<Moment> { new(ArtPhase.Start, 0.25f), new(ArtPhase.Strike, 0.03f), new(ArtPhase.Strike, 0.12f), new(ArtPhase.Strike, 0.28f) },
-                WeaponArtKind.Whirl => new List<Moment> { new(ArtPhase.Start, 0.2f), new(ArtPhase.Start, 0.6f), new(ArtPhase.Start, 1.0f), new(ArtPhase.Start, 1.4f) },
+                WeaponArtKind.Backstep => new List<Moment> { new(ArtPhase.Strike, 0.03f, -reach, 0, -reach), new(ArtPhase.Strike, 0.1f, -reach, 0, -reach), new(ArtPhase.Strike, 0.18f, -reach, 0, -reach), new(ArtPhase.Strike, 0.32f, -reach, 0, -reach) },
+                WeaponArtKind.Pierce => new List<Moment> { new(ArtPhase.Start, 0.12f), new(ArtPhase.Start, 0.44f), new(ArtPhase.Strike, 0.04f), new(ArtPhase.Strike, 0.2f) },
+                WeaponArtKind.Whirl => new List<Moment> { new(ArtPhase.Start, 0.12f), new(ArtPhase.Start, 0.31f), new(ArtPhase.Start, 0.81f), new(ArtPhase.Start, 1.02f) },
                 WeaponArtKind.Wave => new List<Moment> { new(ArtPhase.Strike, 0.05f), new(ArtPhase.Strike, 0.14f), new(ArtPhase.Strike, 0.24f), new(ArtPhase.Strike, 0.36f) },
-                WeaponArtKind.Barrage => new List<Moment> { new(ArtPhase.Start, 0.1f), new(ArtPhase.Start, 0.35f), new(ArtPhase.Start, 0.55f), new(ArtPhase.Start, 0.75f) },
+                WeaponArtKind.Barrage => new List<Moment> { new(ArtPhase.Start, 0.04f), new(ArtPhase.Start, 0.33f), new(ArtPhase.Start, 0.56f), new(ArtPhase.Start, 0.78f) },
                 WeaponArtKind.Gravity => new List<Moment> { new(ArtPhase.Start, 0.3f, well), new(ArtPhase.Start, 1.2f, well), new(ArtPhase.Strike, 0.08f, well), new(ArtPhase.Strike, 0.3f, well) },
                 _ => new List<Moment>(),
             };
@@ -111,6 +111,34 @@ namespace Game.Client
             return c;
         }
 
+        // The art's shots as the game draws them (its projectiles: a bow's arrows, a wand's sparks), where they are at
+        // that moment, flying as the host lets them fly; a spark that has reached the nearest slime ends in its star.
+        static void Shots(PixelImage image, SkillFxPreview.Scene scene, WeaponArt art, WeaponKind kind, Moment moment)
+        {
+            if (art.Kind != WeaponArtKind.Backstep && art.Kind != WeaponArtKind.Barrage) return;
+            bool sparks = art.Kind == WeaponArtKind.Barrage;
+            var shot = sparks ? ItemArt.Spark : ItemArt.Arrow;
+            float speed = kind.Attack.Speed * T, range = kind.Attack.Range * T, near = scene.Slimes.Min(s => s.X) - scene.HeroX - 6;
+            for (int i = 0; i < art.Count; i++)
+            {
+                float from = sparks ? i * art.Time / art.Count : 0;
+                float side = sparks ? (i % 2 == 0 ? 1 : -1) * ((i + 1) / 2) / (float)((art.Count + 1) / 2) * art.Arc / 2 : (i - (art.Count - 1) / 2f) * art.Arc;
+                float age = moment.Time - from, angle = side * (float)Math.PI / 180;
+                if (age < 0) continue;
+                float gone = World.PlayerRadius * T + speed * age, most = Math.Min(range, near / (float)Math.Cos(angle));
+                if (gone < most)
+                {
+                    int x = scene.HeroX + (int)Math.Round(Math.Cos(angle) * gone), y = scene.HeroY - 8 - (int)Math.Round(Math.Sin(angle) * gone);
+                    image.Draw(shot, x - shot.Width / 2, y - shot.Height / 2);
+                    continue;
+                }
+                if (!sparks) continue;
+                var stamps = new List<FxStamp>();
+                SkillFx.Stamps(FxProgram.Cast, SkillFx.SparkHit, new FxContext { Seed = 7 + i, Main = FxRamp.Steel }, age - (most - World.PlayerRadius * T) / speed, stamps);
+                foreach (var stamp in stamps) SkillFxPreview.Blit(image, scene, (float)Math.Cos(angle) * most, (float)Math.Sin(angle) * most + 8, stamp);
+            }
+        }
+
         static PixelImage Render(WeaponArt art, WeaponKind kind, Moment moment, PixelImage floor, PixelImage slime)
         {
             int heroX = HeroX + (int)moment.Hero + (art.Kind == WeaponArtKind.Backstep ? 32 : 0);
@@ -132,6 +160,7 @@ namespace Game.Client
             foreach (var (x, y) in scene.Slimes) image.Draw(slime, x - slime.Width / 2, y - slime.Height + 2);
             image.Draw(scene.Hero, scene.HeroX - HeroArt.FeetX, scene.HeroY - HeroArt.FeetY);
             foreach (var stamp in stamps) if (!stamp.Ground && stamp.Shape != FxShape.Light) SkillFxPreview.Blit(image, scene, ox, oy, stamp);
+            Shots(image, scene, art, kind, moment);
             return image;
         }
     }

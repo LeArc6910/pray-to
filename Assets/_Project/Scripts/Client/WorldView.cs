@@ -2134,6 +2134,9 @@ namespace Game.Client
                 {
                     _shotLooks.Remove(pair.Key);
                     if (shotLook.Look == ShotLook.Orb) OrbBurst(pair.Value.transform.localPosition, shotLook.Color, shotLook.Radius);
+                    // A wand's spark ends in a small star (the barrage's sparks and its plain shots alike).
+                    else if (shotLook.Look == ShotLook.Spark && Feel.SkillFx)
+                        AddFx(FxProgram.Cast, SkillFx.SparkHit, pair.Value.transform.localPosition, new FxContext { Main = FxRamp.Steel }, true);
                 }
                 // An enemy's ends in a ring and bits, the rocks and a monster's too; venom and crescents end their way.
                 EnemyShotGone(pair.Key, pair.Value.transform.localPosition, pair.Value.sprite != CrescentSprite && pair.Value.sprite != VenomGlobSprite);
