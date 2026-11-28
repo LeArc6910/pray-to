@@ -62,6 +62,122 @@ namespace Game.Client
             return image.Outlined(new Rgba(40, 8, 8));
         }
 
+        // The mark over the shrine samurai while it waits sheathed (2026-11-28, Docs/Bosses.md 납도 반격): "do not strike".
+        // One whole cherry blossom, five notched petals turning slowly round a gold heart with motes of light coming and
+        // going round it; round and pink where the strong blow's warning is a red triangle. Its own colours (not tinted).
+        // The petals turn a fifth of the way round over the frames, so the loop has no seam.
+        public const int SakuraSignFrames = 8;
+        public const int SakuraSignSize = 21;
+
+        public static PixelImage SakuraSign(int frame)
+        {
+            const int size = SakuraSignSize - 2;
+            int f = ((frame % SakuraSignFrames) + SakuraSignFrames) % SakuraSignFrames;
+            var image = new PixelImage(size, size);
+            float c = (size - 1) / 2f;
+            double turn = 72.0 * f / SakuraSignFrames;
+            var tip = new Rgba(255, 236, 244);
+            var body = new Rgba(255, 176, 204);
+            var deep = new Rgba(232, 104, 150);
+            var vein = new Rgba(200, 68, 120);
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float dx = x - c, dy = c - y;
+                    float r = (float)Math.Sqrt(dx * dx + dy * dy);
+                    if (r < 0.8f) continue;
+                    // The angle from the nearest petal's middle, -36..36.
+                    double a = Math.Atan2(dy, dx) * 180 / Math.PI - 90 - turn;
+                    a = ((a % 72) + 72) % 72;
+                    if (a > 36) a -= 72;
+                    double off = Math.Abs(a);
+                    // A petal: broad, pinched where it meets its neighbour, notched at its tip.
+                    double reach = 7.4 * Math.Pow(Math.Cos(off * 2.5 * Math.PI / 180), 0.45) - (off < 6 ? 1.6 - off * 0.2 : 0);
+                    if (r > reach) continue;
+                    image[x, y] = r < 2.4f ? deep : off < 3.5 && r < 4.6f ? vein : r > reach - 1.5 ? tip : r < 3.6f ? deep : body;
+                }
+            }
+            var heart = new Rgba(255, 214, 110);
+            image[(int)c, (int)c] = heart;
+            image[(int)c - 1, (int)c] = heart;
+            image[(int)c + 1, (int)c] = heart;
+            image[(int)c, (int)c - 1] = heart;
+            image[(int)c, (int)c + 1] = new Rgba(232, 160, 70);
+            var edged = image.Outlined(new Rgba(90, 24, 48));
+            // Motes of light at the corners, two at a time, each a round behind the last.
+            (int X, int Y)[] motes = { (2, 2), (18, 3), (17, 18), (3, 17) };
+            for (int k = 0; k < motes.Length; k++)
+            {
+                int age = (f + 2 * k) % SakuraSignFrames;
+                if (age > 2) continue;
+                var (mx, my) = motes[k];
+                edged[mx, my] = Rgba.White;
+                if (age != 1) continue;
+                foreach (var (ox, oy) in new[] { (1, 0), (-1, 0), (0, 1), (0, -1) })
+                    if (!edged.IsSet(mx + ox, my + oy)) edged[mx + ox, my + oy] = new Rgba(255, 220, 236, 200);
+            }
+            return edged;
+        }
+
+        // The marks over the black knight's last phase (2026-11-28, Docs/Bosses.md 색 표지): where to stand for the blow
+        // that is coming. Near, red: four arrowheads closing on a full dot ("come in close"); far, blue: four arrowheads
+        // flying out from an empty ring ("get away"). The arrows move the way they point over the frames, so the two
+        // read apart by shape and movement as well as by colour. Their own colours (not tinted).
+        public const int ColorSignFrames = 6;
+        public const int ColorSignSize = 25;
+
+        public static PixelImage ColorSign(bool near, int frame)
+        {
+            const int size = ColorSignSize - 2;
+            int f = ((frame % ColorSignFrames) + ColorSignFrames) % ColorSignFrames;
+            var image = new PixelImage(size, size);
+            int c = size / 2;
+            var main = near ? new Rgba(232, 52, 36) : new Rgba(52, 128, 240);
+            var shine = near ? new Rgba(255, 150, 110) : new Rgba(150, 204, 255);
+            int slide = (int)Math.Round(f * 2f / (ColorSignFrames - 1));
+            // An arrowhead on each of the four ways: its point at one distance from the middle, its broad end four
+            // pixels behind it.
+            int point = near ? 6 - slide : 8 + slide, step = near ? 1 : -1;
+            for (int k = 0; k <= 3; k++)
+            {
+                int d = point + step * k;
+                for (int w = -k; w <= k; w++)
+                {
+                    var color = k == 0 ? Rgba.White : Math.Abs(w) == k ? shine : main;
+                    image[c + d, c + w] = color;
+                    image[c - d, c + w] = color;
+                    image[c + w, c + d] = color;
+                    image[c + w, c - d] = color;
+                }
+            }
+            // A short tail behind each, so it reads as an arrow and not a wedge.
+            for (int k = 4; k <= 5; k++)
+            {
+                int d = point + step * k;
+                if (!near && d < 4) continue;
+                image[c + d, c] = main;
+                image[c - d, c] = main;
+                image[c, c + d] = main;
+                image[c, c - d] = main;
+            }
+            if (near)
+            {
+                // The full dot they close on.
+                for (int y = -1; y <= 1; y++)
+                    for (int x = -1; x <= 1; x++)
+                        image[c + x, c + y] = x == 0 && y == 0 ? Rgba.White : Math.Abs(x) + Math.Abs(y) == 1 ? shine : main;
+            }
+            else
+            {
+                // The empty ring they leave.
+                for (int y = -2; y <= 2; y++)
+                    for (int x = -2; x <= 2; x++)
+                        if (Math.Max(Math.Abs(x), Math.Abs(y)) == 2 && Math.Abs(x) + Math.Abs(y) < 4) image[c + x, c + y] = slide == 0 ? Rgba.White : shine;
+            }
+            return image.Outlined(near ? new Rgba(48, 8, 8) : new Rgba(8, 16, 56));
+        }
+
         // Cherry blossom for the shrine samurai's fight (2026-11-12, the person: "make the blossom stand out, more
         // splendid"), drawn in its own colours: a single petal, notched at its broad end, pale or deep (kind 0, 1), or a
         // whole five-petal flower with a gold heart (kind 2). A faint dark edge keeps them on a pale floor.

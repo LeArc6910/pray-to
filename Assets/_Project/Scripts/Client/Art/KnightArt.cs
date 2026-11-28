@@ -429,6 +429,148 @@ namespace Game.Client
             return image;
         }
 
+        // ---- The helm off (the last phase, 2026-11-28, Docs/Bosses.md): each view's great helm is taken away and a bare
+        // head set on the gorget in its place: a grizzled veteran seen from above as everything is, iron-grey hair swept
+        // back over most of the head, a short weathered face under a shadowed brow, a grey beard. A patch per view, laid
+        // at (X, Y) of the picture: '.' leaves the picture as it is, '_' clears it, the rest are the colours below. ----
+
+        static readonly Dictionary<char, Rgba> HeadPalette = new Dictionary<char, Rgba>
+        {
+            ['K'] = new Rgba(4, 3, 8),
+            ['H'] = new Rgba(178, 174, 172),
+            ['h'] = new Rgba(122, 118, 122),
+            ['d'] = new Rgba(70, 66, 74),
+            ['S'] = new Rgba(200, 154, 126),
+            ['s'] = new Rgba(160, 114, 96),
+            ['f'] = new Rgba(110, 74, 70),
+            ['e'] = new Rgba(34, 22, 28),
+            ['B'] = new Rgba(138, 132, 134),
+            ['b'] = new Rgba(90, 84, 90),
+            ['p'] = new Rgba(33, 30, 40),
+            ['P'] = new Rgba(76, 82, 88),
+            ['q'] = new Rgba(49, 53, 60),
+        };
+
+        static (int X, int Y, string[] Rows) BareHeadOf(BossView view) => view switch
+        {
+            BossView.Front => (28, 1, new[]
+            {
+                "...______...",
+                ".__________.",
+                "___KKKKKK___",
+                "_KKhHHHHhKK_",
+                "KhhHHHHHHhhK",
+                "KhHHHhHHHHhK",
+                "KhHhHHHhHHhK",
+                "KdhhhhhhhhdK",
+                "KdffsSSsffdK",
+                "KsSesSSseSsK",
+                "KsSSsffsSSsK",
+                "KdsbBbbBbsdK",
+                "KKdbBBBBbdKK",
+                "_KKdbBBbdKK_",
+                "_KpKdbbdKpK_",
+                ".KpPqKKqPpK.",
+                ".KpqqqqqqpK.",
+            }),
+            BossView.FrontSide => (31, 1, new[]
+            {
+                ".._____......",
+                "_________....",
+                "____KKKKKK__.",
+                "__KKhHHHHhKK.",
+                "_KhHHHHHHHhK.",
+                "_KhHHHhHHHhK.",
+                "_KhHhHHHHhhK.",
+                "_KdhhhhhhhsK.",
+                "_KdhhhffSffK.",
+                "_KddhhseSSeK.",
+                "_KKdhhsSSfSK.",
+                "...KdbbBbBbK.",
+                "....KKbBBbKpK",
+            }),
+            BossView.Side => (30, 1, new[]
+            {
+                "..._____......",
+                "..__KKKKKKK_..",
+                ".__KhHHHHHHhK.",
+                "..KhHHHHHHHhsK",
+                "..KhHHhHHHhsSK",
+                "..KhHhHHhhfffK",
+                "..KdhhhhhsseSK",
+                "..KdhhhhhssSsK",
+                ".....KdhbbbBbK",
+                "......KdbbBbK.",
+            }),
+            BossView.BackSide => (26, 1, new[]
+            {
+                "..._______....",
+                "..___KKKKK__..",
+                ".__KKhHHHhKK_.",
+                "._KhHHHHHHHhK.",
+                "._KhHHHHHHHhsK",
+                "._KhHHhHHHhssK",
+                "._KdhHHhhhhdsK",
+                "._KddhhhhhddbK",
+                ".KpKdddhhddKK.",
+                ".KppKKKKKKppK.",
+            }),
+            _ => (23, 1, new[]
+            {
+                "....______....",
+                ".___KKKKKK___.",
+                "._KKhHHHHhKK_.",
+                ".KhHHHHHHHHhK.",
+                ".KhHHHhHHHHhK.",
+                ".KhHhHHHhHHhK.",
+                ".KhhHhhhHhhhK.",
+                ".KdhhhhhhhhdK.",
+                ".KKddhhhhddKK.",
+                ".KpKKddddKKpK.",
+                ".KPppKKKKppPK.",
+            }),
+        };
+
+        static readonly Dictionary<BossView, PixelImage> BareViews = new Dictionary<BossView, PixelImage>();
+
+        static PixelImage ViewOf(BossView view, bool bare)
+        {
+            if (!bare) return ViewOf(view);
+            if (BareViews.TryGetValue(view, out var image)) return image;
+            image = ViewOf(view).Copy();
+            var (left, top, rows) = BareHeadOf(view);
+            for (int y = 0; y < rows.Length; y++)
+            {
+                for (int x = 0; x < rows[y].Length; x++)
+                {
+                    char mark = rows[y][x];
+                    if (mark == '.') continue;
+                    image[left + x, top + y] = mark == '_' ? Rgba.Clear : HeadPalette[mark];
+                }
+            }
+            BareViews[view] = image;
+            return image;
+        }
+
+        // The helm where it fell (the last phase's roar drops it): the great helm of the front view itself, lifted off
+        // the picture and laid on its side on the floor, its crown to the right, the eye slit up, a dark mouth where the
+        // neck was.
+        public static PixelImage Helmet()
+        {
+            var view = ViewOf(BossView.Front);
+            var (left, top, rows) = BareHeadOf(BossView.Front);
+            const int tall = 15;
+            var helm = new PixelImage(tall, rows[0].Length);
+            for (int y = 0; y < tall; y++)
+                for (int x = 0; x < rows[y].Length; x++)
+                    if (rows[y][x] != '.' && view[left + x, top + y].A > 0) helm[tall - 1 - y, x] = view[left + x, top + y];
+            // The open neck: the cut end in shadow.
+            for (int y = 0; y < helm.Height; y++)
+                for (int x = 0; x < 2; x++)
+                    if (helm.IsSet(x, y)) helm[x, y] = x == 0 ? Ink : Shade;
+            return helm.Outlined(Ink);
+        }
+
         // Room round the picture for the hammer raised overhead or swung out ahead.
         const int Margin = 34;
         const int Headroom = 40;
@@ -851,9 +993,9 @@ namespace Game.Client
         }
 
         // The picture with each part at its place, on a canvas with room round it; and where the two fists are.
-        static PixelImage Compose(BossView view, Pose pose, out (float X, float Y) hands)
+        static PixelImage Compose(BossView view, Pose pose, bool bare, out (float X, float Y) hands)
         {
-            var image = ViewOf(view);
+            var image = ViewOf(view, bare);
             var parts = PartsOf(view);
             var (armA, armB, _, _) = BoxesOf(view);
             int w = image.Width, h = image.Height;
@@ -1077,7 +1219,8 @@ namespace Game.Client
 
         // One frame. A wind-up (Raise, Wind, Brace, Crouch) runs frame 0..5 through its telegraph; a blow (Smash, Pound,
         // Sweep) 0..3, a smear, the impact, held, recovering; a walk or a charge 0..3, a leap 0..3 rising (and 0..1
-        // breathing at rest). In the last phase the tabard is soaked dark red and the hammer's edge glows like a forge.
+        // breathing at rest). In the last phase the tabard is soaked dark red, the hammer's edge glows like a forge and the
+        // helm is off (BareHeadOf).
         // Faces right; WorldView flips it for the left.
         public static PixelImage Draw(BossView view, KnightPose pose, int frame, int phase) => Render(view, pose, frame, phase, out _);
 
@@ -1100,7 +1243,7 @@ namespace Game.Client
             joints = new Joints { Top = int.MaxValue, Left = int.MaxValue, Bottom = -1, Right = -1 };
             var p = PoseOf(pose, frame);
             bool side = view != BossView.Front && view != BossView.Back;
-            var body = Compose(view, p, out var hands);
+            var body = Compose(view, p, phase >= 3, out var hands);
             float lean = p.Lean, stretch = p.Stretch, shove = p.Shove, drop = p.Drop;
             if (!side)
             {

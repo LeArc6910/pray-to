@@ -92,6 +92,12 @@ namespace Game.Client
                 return BossFxPreview.Write(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out", "bossfx"),
                     TileArt.Ground(TileArt.Index(GroundKind.Floor, 0, 0))) ? 0 : 1;
             }
+            if (args.Length == 2 && args[0] == "--only" && args[1] == "r1b")
+            {
+                // --only r1b: the sheathed counter, the helm off and the two marks on one sheet (out/r1b/, R1bPreview).
+                return R1bPreview.Write(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out", "r1b"),
+                    TileArt.Ground(TileArt.Index(GroundKind.Floor, 0, 0))) ? 0 : 1;
+            }
             if (args.Length == 2 && args[0] == "--only" && args[1] == "monsterfx")
             {
                 // --only monsterfx: just the ordinary monsters' warnings and effects (out/monsterfx/, MonsterFxPreview).

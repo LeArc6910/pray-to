@@ -31,6 +31,10 @@ namespace Game.Client
         // Its entrance (2026-11-17, Docs/Bosses.md 입장 연출): sat on its heels, still, the hat down; the hat comes up;
         // a foot forward and it rises; standing, the hand goes to the hilt and the thumb eases the guard; and at rest.
         Seiza,
+        // The sheathed counter (2026-11-28, Docs/Bosses.md 납도 반격): the blade home, sunk lower than any stance over a
+        // wide base, the hat right down and the hand lying on the hilt, waiting to be struck. The first SheatheSettle
+        // frames sink into it; the rest are a loop, breathing, the guard glinting.
+        Sheathe,
     }
 
     // The samurai of the forgotten shrine (2026-11-12): a ronin in crimson lacquered armour and a straw hat, a katana
@@ -466,6 +470,8 @@ namespace Game.Client
             return keys[keys.Length - 1].Pose;
         }
 
+        static float Ease(float u) => u * u * (3 - 2 * u);
+
         // Frames from one pose to the next, eased (or, for a cut, all at once).
         static IEnumerable<SPose> Tween(SPose from, SPose to, int count)
         {
@@ -566,6 +572,7 @@ namespace Game.Client
             SamuraiPose.Rush => 8,
             SamuraiPose.Kiai => KiaiRise + 4,
             SamuraiPose.Seiza => 30,
+            SamuraiPose.Sheathe => SheatheSettle + SheatheHold,
             _ => 4,
         };
 
@@ -580,6 +587,11 @@ namespace Game.Client
             + Enumerable.Range(0, FramesOf(SamuraiPose.Chiburi)).Sum(f => FrameSeconds(SamuraiPose.Chiburi, f))
             + Enumerable.Range(0, NotoHome).Sum(f => FrameSeconds(SamuraiPose.Noto, f));
 
+        // The sheathed counter: the frames that sink into it, then the frames of the loop it waits in (WorldView plays
+        // 0..SheatheSettle-1 once, then SheatheSettle..FramesOf-1 round and round).
+        public const int SheatheSettle = 6;
+        const int SheatheHold = 8;
+
         // The frames the shout takes to draw and raise the blade, before it shakes there.
         public const int KiaiRise = 24;
 
@@ -592,6 +604,8 @@ namespace Game.Client
             SamuraiPose.Chiburi => frame < 2 ? 0.02f : frame == 2 ? 0.03f : 0.05f,
             SamuraiPose.Noto => frame < NotoHome ? 0.0135f : frame == NotoHome ? 0.29f : 0.0375f,
             SamuraiPose.Again => 0.0135f,
+            // Down into the wait in a fifth of a second; then a slow breath (1.6 s a round).
+            SamuraiPose.Sheathe => frame < SheatheSettle ? 0.035f : 0.2f,
             _ => 0,
         };
 
@@ -602,6 +616,10 @@ namespace Game.Client
 
         // Sat on its heels: the trunk sunk right down over the folded legs, the hat low.
         static readonly SPose Seated = P(lean: 1, drop: 11, nod: 3);
+
+        // Waiting sheathed: lower and wider than the stance before a draw, the weight back on the rear foot, the hat
+        // down over the face, the scabbard turned out a little by the left hand.
+        static readonly SPose Waiting = P(lean: 7, shove: -2, drop: 6, stepA: 7, stepB: -6, nod: 3, grip: 1, glint: 2, saya: 2);
 
         static SPose PoseOf(SamuraiPose pose, int frame)
         {
@@ -664,6 +682,16 @@ namespace Game.Client
                         (0.8f, Set),
                         (0.9f, P(lean: 3, drop: 2, stepA: 3, stepB: -3, nod: 2, grip: 1, glint: 3)),
                         (1, Rest));
+                case SamuraiPose.Sheathe:
+                {
+                    if (f < SheatheSettle) return Lerp(Rest, Waiting, Ease((f + 1) / (float)SheatheSettle));
+                    // Breathing: the trunk sinks a pixel through half the round; the guard glints once a round.
+                    int k = f - SheatheSettle;
+                    var wait = Waiting;
+                    if (k >= SheatheHold / 2) wait.Drop += 1;
+                    wait.Glint = k == 1 || k == 2 ? 3 : k == 0 || k == 3 ? 2 : 1;
+                    return wait;
+                }
                 case SamuraiPose.Kiai:
                     // The blade drawn and raised high, then held there shaking with the shout.
                     if (f < KiaiRise)
@@ -689,6 +717,7 @@ namespace Game.Client
             SamuraiPose.Draw or SamuraiPose.Kiri or SamuraiPose.Sweep or SamuraiPose.Whirl or SamuraiPose.Chiburi => 1,
             SamuraiPose.Noto => frame < NotoTurn ? 1 : 0,
             SamuraiPose.Again => frame < 3 ? 0 : -1,
+            SamuraiPose.Sheathe => frame >= SheatheSettle / 2 ? -1 : 0,
             _ => 0,
         };
 
