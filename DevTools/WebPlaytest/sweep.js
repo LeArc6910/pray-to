@@ -5031,6 +5031,14 @@ async function arenas(browser) {
   }
 }
 
+// The weapon kinds with motions and a feel of their own (Docs/Weapons.md 묶음 B): id, name, HeroStyle, the time between
+// basic attacks (0.5 s / speed).
+const KindsOwn = [
+  ['dagger', '단검', 'Dagger', 0.3125], ['greatsword', '대검', 'Greatsword', 0.833], ['spear', '창', 'Spear', 0.588],
+  ['hammer', '망치', 'Hammer', 1.0], ['crossbow', '석궁', 'Crossbow', 1.111], ['boomerang', '부메랑', 'Boomerang', 0.833],
+  ['wand', '완드', 'Wand', 0.286], ['orb', '오브', 'Orb', 0.735],
+];
+
 // The hero's attacks by weapon (2026-11-19, HeroArt): with each weapon the attack is held at three sturdy slimes and
 // pictures are taken through the combo's three steps, to the right and then up, down and left; then a skill sent
 // forward and one all round, a drink, and the hero struck. On a PC and on a phone held upright.
@@ -5051,6 +5059,8 @@ async function hero(browser) {
     await game.wait(1200);
     await clearRoom(game, 4, 4);
     const weapons = [['copper_sword', '검'], ['copper_bow', '활'], ['copper_staff', '지팡이'], ['copper_pickaxe', '곡괭이'], ['none', '맨손']];
+    // The kinds with motions of their own (Docs/Weapons.md 묶음 B), on the PC only: the phone's are for size and fit.
+    if (profile === 'pc') weapons.push(...KindsOwn.map(([kind, name]) => [`iron_${kind}`, name]));
     for (const [weapon, name] of weapons) {
       await game.send(`heal; hero ${weapon} 1 0`);
       const struck = await game.until(s => s.hurtMonsters > 0, 4000);
@@ -5058,12 +5068,20 @@ async function hero(browser) {
       // Six pictures a little apart catch different frames of the three steps.
       // Healed between pictures: a first-level hero falls to three slimes before the weapons have gone round, and
       // gets up again in the village (2026-11-19).
-      for (let i = 0; i < 6; i++) {
-        await game.wait(170);
+      const own = weapon.startsWith('iron_');
+      for (let i = 0; i < (own ? 4 : 6); i++) {
+        await game.wait(own ? 230 : 170);
               await game.shot(`hero-${profile}-${weapon}-${i}`, `${name} 연타 ${i + 1}`);
       }
+      if (own) {
+        // Its own motion, done within its time between blows (weapon_kinds.csv speed: 0.5 s at 1).
+        const kind = KindsOwn.find(([k]) => `iron_${k}` === weapon);
+        const state = await game.state();
+        check(state.heldStyle === kind[2] && state.strikeLength > 0 && state.strikeLength <= kind[3] * 1.05,
+          `${profile} ${name}: 제 동작(${state.heldStyle}), 한 번 ${state.strikeLength}초 ≤ 공격 간격 ${kind[3]}초`);
+      }
       // The same weapon the other three ways (only on the PC: the phone's pictures are for size and fit).
-      if (profile === 'pc') {
+      if (profile === 'pc' && !own) {
         for (const [dx, dy, way] of [[0, 1, '위'], [-1, 0, '왼쪽'], [0, -1, '아래']]) {
           await game.send(`heal; hero ${weapon} ${dx} ${dy}`);
           await game.wait(450);
@@ -5148,7 +5166,18 @@ async function weapons(browser) {
         const held = await game.state();
         check(!!struck && held.weaponKind === (kind === 'boomerang' ? 'throwing' : kind), `${name} ${label}: 기본 공격이 슬라임에 닿는다 (${held.weaponKind})`);
         await game.wait(300);
-        await game.shot(`weapons-${kind}`, `${label}의 기본 공격 (그림은 아직 검·활·지팡이의 것)`);
+        await game.shot(`weapons-${kind}`, `${label}의 기본 공격 (제 동작, 제 탄)`);
+        // Its own feel (WeaponFeel, Docs/Feel.md): the heavy ones shake on every blow and stop longer, the light ones
+        // stop less; its own shot; an orb's bursts where it stops.
+        await game.wait(900);
+        const felt = await game.state();
+        if (kind === 'greatsword' || kind === 'hammer')
+          check(felt.blowShake >= 0.05 && felt.blowStop >= 0.064, `${name} ${label}: 무거운 타격 (흔들림 ${felt.blowShake}, 멈춤 ${felt.blowStop}초)`);
+        if (kind === 'dagger' || kind === 'wand')
+          check(felt.blowStop > 0 && felt.blowStop <= 0.046, `${name} ${label}: 가벼운 타격 (멈춤 ${felt.blowStop}초, 흔들림 ${felt.blowShake})`);
+        const looks = { crossbow: 'Bolt', boomerang: 'Boomerang', wand: 'Spark', orb: 'Orb' };
+        if (looks[kind]) check(felt.lastShotLook === looks[kind] && felt.kindShots > 0, `${name} ${label}: 제 탄 모양 (${felt.lastShotLook})`);
+        if (kind === 'orb') check(felt.orbBursts > 0, `${name} ${label}: 멈춘 곳에서 터진다 (${felt.orbBursts}번)`);
         await game.send('attack off; clear');
         await game.wait(400);
       }

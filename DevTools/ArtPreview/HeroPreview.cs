@@ -34,8 +34,8 @@ namespace Game.Client
             return new MotionCheck.Step
             {
                 Label = label ?? $"{move}{frame:00}",
-                Seconds = seconds > 0 ? seconds : HeroArt.FrameSeconds(move, gear.Kind, frame),
-                Kind = label != null ? MotionCheck.Kind.Normal : HeroArt.BeatOf(move, gear.Kind, frame) switch
+                Seconds = seconds > 0 ? seconds : HeroArt.FrameSeconds(move, gear.Style, frame),
+                Kind = label != null ? MotionCheck.Kind.Normal : HeroArt.BeatOf(move, gear.Style, frame) switch
                 {
                     HeroArt.Beat.Swing => MotionCheck.Kind.Swing,
                     HeroArt.Beat.Strike => MotionCheck.Kind.Strike,
@@ -53,7 +53,7 @@ namespace Game.Client
         static IEnumerable<MotionCheck.Step> Rest(HeroGear gear, float seconds = 0.3f) => new[] { Frame(HeroMove.Stand, 0, gear, "rest", seconds) };
 
         static IEnumerable<MotionCheck.Step> All(HeroMove move, HeroGear gear, int from = 0) =>
-            Enumerable.Range(from, HeroArt.FramesOf(move, gear.Kind) - from).Select(f => Frame(move, f, gear));
+            Enumerable.Range(from, HeroArt.FramesOf(move, gear.Style) - from).Select(f => Frame(move, f, gear));
 
         static IEnumerable<MotionCheck.Step> Once(HeroMove move, HeroGear gear) => Rest(gear).Concat(All(move, gear)).Concat(Rest(gear));
 
@@ -62,10 +62,13 @@ namespace Game.Client
             Directory.CreateDirectory(folder);
             int jumps = 0;
             var weapons = new[] { HeroWeapon.Sword, HeroWeapon.Bow, HeroWeapon.Staff, HeroWeapon.Pick, HeroWeapon.None };
-            foreach (var weapon in weapons)
+            // The four of old and bare hands, then the kinds with motions of their own (HeroStyle, Docs/Weapons.md 묶음 B).
+            var gears = weapons.Select(HeroGear.Plain)
+                .Concat(new[] { "dagger", "greatsword", "spear", "hammer", "crossbow", "throwing", "wand", "orb" }.Select(HeroGear.PlainKind)).ToList();
+            foreach (var gear in gears)
             {
-                var gear = HeroGear.Plain(weapon);
-                string name = "hero_" + (weapon == HeroWeapon.None ? "fists" : weapon.ToString().ToLowerInvariant());
+                var weapon = gear.Style;
+                string name = "hero_" + (weapon == HeroStyle.None ? "fists" : weapon.ToString().ToLowerInvariant());
                 var attacks = new[] { HeroMove.Attack1, HeroMove.Attack2, HeroMove.Attack3 };
                 // The three steps each from rest, then the three straight on one another as a held attack plays them
                 // (each next strike starting past its own lead-in, WorldView).
@@ -113,7 +116,7 @@ namespace Game.Client
 
             // How many frames each motion has, how long it takes and where its blow lands (hero_frames.txt).
             var table = new System.Text.StringBuilder();
-            foreach (var weapon in weapons)
+            foreach (var weapon in gears.Select(g => g.Style))
             {
                 table.AppendLine($"## {weapon}");
                 foreach (HeroMove move in Enum.GetValues(typeof(HeroMove)))
@@ -131,7 +134,7 @@ namespace Game.Client
             return jumps;
         }
 
-        static int ChainFrame(HeroMove move, HeroWeapon weapon)
+        static int ChainFrame(HeroMove move, HeroStyle weapon)
         {
             float at = HeroArt.ChainSeconds(move, weapon);
             return HeroArt.FrameAt(move, weapon, at + 1e-4f);
@@ -139,7 +142,7 @@ namespace Game.Client
 
         // The frames at the end of a strike in which it goes back to rest (after the hold), which a strike that follows
         // straight on cuts off.
-        static int RecoveryFrames(HeroMove move, HeroWeapon weapon)
+        static int RecoveryFrames(HeroMove move, HeroStyle weapon)
         {
             int frames = HeroArt.FramesOf(move, weapon), strike = HeroArt.StrikeFrame(move, weapon);
             return Math.Max(0, frames - strike - 3);

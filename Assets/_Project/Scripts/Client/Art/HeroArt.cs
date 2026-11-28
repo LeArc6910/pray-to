@@ -107,7 +107,7 @@ namespace Game.Client
             return new HeroGear(MotionOf(kind), "plain_" + kind, metal.Light, metal.Main, metal.Shade, Rgba.Hex("#C88CFF"), Rgba.Hex("#7E46D0"), ShapeOf(kind));
         }
 
-        // Whose motions a kind borrows (Docs/Weapons.md, 묶음 B: until each has its own).
+        // The weapon a kind is drawn like and does its other moves as (rest, walk, skills, roll); its strikes are its own (Style).
         public static HeroWeapon MotionOf(string kind) => kind switch
         {
             "bow" or "crossbow" => HeroWeapon.Bow,
@@ -694,7 +694,8 @@ namespace Game.Client
                 case HeroMove.Drink: return Drinking(rest);
                 case HeroMove.Hurt: return Flinch(rest);
                 case HeroMove.Fall: return Falling(rest);
-                case HeroMove.Roll: return weapon == HeroWeapon.Bow ? Sliding(rest) : weapon == HeroWeapon.Staff ? Gliding(rest) : Tumbling(rest, weapon);
+                // A spear is no spellcaster's: it tumbles like the blades.
+                case HeroMove.Roll: return weapon == HeroWeapon.Bow ? Sliding(rest) : weapon == HeroWeapon.Staff && style != HeroStyle.Spear ? Gliding(rest) : Tumbling(rest, weapon);
                 default: return Rising(rest);
             }
         }

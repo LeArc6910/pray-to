@@ -47,7 +47,7 @@ namespace Game.Core
 
         // Host and client must run the same rules and sheets, so a different version is refused (Docs/CrossPlay.md 버전 정책:
         // every change to the rules, the sheets or a message goes up; PC, phone and web of the same version play together).
-        public const string Version = "0.116.0";
+        public const string Version = "0.117.0";
 
         // Why a joiner of another version is refused, and who has to update: the older side.
         public static string VersionRefusal(string theirs)
@@ -1218,8 +1218,10 @@ namespace Game.Core
     // Clients move projectiles on by their velocity between snapshots, so they are drawn where they really are.
     public readonly struct ProjectileState
     {
-        public ProjectileState(int id, Vec2 position, Vec2 velocity, float radius, bool friendly = false, SkillTag tags = SkillTag.None, int ticksLeft = 0)
+        public ProjectileState(int id, Vec2 position, Vec2 velocity, float radius, bool friendly = false, SkillTag tags = SkillTag.None, int ticksLeft = 0,
+            ShotLook look = ShotLook.Plain)
         {
+            Look = look;
             TicksLeft = Math.Clamp(ticksLeft, 0, 255);
             Id = id;
             Position = position;
@@ -1239,6 +1241,8 @@ namespace Game.Core
         // A player's: the ticks of flight it has left (up to 255), so a client can work out where it will end
         // (World.Landing); 0 for an enemy's.
         public int TicksLeft { get; }
+        // A player's basic shot: how it looks (a bolt, a boomerang, an orb, a spark).
+        public ShotLook Look { get; }
     }
 
     // A telegraphed area. TicksLeft counts from the snapshot's tick to when it lands, out of Duration in all.
@@ -1482,6 +1486,7 @@ namespace Game.Core
                 // The seven tags fit under the top bit, which says whose it is.
                 w.Write((byte)((projectile.Friendly ? 0x80 : 0) | ((int)projectile.Tags & 0x7f)));
                 w.Write((byte)projectile.TicksLeft);
+                w.Write((byte)projectile.Look);
             }
 
             w.Write((ushort)Hazards.Count);
@@ -1592,7 +1597,8 @@ namespace Game.Core
                 float radius = r.ReadByte() / 32f;
                 byte owner = r.ReadByte();
                 int ticksLeft = r.ReadByte();
-                projectiles.Add(new ProjectileState(id, at, velocity, radius, (owner & 0x80) != 0, (SkillTag)(owner & 0x7f), ticksLeft));
+                var look = (ShotLook)r.ReadByte();
+                projectiles.Add(new ProjectileState(id, at, velocity, radius, (owner & 0x80) != 0, (SkillTag)(owner & 0x7f), ticksLeft, look));
             }
 
             int hazardCount = r.ReadUInt16();

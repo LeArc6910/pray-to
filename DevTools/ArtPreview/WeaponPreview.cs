@@ -50,6 +50,53 @@ namespace Game.Client
             Png.Save(big, path);
             Console.WriteLine($"{path}: 무기 종류 {Kinds.Length}줄 (아이콘, 서기 옆·아래, 연타 1·2·3단의 타격 장)");
             WriteCombos(output, loot);
+            WriteShots(output);
+        }
+
+        // out/weapons_shots.png: the kinds' own shots beside the arrow and the ball, tinted as the game tints them
+        // (a bow's and a crossbow's a little, a magic one in its colour), the boomerang a quarter turn at a time.
+        static void WriteShots(string output)
+        {
+            var magic = Rgba.Hex("#B07CFF");
+            var shots = new (PixelImage Image, Rgba Tint, float Share)[]
+            {
+                (ItemArt.Arrow, magic, 0), (ItemArt.CrossbowBolt, magic, 0), (ItemArt.BoomerangShot, magic, 0),
+                (ItemArt.Orb, magic, 1), (ItemArt.OrbShot, magic, 1), (ItemArt.Spark, magic, 1),
+            };
+            const int cell = 20, scale = 6;
+            var sheet = new PixelImage(cell * (shots.Length + 3), cell);
+            for (int y = 0; y < sheet.Height; y++)
+                for (int x = 0; x < sheet.Width; x++) sheet[x, y] = (x / cell) % 2 == 0 ? Rgba.Hex("#3A3240") : Rgba.Hex("#332C3A");
+            int column = 0;
+            void Put(PixelImage image, Rgba tint, float share)
+            {
+                var tinted = new PixelImage(image.Width, image.Height);
+                for (int y = 0; y < image.Height; y++)
+                    for (int x = 0; x < image.Width; x++)
+                    {
+                        var c = image[x, y];
+                        tinted[x, y] = c.A == 0 ? c : new Rgba(c.R * (255 - (int)(share * (255 - tint.R))) / 255, c.G * (255 - (int)(share * (255 - tint.G))) / 255, c.B * (255 - (int)(share * (255 - tint.B))) / 255, c.A);
+                    }
+                sheet.Draw(tinted, column * cell + (cell - image.Width) / 2, (cell - image.Height) / 2);
+                column++;
+            }
+            foreach (var (image, tint, share) in shots) Put(image, tint, share);
+            // The boomerang turned as it spins.
+            var turned = ItemArt.BoomerangShot;
+            for (int t = 0; t < 3; t++)
+            {
+                var next = new PixelImage(turned.Height, turned.Width);
+                for (int y = 0; y < turned.Height; y++)
+                    for (int x = 0; x < turned.Width; x++) next[turned.Height - 1 - y, x] = turned[x, y];
+                turned = next;
+                Put(turned, magic, 0);
+            }
+            var big = new PixelImage(sheet.Width * scale, sheet.Height * scale);
+            for (int y = 0; y < big.Height; y++)
+                for (int x = 0; x < big.Width; x++) big[x, y] = sheet[x / scale, y / scale];
+            string path = Path.Combine(output, "weapons_shots.png");
+            Png.Save(big, path);
+            Console.WriteLine($"{path}: 화살, 석궁 볼트, 부메랑, 구슬, 오브 탄, 완드 불꽃, 도는 부메랑");
         }
 
         // out/weapons_combo.png: a row a kind with motions of its own, side on: for each of the three combo steps the

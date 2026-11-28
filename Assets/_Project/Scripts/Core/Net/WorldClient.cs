@@ -141,8 +141,10 @@ namespace Game.Core
 
     public readonly struct ProjectileView
     {
-        public ProjectileView(int id, Vec2 position, Vec2 velocity, float radius, bool friendly, SkillTag tags, Vec2 origin = default, int ticksLeft = 0)
+        public ProjectileView(int id, Vec2 position, Vec2 velocity, float radius, bool friendly, SkillTag tags, Vec2 origin = default, int ticksLeft = 0,
+            ShotLook look = ShotLook.Plain)
         {
+            Look = look;
             Origin = origin;
             TicksLeft = ticksLeft;
             Id = id;
@@ -165,6 +167,7 @@ namespace Game.Core
         // what WorldClient.LandingOf runs ahead from.
         public Vec2 Origin { get; }
         public int TicksLeft { get; }
+        public ShotLook Look { get; }
     }
 
     public readonly struct MachineView
@@ -1575,7 +1578,7 @@ namespace Game.Core
             {
                 views.Add(new ProjectileView(
                     projectile.Id, projectile.Position + projectile.Velocity * seconds, projectile.Velocity, projectile.Radius, projectile.Friendly, projectile.Tags,
-                    projectile.Position, projectile.TicksLeft));
+                    projectile.Position, projectile.TicksLeft, projectile.Look));
             }
             return views;
         }

@@ -299,6 +299,16 @@ namespace Game.Core
     // hands) swings, ranged shoots arrows, magic shoots bolts. A swing hits everything in its arc; a shot flies straight,
     // hits the first enemy it touches (or goes through Pierce more), may come back to the thrower (Returns) and may
     // burst there (Burst), and stops at walls. See Docs/Combat.md.
+    // How a player's basic shot looks (BasicAttack.Look, carried in the snapshot).
+    public enum ShotLook : byte
+    {
+        Plain,
+        Bolt,
+        Boomerang,
+        Orb,
+        Spark,
+    }
+
     public sealed class BasicAttack
     {
         public static readonly BasicAttack Swing = new BasicAttack(BasicAttackKind.Swing, "휘두르기");
@@ -340,6 +350,13 @@ namespace Game.Core
         // Seconds the finisher dazes a monster it hits (0: none).
         public float Stun { get; }
         public bool Shoots => Kind != BasicAttackKind.Swing;
+
+        // How its shot looks on the screen (Docs/Weapons.md 묶음 B): a boomerang that comes back, an orb's burst, a
+        // crossbow's bolt that goes through, a wand's thin spark, or the plain arrow or ball.
+        public ShotLook Look => Returns ? ShotLook.Boomerang : Burst > 0 ? ShotLook.Orb
+            : Kind == BasicAttackKind.Arrow && Pierce > 0 ? ShotLook.Bolt
+            : Kind == BasicAttackKind.Bolt && Radius < Bolt.Radius ? ShotLook.Spark
+            : ShotLook.Plain;
 
         public static BasicAttack For(SkillTag weaponTags) =>
             (weaponTags & SkillTag.Melee) != 0 ? Swing

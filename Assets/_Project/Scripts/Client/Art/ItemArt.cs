@@ -354,7 +354,7 @@ namespace Game.Client
         public static HeroGear Held(ItemBase item)
         {
             if (item == null || item.Slot != ItemSlot.Weapon) return HeroGear.None;
-            // The kind's own shape, swung with the motions of the weapon it borrows them from (Docs/Weapons.md 묶음 B).
+            // The kind's own shape; it strikes in its own way (HeroGear.Style) and does the rest as the weapon it is drawn like (Docs/Weapons.md 묶음 B).
             string id = item.Kind?.Id;
             var kind = item.IsPickaxe ? HeroWeapon.Pick : id != null ? HeroGear.MotionOf(id)
                 : (item.Tags & SkillTag.Ranged) != 0 ? HeroWeapon.Bow : (item.Tags & SkillTag.Magic) != 0 ? HeroWeapon.Staff : HeroWeapon.Sword;
@@ -1658,6 +1658,58 @@ namespace Game.Client
 
         // A glowing ball in white and greys, for the view to tint with the shot's colour.
         public static readonly PixelImage Orb = Ball(spiky: false);
+
+        // The weapon kinds' own shots (BasicAttack.Look, Docs/Weapons.md 묶음 B), along +x like the arrow.
+        // A crossbow's bolt: short, thick, a broad steel head and stiff vanes.
+        public static readonly PixelImage CrossbowBolt = PixelImage.FromRows(new Dictionary<char, Rgba>(ArrowColors) { ['L'] = Rgba.Hex("#F0F4FA") },
+            "Hs.......m...",
+            "HsshhhhhhMMm.",
+            "HsshhhhhhMLLM",
+            "Hs.......m...");
+
+        // A boomerang seen from above, bent at its elbow; the view spins it as it flies.
+        public static readonly PixelImage BoomerangShot = PixelImage.FromRows(new Dictionary<char, Rgba>(ArrowColors) { ['L'] = Rgba.Hex("#F0F4FA"), ['d'] = Rgba.Hex("#4A5262") },
+            "..dMMMMd..",
+            ".dLLMMMMd.",
+            "dLMmddddd.",
+            "dLMd......",
+            "dMMd......",
+            "dMMd......",
+            "dMmd......",
+            ".dd.......");
+
+        // An orb's shot: a bigger ball inside a faint ring of its glow, in white and greys for the view to tint.
+        public static readonly PixelImage OrbShot = MakeOrbShot();
+
+        static PixelImage MakeOrbShot()
+        {
+            const int size = 13;
+            var image = new PixelImage(size, size);
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                {
+                    float dx = x - 6, dy = y - 6, d = System.MathF.Sqrt(dx * dx + dy * dy);
+                    if (d <= 1.6f) image[x, y] = Rgba.White;
+                    else if (d <= 3) image[x, y] = new Rgba(230, 230, 230);
+                    else if (d <= 4.2f) image[x, y] = new Rgba(170, 170, 170);
+                    else if (d > 5.4f && d <= 6.3f && (x + y) % 2 == 0) image[x, y] = new Rgba(200, 200, 200, 150);
+                }
+            image[5, 4] = Rgba.White;
+            image[4, 5] = Rgba.White;
+            return image;
+        }
+
+        // A wand's spark: a thin bright streak with a point of light at its head.
+        public static readonly PixelImage Spark = MakeSpark();
+
+        static PixelImage MakeSpark()
+        {
+            var image = new PixelImage(9, 5);
+            for (int x = 0; x < 9; x++) image[x, 2] = x < 3 ? new Rgba(150, 150, 150, (byte)(110 + x * 40)) : x < 7 ? new Rgba(225, 225, 225) : Rgba.White;
+            image[7, 1] = image[7, 3] = image[6, 2] = new Rgba(235, 235, 235);
+            image[8, 0] = image[8, 4] = new Rgba(200, 200, 200, 160);
+            return image;
+        }
 
         // An enemy's shot: the same ball with spikes, so it reads as harmful whatever its colour.
         public static readonly PixelImage Spore = Ball(spiky: true);

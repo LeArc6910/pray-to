@@ -1317,6 +1317,10 @@ DevTools/Local/setup.sh --commit
   - 소리 파일 넣기(로컬 세션): 5차 표의 새 세트를 `Resources/Sfx/<세트>_1.wav`부터 넣는다(코드는 그대로, 없으면 지금 소리가 난다). 성별 신음 2(`voice_player_male_hurt`, `voice_player_female_hurt`), 원소 폭발 4(`sfx_spell_poison`·`_void`·`_water`·`_spirit`), 수확 10(`sfx_harvest_mushroom`·`bush`·`pod`·`geode`·`ore`·`clam`·`berry`·`root`·`leaf`·`melon`), 보스 포효 12(`roar_<보스 id>`, 프롬프트 예시는 5차 표). 넣으면 `Docs/SoundCredits.md`에 출처를 적는다
   - (사람) 새 캐릭터 화면에서 [성별 ▶]으로 여자를 골라 미리보기와 게임 안 모습(몸통·턱·홍조)이 어색하지 않은지 본다
   - (사람) 시험장 시험판 [성별]로 남·여를 바꿔 맞아 보고 신음이 너무 잦거나 드물지 않은지, 마지막 휘두르기가 이제 다른 단과 맞는지, 버섯 어미(포자 굴)가 포자를 부를 때 칼 궤적·휘두르기 소리가 없는지, 모르그의 불 띠가 불 소리인지
+- [ ] 202단계: 무기 종류마다 제 동작과 타격감(묶음 B, 2026-11-28) — `Docs/Weapons.md` 묶음 B, `Docs/Feel.md` 무기 종류마다
+  - 명령 한 줄을 다시 돌린다. 새 파일 `Client/Art/HeroArt.Kinds.cs`, `Client/WeaponFeel.cs`의 `.meta`가 생기면 커밋한다. 통신 0.117.0(탄에 모양 한 바이트)
+  - PlayMode `Screens` 사진 여덟 장이 `local-screens`에 올라오는지: `weapon-dagger`·`weapon-greatsword`·`weapon-spear`·`weapon-hammer`·`weapon-crossbow`·`weapon-boomerang`·`weapon-wand`·`weapon-orb`(`FeatureTests.EachWeaponKindStrikesItsOwnWay`)
+  - (사람) 시험장에서 여덟 종을 들고 손맛을 본다: 대검·망치가 무겁게(흔들림·멈춤) 느껴지는지, 단검·완드가 가볍고 빠른지, 석궁 반동, 부메랑이 손을 떠났다 돌아오는지, 오브 폭발, 망치 3단 기절의 별. 소리가 종류에 어울리는지
 
 ## 결과 보고
 

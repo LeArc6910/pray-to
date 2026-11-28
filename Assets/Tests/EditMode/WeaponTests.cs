@@ -227,6 +227,28 @@ namespace Game.Core.Tests
             Assert.AreEqual(0, world.Projectiles.Count, "back in hand");
         }
 
+        // Each kind's shot shows as its own (BasicAttack.Look, Docs/Weapons.md 묶음 B), and the snapshot carries it.
+        [TestCase("copper_bow", ShotLook.Plain)]
+        [TestCase("copper_crossbow", ShotLook.Bolt)]
+        [TestCase("copper_boomerang", ShotLook.Boomerang)]
+        [TestCase("copper_staff", ShotLook.Plain)]
+        [TestCase("copper_wand", ShotLook.Spark)]
+        [TestCase("copper_orb", ShotLook.Orb)]
+        public void EachKindsShotHasItsLookAndTheSnapshotCarriesIt(string weapon, ShotLook look)
+        {
+            var world = Room();
+            var player = world.AddPlayer("a", Gear.Wearing(weapon));
+            world.MovePlayer(player.Id, player.Position, new Vec2(1, 0), 1);
+            world.SetAttacking(player.Id, true);
+            Run(world, 1);
+            Assert.AreEqual(1, world.Projectiles.Count);
+            Assert.AreEqual(look, world.Projectiles[0].Look);
+            var self = new SelfState(0, new Vec2(10, 10), 100, 100, 5, new List<int>(), new List<int>(), 0, -1, 0, 0, 0, -1, -1, 0, 0, -1, 0, 0);
+            var shots = new List<ProjectileState> { new ProjectileState(9, new Vec2(10, 11), new Vec2(8, 0), 0.3f, true, SkillTag.Ranged, 20, look) };
+            var back = SnapshotMessage.Decode(new SnapshotMessage(1, self, new List<EntityState>(), shots, new List<HazardState>(), new List<SimEvent>()).Encode());
+            Assert.AreEqual(look, back.Projectiles[0].Look);
+        }
+
         [Test]
         public void AnOrbBurstsWhereItStopsAndStrikesThoseAround()
         {

@@ -147,7 +147,7 @@ namespace Game.Client
                     break;
                 case SkillKind.Projectile:
                     Start(caster, Motion.Thrust);
-                    if (caster.Gear.Kind != HeroWeapon.Bow && caster.Gear.Kind != HeroWeapon.Staff)
+                    if (caster.Gear.Kind != HeroWeapon.Bow && caster.Gear.Kind != HeroWeapon.Staff || caster.Gear.Style == HeroStyle.Spear)
                     {
                         caster.Combo = 0;
                         caster.SwingTime = SwingSeconds;

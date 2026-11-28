@@ -1041,6 +1041,8 @@ namespace Game.Core
         internal HashSet<int> Pierced { get; } = new HashSet<int>();
         // A basic attack's: how wide it bursts where it stops (an orb's, Docs/Weapons.md); 0 for only what it touches.
         public float Burst { get; internal set; }
+        // A basic attack's look on the screen (BasicAttack.Look).
+        public ShotLook Look { get; internal set; }
         public bool Friendly { get; }
         // A player's: the tags it hits with, buffs included.
         public SkillTag Tags { get; }

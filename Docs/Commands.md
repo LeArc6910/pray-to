@@ -95,7 +95,7 @@ dotnet run --project DevTools/ArtPreview -- --only dungeons
 dotnet run --project DevTools/ArtPreview -- --only portraits
 # 시작화면 개편의 그림만(out/title/: looks.png 주인공 외형(머리 모양·색·피부·눈·옷, 기본 외형과 옛 그림 비교), looks_moves.png 무작위 외형의 모션, logo.png·logo_glint.png 로고와 반짝임, buttons.png 글자 단추·판·목록 줄, biome_icons.png, loading_<생물군계>.png 로딩 장면, T3 화면 시안 screens_pc.png·screens_phone.png·screens_phonewide.png와 화면마다 screen_<크기>_<title|characters|make|worlds|loading|hub>.png. Docs/TitleRework.md T2·T3)
 dotnet run --project DevTools/ArtPreview -- --only title
-# 무기 종류를 주인공이 든 모습(out/weapons_held.png, Docs/Weapons.md 묶음 B). 아이콘 줄은 --only gear의 out/weapons.png
+# 무기 종류를 주인공이 든 모습(out/weapons_held.png), 종류마다 연타 1·2·3단 다섯 장씩(out/weapons_combo.png, 시간도 출력), 종류마다 탄(out/weapons_shots.png). Docs/Weapons.md 묶음 B. 아이콘 줄은 --only gear의 out/weapons.png
 dotnet run --project DevTools/ArtPreview -- --only weapons
 # 그림 린트만(몇 초): 외딴 픽셀·색 수·흔들림·쌍둥이를 세고 out/lint.md에 적는다. 기준(lint-baseline.txt)보다 늘면 실패
 dotnet run --project DevTools/ArtPreview -- --only lint

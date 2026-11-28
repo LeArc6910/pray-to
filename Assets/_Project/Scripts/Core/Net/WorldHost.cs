@@ -823,7 +823,7 @@ namespace Game.Core
                 .Where(p => InView(p.Position))
                 .OrderBy(p => Distance(p.Position))
                 .Take(_config.MaxProjectilesPerSnapshot)
-                .Select(p => new ProjectileState(p.Id, p.Position, p.Velocity, p.Radius, p.Friendly, p.Tags, p.Friendly ? p.RemainingTicks : 0))
+                .Select(p => new ProjectileState(p.Id, p.Position, p.Velocity, p.Radius, p.Friendly, p.Tags, p.Friendly ? p.RemainingTicks : 0, p.Look))
                 .ToList();
 
             // A monster's attack that starts at the monster is drawn from its state and the sheet, so its area is not

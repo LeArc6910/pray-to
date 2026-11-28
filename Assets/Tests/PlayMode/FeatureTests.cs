@@ -537,6 +537,24 @@ namespace Game.Client.Tests
             Assert.IsTrue(_root.Playing);
         }
 
+        // Each weapon kind's own combo and feel (Docs/Weapons.md 묶음 B): the attack held at three slimes with each of
+        // the eight, a picture mid-combo (its motion, its arc or shot, its stars).
+        [UnityTest, Category(Screens.Category)]
+        public IEnumerator EachWeaponKindStrikesItsOwnWay()
+        {
+            yield return Start();
+            foreach (var kind in new[] { "dagger", "greatsword", "spear", "hammer", "crossbow", "boomerang", "wand", "orb" })
+            {
+                Playtest.Run(_root, $"heal; hero iron_{kind} 1 0");
+                yield return new WaitForSecondsRealtime(1.4f);
+                yield return Screens.Take("weapon-" + kind);
+                Assert.IsTrue(World.Enemies.Any(e => e.Health < e.MaxHealth), $"The {kind}'s attack hit nothing.");
+                Playtest.Run(_root, "attack off; clear");
+                yield return new WaitForSecondsRealtime(0.3f);
+            }
+            Assert.IsTrue(_root.Playing);
+        }
+
         // The second weapon (Docs/Weapons.md): the weapons' slot left of the skills with a sword in hand and a bow behind,
         // swapped, on a touch screen, and the bag's worn slots with the spare under the weapon in hand.
         [UnityTest, Category(Screens.Category)]

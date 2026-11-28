@@ -367,6 +367,7 @@ namespace Game.Core
                 PiercesLeft = shot.Pierce,
                 TurnTicks = shot.Returns ? Math.Max(1, flight) : 0,
                 Burst = shot.Burst * (finisher ? FinisherShotRadius : 1),
+                Look = shot.Look,
             };
             _projectiles.Add(projectile);
         }

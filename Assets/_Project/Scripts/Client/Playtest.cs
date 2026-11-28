@@ -2985,6 +2985,14 @@ namespace Game.Client
                 json.Field("skillBursts", view?.SkillBursts ?? 0);
                 json.Field("lastHitElement", view != null ? view.LastHitElement.ToString() : "-");
                 json.Field("namedHits", view?.NamedHits ?? 0);
+                // The weapon kinds' own motions and feel (Docs/Weapons.md 묶음 B, WeaponFeel).
+                json.Field("heldStyle", view?.HeldStyle ?? "-");
+                json.Field("strikeLength", view != null ? Mathf.Round(view.StrikeLengthShown * 1000) / 1000f : 0);
+                json.Field("blowShake", view != null ? Mathf.Round(view.LastBlowShake * 1000) / 1000f : 0);
+                json.Field("blowStop", view != null ? Mathf.Round(view.LastBlowStop * 1000) / 1000f : 0);
+                json.Field("kindShots", view?.KindShotsShown ?? 0);
+                json.Field("lastShotLook", view != null ? view.LastShotLook.ToString() : "-");
+                json.Field("orbBursts", view?.OrbBurstsShown ?? 0);
                 json.Field("mobShots", root.MonsterShotsDrawn);
                 // F2 (Docs/EffectsRework.md 15): monsters' blows landed as their warning's shape and shots drawn in a
                 // kind's own colour; bands of pools drawn; flashes where shots were let fly and how many shots the last

@@ -2088,6 +2088,17 @@ namespace Game.Client
                     bool own = !projectile.Friendly && !rock && !crescent && !venom;
                     var enemy = projectile.Friendly ? null : MakeEnemyShot(projectile, own);
                     var sprite = arrow ? ArrowSprite : projectile.Friendly ? OrbSprite : rock ? RockSprite : crescent ? CrescentSprite : venom ? VenomGlobSprite : EnemyShotSprite(enemy, 0);
+                    // A weapon kind's own shot (BasicAttack.Look): a crossbow's bolt, a spinning boomerang, an orb's
+                    // ball in its ring, a wand's spark.
+                    var look = projectile.Friendly ? projectile.Look : ShotLook.Plain;
+                    if (look != ShotLook.Plain)
+                    {
+                        sprite = ShotSprite(look);
+                        arrow = look == ShotLook.Bolt || look == ShotLook.Boomerang;
+                        _shotLooks[projectile.Id] = (look, color, projectile.Radius);
+                        KindShotsShown++;
+                        LastShotLook = look;
+                    }
                     renderer = Renderer(_root.transform, "Projectile", sprite, arrow ? Color.Lerp(Color.white, color, 0.3f) : own || rock || venom ? Color.white : crescent ? SteelColor : color);
                     float across = sprite.rect.height / Sprites.PixelsPerUnit;
                     renderer.transform.localScale = Vector3.one * (arrow || own ? 1 : Mathf.Max(1, projectile.Radius * (projectile.Friendly ? 2.6f : 2) / across));
@@ -2096,6 +2107,8 @@ namespace Game.Client
                     _projectiles[projectile.Id] = renderer;
                 }
                 renderer.transform.localPosition = new Vector3(projectile.Position.X, projectile.Position.Y, 0);
+                if (projectile.Friendly && projectile.Look == ShotLook.Boomerang)
+                    renderer.transform.localRotation = Quaternion.Euler(0, 0, -(Time.time * 1080 + projectile.Id * 47) % 360);
                 // A skill's projectile is drawn by the skill's own effect instead (WorldView.SkillFx); the plain one
                 // stays, unseen, for its light.
                 renderer.enabled = !DrawSkillShot(projectile, isNew, deltaTime);
@@ -2117,6 +2130,11 @@ namespace Game.Client
             foreach (var pair in _projectiles)
             {
                 if (_seen.Contains(pair.Key)) continue;
+                if (_shotLooks.TryGetValue(pair.Key, out var shotLook))
+                {
+                    _shotLooks.Remove(pair.Key);
+                    if (shotLook.Look == ShotLook.Orb) OrbBurst(pair.Value.transform.localPosition, shotLook.Color, shotLook.Radius);
+                }
                 // An enemy's ends in a ring and bits, the rocks and a monster's too; venom and crescents end their way.
                 EnemyShotGone(pair.Key, pair.Value.transform.localPosition, pair.Value.sprite != CrescentSprite && pair.Value.sprite != VenomGlobSprite);
                 // A crescent breaks into petals and a few sparks of steel, a glob of venom into drops (E6).
@@ -2142,6 +2160,39 @@ namespace Game.Client
 
         static Sprite OrbSprite => Sprites.Centered("shot/orb", () => ItemArt.Orb);
 
+        static Sprite ShotSprite(ShotLook look) => look switch
+        {
+            ShotLook.Bolt => Sprites.Centered("shot/bolt", () => ItemArt.CrossbowBolt),
+            ShotLook.Boomerang => Sprites.Centered("shot/boomerang", () => ItemArt.BoomerangShot),
+            ShotLook.Orb => Sprites.Centered("shot/orbshot", () => ItemArt.OrbShot),
+            ShotLook.Spark => Sprites.Centered("shot/spark", () => ItemArt.Spark),
+            _ => OrbSprite,
+        };
+
+        // Players' shots of a kind with its own look, to end in their way when they go (an orb's burst).
+        readonly Dictionary<int, (ShotLook Look, Color Color, float Radius)> _shotLooks = new Dictionary<int, (ShotLook, Color, float)>();
+        public int OrbBurstsShown { get; private set; }
+        // For the playtest (Docs/Weapons.md 묶음 B): the kind one strikes with, how long one's last strike's picture
+        // runs, the jolt and the hit stop one's last blow that landed gave, and the kinds' own shots drawn.
+        public string HeldStyle => _self.Gear.Style.ToString();
+        public float StrikeLengthShown => _self.StrikeLength;
+        public float LastBlowShake { get; private set; }
+        public float LastBlowStop { get; private set; }
+        public int KindShotsShown { get; private set; }
+        public ShotLook LastShotLook { get; private set; }
+
+        // Where an orb's shot stops it bursts (World: weapon_kinds.csv burst 1.3 tiles): a flash and a ring of its
+        // colour that wide, and a small jolt if it is near (WeaponFeel.Burst).
+        void OrbBurst(Vector3 at, Color color, float radius)
+        {
+            OrbBurstsShown++;
+            float wide = 1.3f * Mathf.Max(1, radius / 0.25f);
+            AddFlash(at, wide * 1.4f, color, FlashKind.Burst);
+            Shockwave(at, wide, Color.Lerp(Color.white, color, 0.5f));
+            Hear(Sound.Boom, at, 0.35f);
+            if (Vector3.Distance(at, _self.Position) < 6) _shake = Mathf.Max(_shake, WeaponFeel.Of(HeroStyle.Orb).Burst);
+        }
+
         void Show(SimEvent e)
         {
             // The things to find in the rooms (WorldView.Pois.cs).
@@ -2158,21 +2209,26 @@ namespace Game.Client
                     bool finisher = step == World.ComboSteps - 1;
                     attacker.Combo = step;
                     attacker.LungeTime = LungeSeconds;
-                    attacker.LungeReach = finisher ? 2 : 1;
+                    // Each weapon kind's own feel (WeaponFeel, Docs/Feel.md): heavier lunges, a crossbow's kick back.
+                    var feel = attacker.Kind == BodyKind.Player ? WeaponFeel.Of(attacker.Gear.Style) : WeaponFeel.Sword;
+                    attacker.LungeReach = (finisher ? 2 : 1) * feel.Lunge;
                     attacker.Lunge = new Vector2(e.Direction.X, e.Direction.Y).normalized;
                     if (attacker.Kind == BodyKind.Player)
                     {
                         // The step's own motion with the weapon in hand (HeroArt), for as long as its picture takes. A
                         // strike straight on the last one starts past its lead-in: the weapon is already up. A bow or
                         // staff struck at something placed is a poke with it.
+                        // Each weapon kind strikes its own way (HeroStyle, Docs/Weapons.md 묶음 B); a spear's thrusts
+                        // are its swings.
                         var held = attacker.Gear.Kind;
-                        if (kind == BasicAttackKind.Swing && (held == HeroWeapon.Bow || held == HeroWeapon.Staff)) Start(attacker, Motion.Thrust);
+                        var style = attacker.Gear.Style;
+                        if (kind == BasicAttackKind.Swing && (held == HeroWeapon.Bow || held == HeroWeapon.Staff) && style != HeroStyle.Spear) Start(attacker, Motion.Thrust);
                         else
                         {
                             var move = (HeroMove)((int)HeroMove.Attack1 + step);
                             bool chained = attacker.StrikeTime > 0;
-                            attacker.StrikeLength = HeroArt.SecondsOf(move, held);
-                            attacker.StrikeTime = attacker.StrikeLength - (chained ? HeroArt.ChainSeconds(move, held) : 0);
+                            attacker.StrikeLength = HeroArt.SecondsOf(move, style);
+                            attacker.StrikeTime = attacker.StrikeLength - (chained ? HeroArt.ChainSeconds(move, style) : 0);
                             attacker.Motion = Motion.None;
                             attacker.MotionTime = 0;
                         }
@@ -2190,9 +2246,11 @@ namespace Game.Client
                     if (NotABlade(attacker)) break;
                     // The finisher's heavier whoosh as loud as the swings before it (2026-11-28, the owner: the last
                     // swing was too loud; the made-in-code whoosh is longer and louder than the recorded swing).
-                    Hear(kind == BasicAttackKind.Arrow ? Sound.Shoot : kind == BasicAttackKind.Bolt ? Sound.Zap : finisher ? Sound.Heavy : Sound.Swing, attacker.Position,
-                        finisher && kind == BasicAttackKind.Swing ? FinisherSwingVolume : 1);
-                    if (finisher && attacker == _self) _shake = Mathf.Max(_shake, 0.04f);
+                    bool heavySwing = kind == BasicAttackKind.Swing && (finisher || feel.HeavySound);
+                    Hear(kind == BasicAttackKind.Arrow ? Sound.Shoot : kind == BasicAttackKind.Bolt ? Sound.Zap : heavySwing ? Sound.Heavy : Sound.Swing, attacker.Position,
+                        (heavySwing ? FinisherSwingVolume : 1) * feel.Volume);
+                    if (finisher && attacker == _self) _shake = Mathf.Max(_shake, 0.04f * feel.Heavy);
+                    if (feel.Kick > 0 && attacker == _self) _shake = Mathf.Max(_shake, feel.Kick * (finisher ? 1.6f : 1));
                     // Shots show as their projectile (a finisher's is bigger), with a puff where it leaves; only swings
                     // draw the arc. A bow is drawn and let go, a staff raised and thrust (the attack's own motion).
                     if (kind != BasicAttackKind.Swing)
@@ -2210,7 +2268,8 @@ namespace Game.Client
                     attacker.SwingTime = SwingSeconds;
                     attacker.Swing.transform.localRotation = Quaternion.Euler(0, 0, e.Direction.Angle * Mathf.Rad2Deg);
                     // The second cut comes back up: the crescent mirrored across the way it points. The finisher is bigger.
-                    attacker.Swing.transform.localScale = step == 1 ? new Vector3(1, -1, 1) : finisher ? Vector3.one * FinisherSwingScale(attacker) : Vector3.one;
+                    float arc = feel.Arc * (finisher ? FinisherSwingScale(attacker) : 1);
+                    attacker.Swing.transform.localScale = new Vector3(arc, arc * feel.Thin * (step == 1 ? -1 : 1), 1);
                     break;
                 case SimEventType.Hit:
                     var target = Find(e.Target);
@@ -2235,6 +2294,8 @@ namespace Game.Client
                     }
                     // Knocked back a little, away from whoever struck, and a star on its near side where the blow landed.
                     var away = hitter != null ? (Vector2)(target.Position - hitter.Position) : Vector2.zero;
+                    // The striker's weapon kind's feel (WeaponFeel): a heavy one knocks further, stops longer, shakes more.
+                    var blowFeel = hitter != null && hitter.Kind == BodyKind.Player ? WeaponFeel.Of(hitter.Gear.Style) : WeaponFeel.Sword;
                     // The number pops, leans away from the blow and stands beside the others off the same body (E7).
                     AddNumber(target.Position, e.Target, e.Critical && !guarded ? e.Amount + "!" : e.Amount.ToString(), color, (e.Critical || heavy) && !guarded,
                         away.sqrMagnitude > 1e-4f ? away.normalized.x : 0);
@@ -2242,7 +2303,7 @@ namespace Game.Client
                     {
                         target.Knock = away.normalized;
                         target.KnockTime = KnockSeconds;
-                        target.KnockReach = heavy ? 2.5f : e.Critical ? 1.6f : 1;
+                        target.KnockReach = (heavy ? 2.5f : e.Critical ? 1.6f : 1) * blowFeel.Knock;
                     }
                     var landed = target.Position - (Vector3)(away.normalized * target.Diameter * 0.3f) + new Vector3(0, target.Diameter * 0.2f, 0);
                     // What the blow is made of, thrown on its way from where it landed (E7, HitFx): a weapon's added
@@ -2254,7 +2315,7 @@ namespace Game.Client
                     else
                     {
                         var (made, ramp) = HitLookOf(e.Source, hitter, e.Tags);
-                        AddHitFx(landed, made, ramp, hurtsMe ? FxRamp.Danger : e.Critical ? FxRamp.Gold : FxRamp.Steel, blowWay, heavy || e.Critical, blowAlpha);
+                        AddHitFx(landed, made, ramp, hurtsMe ? FxRamp.Danger : e.Critical ? FxRamp.Gold : FxRamp.Steel, blowWay, heavy || e.Critical || blowFeel.BigStar && !hurtsMe, blowAlpha);
                         if (e.Tags != SkillTag.None)
                         {
                             LastHitElement = made;
@@ -2275,13 +2336,17 @@ namespace Game.Client
                     else if (e.Source == _client.PlayerId)
                     {
                         // Shake only for the strong blows (an ordinary one's 0.025 was under half a pixel, 2026-11-19).
-                        if (heavy || e.Critical) _shake = Mathf.Max(_shake, heavy ? 0.1f : 0.07f);
-                        _hitStop = Mathf.Max(_hitStop, heavy || e.Critical ? HitStopSeconds : LightStopSeconds);
+                        // A heavy weapon's shake on every blow, more on its strong ones (WeaponFeel).
+                        if (heavy || e.Critical) _shake = Mathf.Max(_shake, (heavy ? 0.1f : 0.07f) * blowFeel.Heavy);
+                        else _shake = Mathf.Max(_shake, blowFeel.Shake);
+                        _hitStop = Mathf.Max(_hitStop, (heavy || e.Critical ? HitStopSeconds : LightStopSeconds) * blowFeel.Stop);
+                        LastBlowShake = heavy || e.Critical ? (heavy ? 0.1f : 0.07f) * blowFeel.Heavy : blowFeel.Shake;
+                        LastBlowStop = (heavy || e.Critical ? HitStopSeconds : LightStopSeconds) * blowFeel.Stop;
                         // A finisher or a crit sends a ring out from where it landed.
                         if (heavy || e.Critical) Shockwave(landed, heavy ? 1.3f + target.Diameter * 0.3f : 0.9f + target.Diameter * 0.2f, e.Critical && !heavy ? ImpactGold : ImpactWhite);
                         _combatUntil = Time.time + CombatHold;
                     }
-                    Hear(hurtsMe ? Sound.Hurt : heavy ? Sound.Thump : e.Critical ? Sound.Crit : Sound.Hit, target.Position);
+                    Hear(hurtsMe ? Sound.Hurt : heavy || blowFeel.HeavySound && !e.Critical ? Sound.Thump : e.Critical ? Sound.Crit : Sound.Hit, target.Position, hurtsMe ? 1 : blowFeel.Volume);
                     if (target.Kind == BodyKind.Player && !guarded) Groan(target, e, hurtsMe);
                     break;
                 case SimEventType.Rolled:
@@ -2806,7 +2871,7 @@ namespace Game.Client
                 case SkillKind.Projectile:
                     // Both hands sent forward after it. A sword still cuts the arc; a bow or staff is aimed instead.
                     Start(caster, Motion.Thrust);
-                    if (caster.Gear.Kind == HeroWeapon.Bow || caster.Gear.Kind == HeroWeapon.Staff) break;
+                    if ((caster.Gear.Kind == HeroWeapon.Bow || caster.Gear.Kind == HeroWeapon.Staff) && caster.Gear.Style != HeroStyle.Spear) break;
                     caster.Combo = 0;
                     caster.SwingTime = SwingSeconds;
                     caster.Swing.transform.localRotation = Quaternion.Euler(0, 0, e.Direction.Angle * Mathf.Rad2Deg);
@@ -3407,7 +3472,7 @@ namespace Game.Client
             var held = body.Gear.Kind;
             var tags = GrantedTags(playerId);
             var ramp = (tags & SkillTag.Fire) != 0 ? FxRamp.Fire : (tags & SkillTag.Cold) != 0 ? FxRamp.Cold : (tags & SkillTag.Lightning) != 0 ? FxRamp.Bolt : FxRamp.Mist;
-            var fx = AddFx(FxProgram.Cast, held == HeroWeapon.Bow ? SkillFx.RollSlide : held == HeroWeapon.Staff ? SkillFx.RollBlink : SkillFx.Roll, feet,
+            var fx = AddFx(FxProgram.Cast, held == HeroWeapon.Bow ? SkillFx.RollSlide : held == HeroWeapon.Staff && body.Gear.Style != HeroStyle.Spear ? SkillFx.RollBlink : SkillFx.Roll, feet,
                 new FxContext { Dir = way.Angle, Length = Vec2.Distance(from, at) * Sprites.PixelsPerUnit, Main = ramp }, mine);
             if (fx != null) fx.Ghost = body.Shape.sprite;
         }
@@ -3424,7 +3489,7 @@ namespace Game.Client
             var held = body.Gear.Kind;
             if (dead) return (HeroMove.Fall, HeroArt.FrameAt(HeroMove.Fall, HeroWeapon.None, body.DownTime), false);
             if (body.RiseTime > 0) return (HeroMove.Rise, HeroArt.FrameAt(HeroMove.Rise, HeroWeapon.None, HeroArt.SecondsOf(HeroMove.Rise, HeroWeapon.None) - body.RiseTime), false);
-            if (body.Motion == Motion.Roll && body.MotionTime > 0) return (HeroMove.Roll, HeroArt.FrameAt(HeroMove.Roll, held, body.MotionLength - body.MotionTime), false);
+            if (body.Motion == Motion.Roll && body.MotionTime > 0) return (HeroMove.Roll, HeroArt.FrameAt(HeroMove.Roll, body.Gear.Style, body.MotionLength - body.MotionTime), false);
             if (body.HurtTime > 0) return (HeroMove.Hurt, HeroArt.FrameAt(HeroMove.Hurt, held, HurtSeconds - body.HurtTime), false);
             if (body.Motion != Motion.None && body.MotionTime > 0)
             {
@@ -3437,7 +3502,8 @@ namespace Game.Client
             {
                 var move = (HeroMove)((int)HeroMove.Attack1 + Mathf.Clamp(body.Combo, 0, World.ComboSteps - 1));
                 float elapsed = body.StrikeLength - body.StrikeTime;
-                if (!(moving && elapsed > HeroArt.StrikeSeconds(move, held) + PlantSeconds)) return (move, HeroArt.FrameAt(move, held, elapsed), false);
+                var style = body.Gear.Style;
+                if (!(moving && elapsed > HeroArt.StrikeSeconds(move, style) + PlantSeconds)) return (move, HeroArt.FrameAt(move, style, elapsed), false);
             }
             else if (body.CastTime > 0) return (HeroMove.Cast, HeroArt.FrameAt(HeroMove.Cast, held, body.CastLength - body.CastTime), false);
             if (moving) return (HeroMove.Walk, HeroArt.FrameAt(HeroMove.Walk, held, body.Walked), false);
@@ -3982,7 +4048,7 @@ namespace Game.Client
             foreach (var pair in _projectiles)
             {
                 var shot = pair.Value;
-                if (shot.sprite == ArrowSprite) continue;
+                if (shot.sprite == ArrowSprite || _shotLooks.TryGetValue(pair.Key, out var kindShot) && kindShot.Look is ShotLook.Bolt or ShotLook.Boomerang) continue;
                 var at = shot.transform.localPosition;
                 _lights.Add(new LightSource(new Vec2(at.x, at.y), ShotLight, 0.8f, ShotLightColor(pair.Key, shot), tints: true));
             }
