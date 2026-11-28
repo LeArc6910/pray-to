@@ -922,24 +922,18 @@ async function tempo(browser) {
   s = await game.state();
   check(s.bossPhase === 3 && Math.abs(s.bossTelegraph - 0.9 * 0.8) < 0.01, `3페이즈 거합 베기의 예고는 0.72초(시구레 템포 0.9·0.8) (페이즈 ${s.bossPhase}, ${s.bossTelegraph})`);
   await game.wait(2500);
-  // The five-fold draw: count how often the boss winds up again before it rests.
-  await game.send('heal; boss shrine_samurai use sanren');
-  let charges = 0, last = '';
-  const end = Date.now() + 6000;
-  while (Date.now() < end) {
-    const t = await game.state();
-    if (t.bossState === 'Charge' && last !== 'Charge') charges++;
-    last = t.bossState;
-    if (t.bossState === 'Recover' && charges > 0) break;
-    await game.wait(40);
-  }
-  check(charges === 5, `3페이즈 오연 발도: 돌진 다섯 번 (${charges})`);
-  await game.wait(2000);
   await game.send('heal; boss shrine_samurai use ougi');
   await game.wait(600);
   s = await game.state();
   check(s.finisher === '오의 천섬' && s.finisherShown, `필살기 이름 띠: 「오의 천섬」 (${s.finisher}, 보임 ${s.finisherShown})`);
   await game.shot('tempo-finisher', '오의 천섬의 이름 띠(보스 막대 밑)');
+  await game.wait(3000);
+  // The five-fold draw (last: it may fell the player): four more runs to come as the first winds up.
+  await game.send('heal; boss shrine_samurai use sanren');
+  await game.wait(100);
+  s = await game.state();
+  check(s.bossAttack === 'sanren' && s.bossChargesLeft === 4, `3페이즈 오연 발도: 첫 돌진 뒤에 네 번 더 (${s.bossAttack}, 남은 ${s.bossChargesLeft})`);
+  await game.shot('tempo-five', '오연 발도의 첫 예고');
   await game.context.close();
 }
 

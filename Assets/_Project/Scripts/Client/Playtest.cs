@@ -2963,6 +2963,7 @@ namespace Game.Client
                 json.Field("bossState", fighting?.State.ToString() ?? "");
                 json.Field("bossAttack", fighting?.Attack?.Id ?? "");
                 json.Field("bossTelegraph", fighting?.Attack?.Telegraph ?? 0);
+                json.Field("bossChargesLeft", fighting?.ChargesLeft ?? 0);
                 json.Field("finisher", GameRoot.FinisherName ?? "");
                 json.Field("finisherShown", GameRoot.FinisherShown.width > 0);
                 // What the silk mother's blows left on the floor: webs and pools of venom (in the world, and drawn), and
