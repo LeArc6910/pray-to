@@ -120,6 +120,19 @@ namespace Game.Client
         internal int RingsShown => _view?.RingsShown ?? 0;
         internal int VolleysHeard => _view?.VolleysHeard ?? 0;
         internal int ChimesHeard => _view?.ChimesHeard ?? 0;
+        // R4b: images, puddles, gates, hands, echoes and maze rings drawn; hourglass, mist and the turned gravity.
+        internal int ClonesShown => _view?.ClonesShown ?? 0;
+        internal int PuddlesShown => _view?.PuddlesShown ?? 0;
+        internal int GatesShown => _view?.GatesShown ?? 0;
+        internal int HandsShown => _view?.HandsShown ?? 0;
+        internal int EchoesShown => _view?.EchoesShown ?? 0;
+        internal int MazeRingsShown => _view?.MazeRingsShown ?? 0;
+        internal bool HourglassShown => _view != null && _view.HourglassShown;
+        internal bool MistShown => _view != null && _view.MistShown;
+        internal int PuddleFlashes => _view?.PuddleFlashes ?? 0;
+        internal int ClonesBroken => _view?.ClonesBroken ?? 0;
+        internal int StarsShown => _view?.StarsShown ?? 0;
+        internal bool GravityTurned => _view != null && _view.GravityTurned;
         internal int WavesShown => _view?.WavesShown ?? 0;
         internal int DragsShown => _view?.DragsShown ?? 0;
         internal bool RageShown => _view?.RageShown ?? false;
@@ -2978,8 +2991,29 @@ namespace Game.Client
 
         // The boss's bar (U7 보스 막대 장식): its name line over a dark strip with a skull at the left and a pip for each
         // phase at the right (passed ones dark red, the one now bright), the bar in a framed well under it.
+        // The void lord's gravity turned over (R4b, its last phase: pulls become pushes): a violet rim round the screen,
+        // breathing. For the playtests, whether it was drawn in the last repaint.
+        internal static bool GravityRimShown { get; private set; }
+
+        static void DrawGravityRim(EntityView boss)
+        {
+            bool on = boss.Boss.Id == "void_lord" && boss.Phase >= 3 && boss.BossState != BossState.Interlude;
+            if (Event.current.type == EventType.Repaint) GravityRimShown = on;
+            if (!on || Event.current.type != EventType.Repaint) return;
+            var previous = GUI.color;
+            float pulse = 0.5f + 0.5f * Mathf.Sin(Time.time * 3);
+            float thick = Mathf.Max(4, Ui.FullWidth * 0.006f);
+            GUI.color = new Color(0.62f, 0.35f, 1f, (0.35f + 0.25f * pulse) * previous.a);
+            GUI.DrawTexture(new Rect(0, 0, Ui.FullWidth, thick), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(0, Ui.FullHeight - thick, Ui.FullWidth, thick), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(0, 0, thick, Ui.FullHeight), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(Ui.FullWidth - thick, 0, thick, Ui.FullHeight), Texture2D.whiteTexture);
+            GUI.color = previous;
+        }
+
         static void DrawBossBar(EntityView boss, int level)
         {
+            DrawGravityRim(boss);
             var place = BossBarArea(0);
             float width = place.width, x = place.x, top = place.y;
             // The name line as tall as the font needs, so it is not cut off, and the bar under it.
@@ -3043,7 +3077,14 @@ namespace Game.Client
             }
             if (_interludeSince < 0) _interludeSince = Time.time;
             int left = Mathf.Max(0, Mathf.CeilToInt(interlude.Seconds - (Time.time - _interludeSince)));
-            string task = interlude.Kind == InterludeKind.Eggs ? "알을 모두 깨라" : "군기를 부숴라";
+            string task = interlude.Kind switch
+            {
+                InterludeKind.Eggs => "알을 모두 깨라",
+                InterludeKind.Legion => "군기를 부숴라",
+                // R4b: the wraith is mist (keep out of what falls); the void lord's maze (the gap of each ring).
+                InterludeKind.Mist => "안개 속 벼락을 피하라",
+                _ => "별 사이 틈으로 걸어라",
+            };
             var words = new GUIContent($"막간 · {task} · {left}초");
             if (Event.current.type == EventType.Repaint) InterludeShown = words.text;
             _interlude ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, wordWrap = true };

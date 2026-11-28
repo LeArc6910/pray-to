@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Game.Core;
 
 namespace Game.Client
 {
@@ -13,6 +14,8 @@ namespace Game.Client
         Cold,
         // Green (2026-11-28, AttackWarning.Safe): where to stand, the shadow behind the cave warden's pillars.
         Safe,
+        // Faint violet (R4b, the void lord's rewind): a blast that landed a moment ago, coming again.
+        Echo,
     }
 
     enum HazardForm : byte
@@ -21,6 +24,8 @@ namespace Game.Client
         Donut,
         Cone,
         Band,
+        // A ring with a gap (R4b, the void lord's star maze, World.MazeGap degrees round the angle).
+        Gapped,
     }
 
     // What the floor a blow lands on throws up.
@@ -76,6 +81,7 @@ namespace Game.Client
             Ramp("#FFF6D8", "#FFD060", "#FFB21E", "#C07A10", "#5E3A08"),
             Ramp("#E0F4FF", "#8AD0FF", "#3A8CFF", "#1E4AB8", "#101E5A"),
             Ramp("#E8FFE0", "#9CFF8A", "#3FE05A", "#1E9A3A", "#0E4A1E"),
+            Ramp("#F2E6FF", "#CDA8FF", "#9A6AE0", "#5A3A9A", "#2A1A4A"),
         };
 
         // Light, middle and dark of what flies up, then the soot or frost left behind.
@@ -151,6 +157,10 @@ namespace Game.Client
                     degrees = degrees / 45 * 45;
                     second = Math.Min(across / 2 - 3, Math.Max(0, (int)Math.Round(width * TileArt.Size / 2f) * 2));
                     break;
+                case HazardForm.Gapped:
+                    // Its gap must be where the host has it: whole degrees.
+                    second = Math.Min(across / 2 - 3, Math.Max(0, (int)Math.Round(width * TileArt.Size / 2f) * 2));
+                    break;
                 case HazardForm.Cone:
                     second = Math.Clamp((int)Math.Round(width), 1, 360);
                     if (second >= 360)
@@ -200,6 +210,17 @@ namespace Game.Client
                             inside = d - r;
                             along = blow = mid = d / r;
                             break;
+                        case HazardForm.Gapped:
+                        {
+                            float band = Math.Max(1, r - inner);
+                            float off = Math.Abs(Off((float)Math.Atan2(wy, wx) - turn));
+                            float gap = World.MazeGap * (float)Math.PI / 360;
+                            inside = Math.Max(Math.Max(d - r, inner - d), (gap - off) * d);
+                            along = (d - inner) / band;
+                            blow = off / (float)Math.PI;
+                            mid = Math.Abs(2 * along - 1);
+                            break;
+                        }
                         case HazardForm.Donut:
                         {
                             float band = Math.Max(1, r - inner);
@@ -243,7 +264,7 @@ namespace Game.Client
             }
             if (maxX < 0) minX = minY = maxX = maxY = reach;
             int w = maxX - minX + 1, h = maxY - minY + 1;
-            float extent = form == HazardForm.Donut ? r - inner : form == HazardForm.Band ? length : r;
+            float extent = form == HazardForm.Donut || form == HazardForm.Gapped ? r - inner : form == HazardForm.Band ? length : r;
             var field = new HazardField
             {
                 Width = w,
@@ -267,12 +288,14 @@ namespace Game.Client
                     field.Spine.Add((ox, oy, r * 0.9f, r < 14 ? 6 : 11));
                     break;
                 case HazardForm.Donut:
+                case HazardForm.Gapped:
                 {
                     float at = (r + inner) / 2;
                     int n = Math.Clamp((int)Math.Round(2 * Math.PI * at / 28), 6, 14);
                     for (int i = 0; i < n; i++)
                     {
                         float a = i * 2 * (float)Math.PI / n;
+                        if (form == HazardForm.Gapped && Math.Abs(Off(a - turn)) < World.MazeGap * (float)Math.PI / 360) continue;
                         field.Spine.Add((ox + (float)Math.Cos(a) * at, oy - (float)Math.Sin(a) * at, (r - inner) * 0.55f, 3));
                     }
                     break;

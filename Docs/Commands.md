@@ -158,6 +158,11 @@ dotnet run --project DevTools/CoreSandbox -- --boss 600 1 --boss-id antlion --ge
 dotnet run --project DevTools/CoreSandbox -- --boss 600 1 --boss-id mad_general --gear iron_sword,iron_armor,iron_helmet,iron_boots,iron_ring,iron_amulet --classes warrior,fire_mage --reaction 0.5 --level 17 --build
 # 웹 점검 구역 order(PC·휴대폰): 공명 순서·왕관의 빛·알 막간·별자리, 군기·호령 표적·환영 창진·군단 막간·일제 사격
 node DevTools/WebPlaytest/sweep.js --wait <커밋> --only order
+# 분신·되감기·별 미로(R4b, Docs/Bosses.md 분신·되감기·별 미로): 왕관의 망령(미스릴 24)·공허의 군주(흑요석 34), 위 명령의 boss-id·장비·레벨만 바꿈(--roll-miss 0.4로 놓치는 봇)
+dotnet run --project DevTools/CoreSandbox -- --boss 600 1 --boss-id crown_wraith --gear mithril_sword,mithril_armor,mithril_helmet,mithril_boots,mithril_ring,mithril_amulet --classes warrior,fire_mage --reaction 0.5 --level 24 --build
+dotnet run --project DevTools/CoreSandbox -- --boss 600 1 --boss-id void_lord --gear obsidian_sword,obsidian_armor,obsidian_helmet,obsidian_boots,obsidian_ring,obsidian_amulet --classes warrior,fire_mage --reaction 0.5 --level 34 --build
+# 웹 점검 구역 mirror(PC·휴대폰): 안개 막간·웅덩이·분신·따라 하기·가라앉은 손·때려서 흩기, 공간 문·되감기·별 미로·중력 반전 테두리. Playtest 명령 `boss <id> clones [n]`
+node DevTools/WebPlaytest/sweep.js --wait <커밋> --only mirror
 node DevTools/WebPlaytest/sweep.js --wait <커밋> --only forces
 ```
 

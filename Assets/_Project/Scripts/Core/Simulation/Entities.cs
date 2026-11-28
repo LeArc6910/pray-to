@@ -798,7 +798,7 @@ namespace Game.Core
         public bool IsDead => Health <= 0;
         // Out of reach while it roars, and while it is underground or in the air before a burrow or a leap comes down.
         public bool Invulnerable => State == BossState.Roar || State == BossState.Enter || State == BossState.Interlude || Away;
-        public bool Away => State == BossState.Telegraph && Attack != null && Attack.GoesAway;
+        public bool Away => State == BossState.Telegraph && Attack != null && (Attack.GoesAway || Attack.Shape == AttackShape.Clone);
 
         internal Vec2 ChargeDirection { get; set; }
         // Where its charge set off (a charge that leaves ground lays it along the run, World.EndCharge).
@@ -857,6 +857,38 @@ namespace Game.Core
         internal bool InterludeNext { get; set; }
         internal int ChargesToCome { get; set; }
         internal int ChargeTicks { get; set; }
+
+        // ---- R4b (2026-11-28): images, the rewind ----
+        // Where it and its images will form (AttackShape.Clone, laid as it winds up) and which of them is its own.
+        internal List<Vec2> CloneSpots { get; } = new List<Vec2>();
+        internal int CloneSelf { get; set; }
+        // Where it stood last tick (its images take the same step, World.WalkClones).
+        internal Vec2 LastPosition { get; set; }
+        // Its blasts that have landed lately (World.EchoSeconds), for its rewind.
+        internal List<Echo> Echoes { get; } = new List<Echo>();
+    }
+
+    // A blast of a boss's that landed (R4b, the void lord's rewind lays it again).
+    internal readonly struct Echo
+    {
+        public Echo(HazardShape shape, Vec2 position, Vec2 direction, float size, float width, int damage, long tick)
+        {
+            Shape = shape;
+            Position = position;
+            Direction = direction;
+            Size = size;
+            Width = width;
+            Damage = damage;
+            Tick = tick;
+        }
+
+        public HazardShape Shape { get; }
+        public Vec2 Position { get; }
+        public Vec2 Direction { get; }
+        public float Size { get; }
+        public float Width { get; }
+        public int Damage { get; }
+        public long Tick { get; }
     }
 
     // Something standing in a boss's arena (2026-11-28, R2, PropKind): a vent, a pillar, a vein. MaxHealth 0 cannot be
@@ -878,7 +910,8 @@ namespace Game.Core
         public int Id { get; }
         public int Owner { get; }
         public PropKind Kind { get; }
-        public Vec2 Position { get; }
+        // A mirror image walks as its boss walks (R4b); the rest stand.
+        public Vec2 Position { get; internal set; }
         public float Radius { get; }
         public float Health { get; internal set; }
         public float MaxHealth { get; }
@@ -930,6 +963,9 @@ namespace Game.Core
         Push,
         Tether,
         Wave,
+        // R4b (2026-11-28, the void lord's star maze): a ring from Width out to Size, all but a gap of World.MazeGap
+        // degrees round Direction.
+        Maze,
     }
 
     // A marked area that hurts every player inside it when ResolveTick comes. Zero damage marks a charge's path.
@@ -1014,6 +1050,10 @@ namespace Game.Core
         // R4a (AttackShape.Mark): the player it follows until LockTick, 0 for none.
         internal int Follows { get; set; }
         internal long LockTick { get; set; }
+        // R4b: a blast laid again by a rewind (not itself kept to be laid again); a ring of the star maze that has fallen
+        // and burns on, landing again every World.MazeBurn until the interlude ends.
+        public bool Echo { get; internal set; }
+        public bool Burning { get; internal set; }
 
         // Whether a circle of the given radius at point touches the area.
         public bool Contains(Vec2 point, float radius)
@@ -1051,6 +1091,12 @@ namespace Game.Core
                     return run >= 0 && run <= Size && MathF.Abs(offset.X * Direction.Y - offset.Y * Direction.X) <= Width / 2;
                 case HazardShape.Ring:
                     return distance <= Size + radius && distance >= Width - radius;
+                case HazardShape.Maze:
+                    if (distance > Size + radius || distance < Width - radius) return false;
+                    // In the gap (with the whole of the circle inside it) is safe.
+                    if (distance < 1e-4f) return true;
+                    float off = MathF.Acos(Math.Clamp(Vec2.Dot(offset / distance, Direction), -1, 1)) * 180 / MathF.PI;
+                    return off > World.MazeGap / 2 - MathF.Asin(Math.Min(1, radius / distance)) * 180 / MathF.PI;
                 case HazardShape.Cone:
                     if (distance > Size + radius) return false;
                     return distance < 1e-4f || Vec2.Dot(offset / distance, Direction) >= MathF.Cos(Width * 0.5f * MathF.PI / 180f);

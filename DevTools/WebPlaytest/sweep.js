@@ -862,7 +862,7 @@ async function patterns(browser) {
   const uses = [
     ['cave_warden', 'shockwave', '충격파(고리: 보스 곁은 안전)'], ['cave_warden', 'rock_trail', '바위 줄기(차례로 터지는 원)'],
     ['crystal_queen', 'crystal_cross', '수정 십자'], ['crystal_queen', 'venom_share', '왕관의 빛(나눠 맞기, 금색)'], ['crystal_queen', 'crystal_spiral', '수정 나선'],
-    ['void_lord', 'void_cross', '공허 십자(대각선)'], ['void_lord', 'event_horizon', '사건의 지평선(고리)'],
+    ['void_lord', 'event_horizon', '사건의 지평선(고리)'],
     ['tide_serpent', 'whirlpool', '물살 뱀의 소용돌이(고리)'], ['tide_serpent', 'tidal_trail', '물살 뱀의 밀물(연쇄 폭발)'],
     ['antlion', 'pit', '개미귀신의 개미지옥(멀리 있는 사람 발밑)'], ['antlion', 'quicksand', '개미귀신의 모래늪(고리)'],
     // Follow-ups (2026-11-25, B5b, the follow column): the second is marked with the first and lands 0.5 s after it.
@@ -1464,15 +1464,12 @@ async function voidlord(browser) {
     ['grasp', '공허의 손아귀(빈손을 뒤로 당김)', 0.8, false, true],
     ['beam', '공허 광선(구슬을 앞으로 내밀어 부풀림)', 0.9, false, true],
     ['void_ring', '공허 고리(팔과 망토를 펼침)', 0.6, false, false],
-    ['blink', '돌진(공허로 흩어짐)', 0.9, false, true],
+    ['blink', '순간이동(사라졌다가 마지막 자리로 내려꽂힘)', 1.1, false, true],
     ['star_fall', '별똥별(두 팔을 높이 듦)', 1.2, false, true],
-    ['collapse', '붕괴(손을 들어 움켜쥠)', 1.0, false, true],
-    ['void_cross', '공허 십자(구슬을 머리 위로)', 1.0, false, true],
-    ['void_lance', '공허 창(구슬을 앞으로)', 1.0, false, true],
     ['gravity_share', '중력 붕괴(나눠 맞기, 움켜쥠)', 1.4, false, true],
     ['event_horizon', '사건의 지평선(구슬을 머리 위로)', 1.3, false, true],
     ['black_holes', '검은 구멍(필살기, 경고, 움켜쥠)', 1.4, true, true],
-    ['void_spiral', '공허 나선(펼쳐 돈다)', 0.7, false, false],
+    ['rewind', '되감기(모래시계, 지난 예고가 거꾸로)', 1.2, false, false],
   ];
   for (const [attack, name, telegraph, strong, marked] of uses) {
     await game.send('heal; clear');
@@ -1529,8 +1526,7 @@ async function wraith(browser) {
     ['soul_lance', '넋의 창(손에 번개 창이 생김)', 0.7, false, true],
     ['phantom_rush', '유령 돌진(웅크리고 흐려짐)', 0.8, false, true],
     ['crown_ring', '왕관의 고리(왕관이 머리 위로 떠오름)', 1.0, false, true],
-    ['deep_share', '깊은 수압(머리 위로 번개 구슬)', 1.1, false, true],
-    ['soul_ripple', '넋의 파문(주먹을 가슴으로)', 0.5, false, true],
+    ['sunken_hands', '가라앉은 손(웅덩이에서 손이 솟음)', 1.1, false, true],
     ['storm_brand', '번개 낙인(필살기, 경고, 왕관이 폭풍처럼)', 1.4, true, true],
   ];
   for (const [attack, name, telegraph, strong, marked] of uses) {
@@ -2040,6 +2036,90 @@ async function order(browser) {
       s = await game.state();
       check(s.warningSign && s.bands >= 5 && s.volleysHeard >= 1, `「불화살 일제 사격」: 띠 다섯과 화살비 소리 (표지 ${s.warningSign}, 띠 ${s.bands}, 소리 ${s.volleysHeard})`);
       await game.shot('order-volley', '필살 「불화살 일제 사격」: 방금 떨어진 띠로 들어간다');
+    }
+    await game.context.close();
+  }
+}
+
+// ---------------------------------------------------------------- 분신·되감기·별 미로 (R4b, 2026-11-28, Docs/Bosses.md)
+// The crown wraith's mist interlude (named with its seconds), its puddles, the images it forms (only the true one's
+// crown gold), its blow copied by them, its sunken hands, and a blow on itself scattering them; the void lord's gates
+// and the beam through them, its rewind (an hourglass, the last blasts again in faint violet), its star maze and its
+// gravity turned over (a violet rim). Pictures are taken while each is still coming.
+async function mirror(browser) {
+  for (const profile of [Profiles.pc, Profiles.phone]) {
+    const pc = profile === Profiles.pc;
+    note(`\n## 분신·되감기·별 미로 (${pc ? 'PC' : '휴대폰'})\n`);
+    const game = await open(browser, run, profile, url);
+    await game.startSolo();
+    await game.wait(1200);
+    await game.send('xp 2000000; equip void_sword void_helmet void_armor void_boots; heal');
+    await game.send('heal; goto boss crown_wraith');
+    await game.until(t => has(t.banner, '왕관의 망령') || has(t.entrance, '왕관의 망령'), 8000, game.texts);
+    await game.wait(4500);
+    let s;
+    await game.send('heal; clear; boss crown_wraith hurt 0.36');
+    s = (await game.until(t => t.interlude && t.mistShown && has(t.interludeShown, '안개'), 5000)) || await game.state();
+    check(s.interlude && s.mistShown && has(s.interludeShown, '안개') && s.puddles >= 2 && s.puddlesShown >= 2,
+      `안개 막간: 망령이 안개가 되고 웅덩이가 깔린다 (막간 ${s.interlude}, 안개 ${s.mistShown}, 웅덩이 ${s.puddles}/${s.puddlesShown}, "${s.interludeShown}")`);
+    await game.shot(pc ? 'mirror-mist' : 'mirror-mist-phone', '안개 막간: 안개 속 벼락, 웅덩이');
+    s = (await game.until(t => !t.interlude && t.clones >= 2 && t.clonesShown >= 2, 9000)) || await game.state();
+    check(!s.interlude && s.clones >= 2 && s.clonesShown >= 2, `분신: 안개에서 셋으로 모인다 (분신 ${s.clones}, 그림 ${s.clonesShown})`);
+    await game.shot(pc ? 'mirror-clones' : 'mirror-clones-phone', '분신: 진짜만 왕관이 금색');
+    if (pc) {
+      await game.send('heal; clear; boss crown_wraith use grasp');
+      await game.wait(250);
+      s = await game.state();
+      check(s.clonesShown >= 1 && s.hazards >= 2 && s.marksShown >= 2, `망령의 손길: 뒤로 나타나고 분신이 따라 한다 (예고 ${s.hazards}, 그림 ${s.marksShown})`);
+      await game.shot('mirror-mimic', '망령의 손길: 분신이 시차로 따라 한다');
+      await game.wait(1500);
+    }
+    await game.send('heal; clear; boss crown_wraith use sunken_hands');
+    await game.wait(500);
+    s = await game.state();
+    check(s.hands >= 2 && s.handsShown >= 2, `가라앉은 손: 웅덩이마다 손이 솟는다 (손 ${s.hands}, 그림 ${s.handsShown})`);
+    await game.shot(pc ? 'mirror-hands' : 'mirror-hands-phone', '가라앉은 손: 웅덩이에서 솟아 붙잡는다');
+    await game.wait(1500);
+    await game.send('heal; clear; boss crown_wraith clones 2');
+    await game.wait(300);
+    await game.send('boss crown_wraith strike');
+    s = (await game.until(t => t.clones === 0 && t.clonesShown === 0, 2000)) || await game.state();
+    check(s.clones === 0 && s.clonesShown === 0, `진짜를 때리면 분신이 모두 흩어진다 (분신 ${s.clones}, 그림 ${s.clonesShown}, 흩어진 수 ${s.clonesBroken})`);
+
+    await game.send('heal; clear; goto boss void_lord');
+    await game.until(t => has(t.banner, '공허의 군주') || has(t.entrance, '공허의 군주'), 8000, game.texts);
+    await game.wait(4500);
+    await game.send('heal; clear; boss void_lord hurt 0.36');
+    await game.until(t => t.bossPhase === 2, 4000);
+    await game.wait(2500);
+    s = await game.state();
+    check(s.gates >= 2 && s.gatesShown >= 2, `공간 문: 문 둘이 선다 (${s.gates}, 그림 ${s.gatesShown})`);
+    if (pc) {
+      await game.send('heal; clear; boss void_lord use beam');
+      await game.wait(400);
+      await game.shot('mirror-gate', '공허 광선: 한 문으로 들어가 다른 문에서 나온다');
+      await game.wait(1500);
+    }
+    await game.send('heal; clear; boss void_lord use star_fall');
+    await game.wait(1800);
+    await game.send('heal; boss void_lord use rewind');
+    s = (await game.until(t => t.echoes >= 1 && t.echoesShown >= 1 && t.hourglassShown, 1500)) || await game.state();
+    check(s.echoes >= 1 && s.echoesShown >= 1 && s.hourglassShown,
+      `되감기: 모래시계와 흐린 보라로 다시 그린 예고 (되감은 ${s.echoes}, 그림 ${s.echoesShown}, 모래시계 ${s.hourglassShown})`);
+    await game.shot(pc ? 'mirror-rewind' : 'mirror-rewind-phone', '되감기: 방금 피한 곳이 거꾸로 다시');
+    await game.wait(3000);
+    await game.send('heal; clear; boss void_lord hurt 0.33');
+    await game.until(t => t.bossPhase === 3, 4000);
+    s = (await game.until(t => t.interlude && t.mazeRings >= 3 && t.mazeRingsShown >= 3 && has(t.interludeShown, '별'), 5000)) || await game.state();
+    check(s.interlude && s.mazeRings >= 3 && s.mazeRingsShown >= 3 && has(s.interludeShown, '별'),
+      `별 미로 막간: 고리마다 틈 하나 (막간 ${s.interlude}, 고리 ${s.mazeRings}, 그림 ${s.mazeRingsShown}, "${s.interludeShown}")`);
+    await game.shot(pc ? 'mirror-maze' : 'mirror-maze-phone', '별 미로 막간: 바깥 고리부터 떨어진다, 틈으로 걷는다');
+    if (pc) {
+      await game.wait(4500);
+      await game.shot('mirror-maze-burn', '별 미로: 떨어진 고리는 계속 탄다');
+      s = (await game.until(t => !t.interlude && t.gravityRimShown, 12000)) || await game.state();
+      check(!s.interlude && s.gravityRimShown, `막간 뒤 중력이 뒤집힌다: 화면 둘레 보라 (${s.gravityRimShown})`);
+      await game.shot('mirror-gravity', '중력 반전: 화면 둘레가 보라로 숨 쉰다');
     }
     await game.context.close();
   }
@@ -3822,9 +3902,9 @@ const BossBlows = {
     'circle 7 3.2 1.4 0 0 F tide_serpent bubble_burst', 'line -8 -3.4 8 1.4 0 F tide_serpent water_jet', 'ring 5 -2.4 3.4 1.4 0 F tide_serpent whirlpool'],
   // The void lord's own void and frost (2026-11-28): claws, a star, a rift, a lance, the floor drawn in, a horizon.
   voidlord: ['cone -8 2.6 3.8 110 0 F void_lord grasp', 'circle -2.2 3 1.8 0 0 F void_lord star_fall', 'share 3 3.2 2 0 0 F void_lord gravity_share',
-    'circle 7 3.2 2.6 0 0 F void_lord collapse', 'line -8 -3.4 8 1.6 0 F void_lord beam', 'ring 5 -2.4 4 1.2 0 F void_lord void_ripple'],
+    'circle 7 3.2 1.6 0 0 F void_lord black_holes', 'line -8 -3.4 8 1.6 0 F void_lord beam', 'ring 5 -2.4 4 1.2 0 F void_lord event_horizon'],
   // The crown wraith's own lightning (2026-11-28): the claws, the bolts, the spear, the ring and the shared blow.
-  wraith: ['cone -8 2.6 3.4 110 0 F crown_wraith grasp', 'circle -2.2 3 1.5 0 0 F crown_wraith lightning_fall', 'share 3 3.2 1.8 0 0 F crown_wraith deep_share',
+  wraith: ['cone -8 2.6 3.4 110 0 F crown_wraith grasp', 'circle -2.2 3 1.5 0 0 F crown_wraith lightning_fall', 'circle 3 3.2 1.3 0 0 F crown_wraith sunken_hands',
     'circle 7 3.2 1.4 0 0 F crown_wraith storm_brand', 'line -8 -3.4 8 1.2 0 F crown_wraith soul_lance', 'ring 5 -2.4 3.4 1.4 0 F crown_wraith crown_ring'],
   // The lava titan's own fire (2026-11-28): lava bursting out of the floor, the wall of fire, the split floor, the band.
   titan: ['circle -7 3 2.2 0 0 F lava_titan slam', 'cone -3.6 2.4 3.8 110 0 F lava_titan fire_wave', 'circle 2.6 3.2 2.2 0 0 F lava_titan eruption',
@@ -4211,10 +4291,15 @@ async function shots(browser) {
     // the bosses' wind-ups and entrances throw pieces where they threw square dots.
     await pollState(game, t => t.bossShots === 0, 6000);
     const before = (await game.state()).spiralAims;
-    await game.send('heal; boss void_lord use void_spiral');
+    // R4b took the void lord's spiral away: Morg's whirl of madness in its place (told to, in any phase).
+    await game.send('heal; goto boss mad_general');
+    await game.until(t => has(t.banner, '등장') || has(t.entrance, '등장'), 6000, game.texts);
+    await game.wait(1500);
+    await pollState(game, t => t.bossShots === 0, 6000);
+    await game.send('heal; boss mad_general use ember_spiral');
     const next = await pollState(game, t => t.spiralAims > before && t.roundAim >= 0 && t.bossShots > 0, 4000);
-    check(next.spiralAims > before && next.roundAim >= 0, `공허 나선: 첫 발사 뒤 다음 발사의 조준선이 나온다 (${next.spiralAims - before}번째, ${next.roundAim}도, ${next.aimDots}점, 나는 탄 ${next.bossShots}발)`);
-    await game.shot('shots-spiral-next', '공허 나선: 첫 발사가 나는 중에 다음 발사의 조준선');
+    check(next.spiralAims > before && next.roundAim >= 0, `광기의 회전(모르그): 첫 발사 뒤 다음 발사의 조준선이 나온다 (${next.spiralAims - before}번째, ${next.roundAim}도, ${next.aimDots}점, 나는 탄 ${next.bossShots}발)`);
+    await game.shot('shots-spiral-next', '광기의 회전(모르그): 첫 발사가 나는 중에 다음 발사의 조준선');
     const bits = await game.state();
     check(bits.bitsThrown > 0, `보스의 예고·입장에서 사각 점 대신 조각이 튄다 (${bits.bitsThrown}개)`);
   }
@@ -9797,7 +9882,7 @@ async function towns(browser) {
   }
 }
 
-const Sections = { menu, title, testground, hunt, harvest, zones, towns, time, basics, first, firstphone, hour, bag, combat, hero, roll, weapons, arts, bosses, patterns, tempo, ground, props, forces, order, veineater, samurai, knight, warden, antlion, serpent, titan, voidlord, wraith, queen, general, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, layers, monsterfx, hazards, bossfx, hits, shots, blast, mobwarn, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
+const Sections = { menu, title, testground, hunt, harvest, zones, towns, time, basics, first, firstphone, hour, bag, combat, hero, roll, weapons, arts, bosses, patterns, tempo, ground, props, forces, order, mirror, veineater, samurai, knight, warden, antlion, serpent, titan, voidlord, wraith, queen, general, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, layers, monsterfx, hazards, bossfx, hits, shots, blast, mobwarn, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

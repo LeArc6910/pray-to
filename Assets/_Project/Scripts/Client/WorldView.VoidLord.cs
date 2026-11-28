@@ -25,6 +25,7 @@ namespace Game.Client
             "void_ring" or "void_storm" or "void_spiral" => VoidLordPose.Burst,
             "blink" => VoidLordPose.Blink,
             "collapse" or "black_holes" or "gravity_share" or "void_ripple" => VoidLordPose.Crush,
+            "rewind" => VoidLordPose.Smite,
             "void_cross" or "event_horizon" => VoidLordPose.Smite,
             _ => attack.Shape switch
             {

@@ -188,8 +188,8 @@ namespace CoreSandbox
                 // Green ground is where to be; a pull or push is walked against by getting out of what it is for (R3);
                 // a wall of water is read apart (below).
                 if (hazard.Safe || hazard.Shape == HazardShape.Pull || hazard.Shape == HazardShape.Push || hazard.Shape == HazardShape.Wave) continue;
-                // Bands that land one after another (R4a) are read together below.
-                if (hazard.Order > 0 && hazard.Shape == HazardShape.Line) continue;
+                // Bands that land one after another (R4a) are read together below, and so is the star maze (R4b).
+                if (hazard.Order > 0 && hazard.Shape == HazardShape.Line || hazard.Shape == HazardShape.Maze) continue;
                 if (!hazard.Contains(player.Position, World.PlayerRadius + 0.3f)) continue;
                 // A blast that spares the shaded (R2b): behind the nearest pillar from the boss.
                 if (hazard.Shades)
@@ -275,6 +275,19 @@ namespace CoreSandbox
                 var on = later is Vec2 l ? (Vec2.Dot(l - middle, across) >= 0 ? across : across * -1)
                     : world.FindBoss(next.Source) is Boss b ? (Vec2.Dot(b.Home - middle, across) >= 0 ? across : across * -1) : across;
                 away += (next.Order == 1 ? on : on * -1) * 3;
+            }
+            // The star maze (R4b): from the gap of the ring that has fallen, straight in to the next ring's band, then along
+            // it to that ring's gap before it falls.
+            var ring = world.Hazards.Where(h => h.Shape == HazardShape.Maze && !h.Burning).OrderBy(h => h.ResolveTick).FirstOrDefault();
+            if (ring != null)
+            {
+                var off = player.Position - ring.Position;
+                float distance = off.Length;
+                float band = Math.Min(ring.Size, ring.Width + 2.2f);
+                var spot = distance > band
+                    ? ring.Position + (distance > 1e-4f ? off / distance : ring.Direction) * (band - 0.6f)
+                    : ring.Position + ring.Direction * ((band + ring.Width) / 2);
+                if (Vec2.Distance(spot, player.Position) > 0.3f) away = (spot - player.Position).Normalized * 3;
             }
             // Out of a boss's edge that bites, back toward its middle.
             var edged = world.Bosses.FirstOrDefault(b => !b.IsDead && World.InEdge(b, player.Position));

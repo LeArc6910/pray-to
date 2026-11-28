@@ -180,6 +180,7 @@ namespace Game.Core
             WorkEdge(boss);
             WorkProps(boss);
             WorkPits(boss);
+            WalkClones(boss);
 
             switch (boss.State)
             {
@@ -389,6 +390,8 @@ namespace Game.Core
         void StartTelegraph(Boss boss, Player target, List<Player> fighters, bool again = false, bool repeat = false)
         {
             var attack = boss.Attack;
+            // A blow from behind (R4b, boost behind): it comes out behind its target first.
+            if (attack.Behind && !again) ComeBehind(boss, target);
             var aim = target.Position - boss.Position;
             if (aim.LengthSquared > 1e-6f) boss.Facing = aim.Normalized;
             boss.State = BossState.Telegraph;
@@ -422,6 +425,9 @@ namespace Game.Core
             int laid = _hazards.Count;
             LayHazards(boss, attack, target, fighters, boss.Facing, resolve, cause);
             Falls(attack, laid);
+            // Its images lay it too (R4b); whatever lightning touches a puddle flashes through it (at the end).
+            int laidFirst = laid;
+            Mimic(boss, attack, target, fighters, resolve, cause);
             // The first circle of a fight that raises a pillar (a crystal, a banner: R4a) harms no one: it shows what comes
             // (R2b, like the first lava).
             if ((attack.Pool == PoolKind.Pillar || attack.Pool == PoolKind.Crystal || attack.Pool == PoolKind.Banner) && attack.Shape == AttackShape.Circle && boss.Phase >= attack.PoolFrom)
@@ -460,6 +466,7 @@ namespace Game.Core
                     Falls(second, laid);
                 }
             }
+            Conduct(boss, laidFirst);
         }
 
         // ---- R1b (2026-11-28, Docs/BossRedesign.md 8): the late blow, the noto counter and the colours. ----
@@ -658,6 +665,16 @@ namespace Game.Core
                 case AttackShape.Bands:
                     LayBands(boss, attack, resolve, cause);
                     break;
+                case AttackShape.Clone:
+                    LayCloneSpots(boss, attack, resolve, cause);
+                    break;
+                case AttackShape.Hands:
+                    LayHands(boss, attack, fighters, resolve, cause);
+                    break;
+                case AttackShape.Rewind:
+                    LayRewind(boss, attack, resolve, cause);
+                    _events.Add(new SimEvent(SimEventType.Cue, boss.Id, amount: CueRewind, direction: boss.Facing));
+                    break;
                 case AttackShape.Burrow:
                 case AttackShape.Leap:
                     // Where it will come down, which is where the boss will stand.
@@ -716,6 +733,9 @@ namespace Game.Core
                     break;
                 case AttackShape.Eat:
                     Eat(boss);
+                    break;
+                case AttackShape.Clone:
+                    FormClones(boss, attack.Spread);
                     break;
                 case AttackShape.Tether:
                     LayThreads(boss, attack);
@@ -867,6 +887,8 @@ namespace Game.Core
         {
             // Stunned (it ran into a pillar), its core is bare (R2b).
             if (boss.State == BossState.Stun) amount = (int)MathF.Round(amount * StunTakenShare);
+            // Struck itself, its mirror images scatter (R4b).
+            if (amount > 0) ScatterClones(boss);
             boss.Health -= amount;
             _events.Add(new SimEvent(SimEventType.Hit, source, boss.Id, amount, critical, cause: cause, tags: tags));
             if (!boss.IsDead) Heat(boss, amount);
@@ -1001,10 +1023,14 @@ namespace Game.Core
                 _hazards.RemoveAt(i);
                 // A wall has struck on its way and is gone at its end.
                 if (hazard.Shape == HazardShape.Wave) continue;
+                // A fallen ring of the star maze burns on (R4b).
+                if (hazard.Shape == HazardShape.Maze) BurnMaze(hazard);
                 LeavePool(hazard);
                 LeaveMonsterPool(hazard);
                 if (hazard.Plucks != 0) (plucked ??= new List<int>()).Add(hazard.Plucks);
                 if (hazard.Damage <= 0) continue;
+                // Kept for its boss's rewind (R4b).
+                KeepEcho(hazard);
                 var hit = _players.Where(p => !p.IsDead && hazard.Contains(p.Position, PlayerRadius)).ToList();
                 if (hazard.Plucks != 0)
                 {

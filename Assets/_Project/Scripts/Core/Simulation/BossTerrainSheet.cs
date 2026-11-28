@@ -51,6 +51,13 @@ namespace Game.Core
         Crystal,
         Egg,
         Banner,
+        // R4b (2026-11-28, Docs/BossRedesign.md 5.6·5.8): the crown wraith's mirror image (AttackShape.Clone: goes at one
+        // blow, walks as the wraith walks), its puddle of sea water (a lightning blast that touches it flashes through
+        // the whole puddle, World.Conduct; a sunken hand rises from it), and the void lord's gate (a beam that meets one
+        // comes out of the other, World.LayBeam). Puddles and gates cannot be broken.
+        Clone,
+        Puddle,
+        Gate,
     }
 
     // What a boss's interlude asks (R4a, interlude column): its eggs broken before they hatch, or its legion's charges
@@ -59,6 +66,11 @@ namespace Game.Core
     {
         Eggs,
         Legion,
+        // R4b: the crown wraith goes to mist (What, a circle attack of its own, falls now and then) and forms again with
+        // Count mirror images; the void lord floats over the middle while Count rings of stars fall from the outside in,
+        // each with one gap: walk the way through (World.Maze).
+        Mist,
+        Maze,
     }
 
     // From Phase's roar, for Seconds the boss cannot be hurt: Eggs lays Count eggs round the arena that hatch What (a
@@ -160,7 +172,9 @@ namespace Game.Core
                         "pit" => PropKind.Pit,
                         "crystal" => PropKind.Crystal,
                         "banner" => PropKind.Banner,
-                        _ => throw new FormatException($"props의 종류는 vent, pillar, vein, pit, crystal, banner 가운데 하나입니다('{bits[0]}')."),
+                        "puddle" => PropKind.Puddle,
+                        "gate" => PropKind.Gate,
+                        _ => throw new FormatException($"props의 종류는 vent, pillar, vein, pit, crystal, banner, puddle, gate 가운데 하나입니다('{bits[0]}')."),
                     };
                     int count = bits.Length == 2 ? SheetValues.ParseNumber(bits[1], "props") : 1;
                     if (bits.Length > 2 || count < 1) throw new FormatException($"props는 vent*3처럼 적습니다('{item}').");
@@ -173,7 +187,9 @@ namespace Game.Core
         }
 
         // interlude column (R4a): "3:eggs:5:12:crystal_hatchling" (from phase 3's roar, five eggs, twelve seconds, what
-        // they hatch), "3:legion:3:15:phantom_ranks" (three charges of that wave attack over fifteen seconds).
+        // they hatch), "3:legion:3:15:phantom_ranks" (three charges of that wave attack over fifteen seconds); R4b
+        // "2:mist:2:6:lightning_fall" (six seconds of mist with that falling now and then, then two images),
+        // "3:maze:4:12:-" (four rings of stars over twelve seconds).
         public static BossInterlude Interlude(string cell, int phaseCount)
         {
             if (cell.Length == 0) return null;
@@ -185,7 +201,9 @@ namespace Game.Core
             {
                 "eggs" => InterludeKind.Eggs,
                 "legion" => InterludeKind.Legion,
-                _ => throw new FormatException($"interlude의 종류는 eggs, legion 가운데 하나입니다('{parts[1]}')."),
+                "mist" => InterludeKind.Mist,
+                "maze" => InterludeKind.Maze,
+                _ => throw new FormatException($"interlude의 종류는 eggs, legion, mist, maze 가운데 하나입니다('{parts[1]}')."),
             };
             int count = SheetValues.ParseNumber(parts[2], "interlude");
             float seconds = SheetValues.ParseDecimal(parts[3], "interlude");
