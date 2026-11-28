@@ -283,6 +283,7 @@ namespace Game.Client
         }
 
         readonly List<Shade> _shades = new List<Shade>();
+        Vec2 _shadeFrom;
         static readonly Color ShadeColor = new Color(0.03f, 0.07f, 0.16f, 0.62f);
         static readonly Color ShadeEdgeColor = new Color(0.45f, 1f, 1f, 1f);
         const float ShadeEdge = 0.12f;
@@ -291,7 +292,9 @@ namespace Game.Client
         public int ShadesShown => _shades.Count(s => s.Fill.enabled);
         // Where each shown shadow is and how big and clear, for the playtests (2026-11-28: the shadows counted as shown
         // but none could be seen in the picture).
-        public string ShadeTrace => string.Join(" ", _shades.Where(s => s.Fill.enabled).Select(s =>
+        public string ShadeTrace => $"from {_shadeFrom.X:0.0},{_shadeFrom.Y:0.0} cam {_camera.transform.position.x:0.0},{_camera.transform.position.y:0.0} root {_root.transform.position.x:0.0},{_root.transform.position.y:0.0} pillars "
+            + string.Join(" ", _client.Props().Where(p => p.Kind == PropKind.Pillar).Select(p => $"{p.Position.X:0.0},{p.Position.Y:0.0}r{p.Radius:0.00}")) + " shades "
+            + string.Join(" ", _shades.Where(s => s.Fill.enabled).Select(s =>
             $"{s.Fill.transform.position.x:0.0},{s.Fill.transform.position.y:0.0}:{s.Fill.transform.lossyScale.x:0.0}x{s.Fill.transform.lossyScale.y:0.00}:a{s.Fill.color.a:0.00}:o{s.Fill.sortingOrder}:{s.Fill.sortingLayerName}:{(s.Fill.sprite == null ? "nosprite" : s.Fill.sprite.rect.width + "px/" + s.Fill.sprite.pixelsPerUnit)}"));
 
         SpriteRenderer ShadePiece(string name, Color color, int order)
@@ -325,6 +328,7 @@ namespace Game.Client
             if (blast != null)
             {
                 var from = blast.Value.Position;
+                _shadeFrom = from;
                 float pulse = 0.5f + 0.5f * Mathf.Sin(Time.time * 6);
                 foreach (var prop in _client.Props())
                 {
