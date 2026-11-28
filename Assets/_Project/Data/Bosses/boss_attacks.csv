@@ -9,19 +9,15 @@ cave_warden,call_slimes,슬라임 부르기,3,summon,self,0.8,,,,,,3,3,,1.0,10,s
 cave_warden,shockwave,충격파,2|3,ring,self,1.2,209,2.2,6,,,,,,1.0,18,,,,,
 cave_warden,rock_trail,바위 줄기,,trail,nearest,0.8,161,1.1,8,,,5,,8,0.9,18,,,pillar:12,,3:count=7 length=10
 cave_warden,core_burst,핵 폭주,3,cover,self,1.6,146,,,,,,,,1.1,16,,strong,,,
-crystal_queen,bite,물어뜯기,,cone,nearest,0.7,290,,3.2,90,,,,,0.7,30,,,,crystal_ripple:0.5,3:repeat=1
-crystal_queen,crystal_rain,수정 비,2|3,circle,random,1.2,372,1.4,,,,5,4.5,,1.0,25,,,,,
+crystal_queen,bite,물어뜯기,,cone,nearest,0.7,290,,3.2,90,,,,,0.7,30,,,,,3:repeat=1
 crystal_queen,shard_ring,수정 가시,1|2,burst,self,0.6,81,0.3,,,,12,,8,0.9,20,,,,,2:count=16
 crystal_queen,pounce,덮치기,1|2,charge,farthest,0.9,290,,12,,2.4,,,18,1.1,20,,,,,2:count=2
-crystal_queen,web_quake,결정 공명,,circle,each,1.0,254,2.0,,,,1,,,1.0,20,,,,,3:count=2 spread=2
-crystal_queen,shard_storm,수정 폭풍,3,burst,self,0.6,81,0.3,,,,20,,8,0.9,15,,,,,
+crystal_queen,web_quake,수정 꽂기,,circle,nearest,1.0,254,1.2,,,,1,3,,1.0,20,,,crystal:10,,2:count=2;3:count=3
+crystal_queen,resonance,공명 순서,,order,nearest,1.2,360,2.0,,,,2,0.4,,1.0,20,,,,,2:count=3;3:count=4 spread=0.3
 crystal_queen,call_bats,알 낳기,3,summon,self,0.8,,,,,,3,3,,1.0,10,crystal_hatchling,,,,
-crystal_queen,crystal_cross,수정 십자,2|3,cross,nearest,1.0,254,,9,0,1.2,,,,0.9,20,,,,crystal_ripple:0.5,
-crystal_queen,venom_share,왕관의 빛,2|3,share,random,1.3,473,1.8,,,,,,,1.0,15,,,,,
-crystal_queen,crystal_spiral,수정 나선,3,spiral,self,0.7,81,0.3,,20,4,6,,7,1.0,15,,,,,
-crystal_queen,crystal_lattice,수정 격자,3,cross,nearest,1.1,254,,8,45,1.2,,,,1.0,16,,,,,
-crystal_queen,shard_hail,수정 우박,3,circle,each,1.4,231,1.3,,,,3,2.6,,1.1,16,,strong,,,
-crystal_queen,crystal_ripple,수정 파문,2|3,ring,nearest,0.5,122,1.2,7,,,,,,0.9,0,,,,,
+crystal_queen,crystal_cross,수정 십자,2|3,cross,nearest,1.0,254,,9,0,1.2,,,,0.9,20,,,,,
+crystal_queen,venom_share,왕관의 빛,2|3,beam,nearest,1.0,290,,14,40,1.2,1,,,1.0,16,,,,,3:count=2
+crystal_queen,shard_hail,왕관의 별자리,3,order,nearest,1.6,231,3,,,,6,0.35,,1.1,16,,strong,,,
 lava_titan,slam,내려찍기,,circle,nearest,0.9,423,2.2,,,,1,,,0.9,30,,,lava:5:2,,3:repeat=1
 lava_titan,fire_wave,불꽃 휩쓸기,,cone,nearest,0.8,367,,3.8,110,,,,,0.8,25,,,,,3:repeat=1
 lava_titan,meteor,유성 낙하,2|3,circle,random,1.2,541,1.6,,,,5,5,,1.0,25,,,rock:10,,
@@ -67,14 +63,15 @@ antlion,sand_spiral,모래 나선,3,spiral,self,0.5,79,0.3,,22,5,6,,7,1.3,14,,,,
 antlion,call_scorpions,전갈 부르기,3,summon,self,0.8,,,,,,3,3,,1.0,10,sand_scorpion,,,,
 antlion,maw,개미지옥의 입,3,circle,middle,1.6,224,4,,,,1,,,1.1,16,,strong,,,,2.4
 mad_general,cleave,베어 가르기,,cone,nearest,0.8,285,,3.4,110,,,,,0.8,30,,,,ember_wake:0.5,2:repeat=1;3:repeat=2
-mad_general,hellfire,불길 호령,,circle,random,1.2,418,1.5,,,,4,4,,1.0,25,,,,,3:count=6
-mad_general,dark_cross,유령 창진,2|3,cross,nearest,1.0,262,,9,45,1.2,,,,0.9,18,,,,ember_wake:0.5,
+mad_general,hellfire,불길 호령,,circle,banner,1.2,418,1.5,,,,4,4,,1.0,25,,,,,3:count=6
+mad_general,dark_cross,환영 창진,2|3,wave,nearest,1.0,180,,,,2.2,2,1.4,6,1.0,18,,,,,3:count=3 angle=180
 mad_general,war_charge,군기 돌격,1|2,charge,farthest,0.9,302,,12,,2.4,,,18,1.1,20,,,,,2:count=2
-mad_general,flame_ring,군기 꽂기,2|3,ring,self,1.2,360,2.4,6,,,,,,1.0,18,,,,,
+mad_general,flame_ring,군기 꽂기,2|3,circle,nearest,1.2,360,1.4,,,,1,2,,1.0,18,,,banner:12,,3:count=2 spread=4
+mad_general,marked_volley,호령 표적,2|3,mark,nearest,1.3,360,2.5,,,,1,,,1.0,16,,,,,3:count=2
 mad_general,ember_spiral,광기의 회전,3,spiral,self,0.7,85,0.3,,20,4,6,,7,1.1,15,,,,,
 mad_general,call_soldiers,병사 부르기,3,summon,self,0.8,,,,,,2,3,,1.0,10,demon_soldier,,,,
-mad_general,meteors,불화살 일제 사격,3,circle,each,1.4,242,1.4,,,,3,2.6,,1.1,16,,strong,,,
-mad_general,ember_wake,불씨 파문,2|3,ring,nearest,0.5,127,1.2,3.6,,,,,,0.9,0,,,,,
+mad_general,meteors,불화살 일제 사격,3,bands,self,1.6,242,,,,,5,0.3,,1.1,16,,strong,,,
+mad_general,ember_wake,불씨 파문,3,ring,nearest,0.5,127,1.2,3.6,,,,,,0.9,0,,,,,
 crown_wraith,grasp,망령의 손길,,cone,nearest,0.6,400,,3.4,110,,,,,0.8,28,,,,crown_ring:0.5,3:repeat=1
 crown_wraith,lightning_fall,벼락,,circle,random,1.0,360,1.5,,,,4,4,,1.0,22,,,,soul_ripple:0.5,3:count=6
 crown_wraith,soul_lance,넋의 창,,line,nearest,0.7,415,,11,,1.2,,,,1.0,18,,,,soul_ripple:0.5,2:repeat=1;3:repeat=2

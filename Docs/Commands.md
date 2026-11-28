@@ -152,6 +152,8 @@ dotnet run --project DevTools/CoreSandbox -- --boss 600 1 --boss-id vein_eater -
 node DevTools/WebPlaytest/sweep.js --wait <커밋> --only props
 # 끌기·숨기·벽(R3, Docs/Bosses.md 끌기·숨기·벽): 개미귀신(철 12)·물살 뱀(미스릴 22)·아라네(공허 45) 봇 전투(알맞음, 위 명령의 boss-id·장비·레벨만 바꿈, --roll-miss 0.4로 놓치는 봇)와 웹 점검 구역 forces(PC·휴대폰)
 dotnet run --project DevTools/CoreSandbox -- --boss 600 1 --boss-id antlion --gear iron_sword,iron_armor,iron_helmet,iron_boots,iron_ring,iron_amulet --classes warrior,fire_mage --reaction 0.5 --level 12 --build
+# 순서·막간(R4a, Docs/Bosses.md 순서·막간): 수정 거미 여왕(철 14)·모르그(철 17), 위 명령의 boss-id·레벨만 바꿈(--roll-miss 0.4로 놓치는 봇). 끝에 쓰러진 페이즈(막간 포함)
+dotnet run --project DevTools/CoreSandbox -- --boss 600 1 --boss-id mad_general --gear iron_sword,iron_armor,iron_helmet,iron_boots,iron_ring,iron_amulet --classes warrior,fire_mage --reaction 0.5 --level 17 --build
 node DevTools/WebPlaytest/sweep.js --wait <커밋> --only forces
 ```
 

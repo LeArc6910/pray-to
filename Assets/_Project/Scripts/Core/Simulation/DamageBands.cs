@@ -164,6 +164,8 @@ namespace Game.Core
             // A chasing mound is marked only for the moment it stops (World.MoundStop, R3): a quick one.
             if (attack.Chases) return HitKind.Quick;
             if (attack.Shape == AttackShape.Charge && attack.Count >= 2) return HitKind.Combo;
+            // Walls that come one after another (R4a, Morg's ranks): each a share, as a run of dashes.
+            if (attack.Shape == AttackShape.Wave && attack.Count >= 2) return HitKind.Combo;
             if (attack.Weight == 0) return HitKind.FollowUp;
             return attack.Telegraph >= HeavyTelegraph ? HitKind.Heavy : attack.Telegraph >= SlowTelegraph ? HitKind.Slow : HitKind.Quick;
         }

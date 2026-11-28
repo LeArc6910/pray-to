@@ -19,7 +19,7 @@ namespace Game.Client
         static CrystalQueenPose QueenBlowOf(BossAttack attack) => attack.Id switch
         {
             "bite" => CrystalQueenPose.Bite,
-            "crystal_rain" or "shard_hail" or "crystal_cross" or "crystal_lattice" or "venom_share" => CrystalQueenPose.Flash,
+            "crystal_rain" or "shard_hail" or "crystal_cross" or "crystal_lattice" or "venom_share" or "resonance" => CrystalQueenPose.Flash,
             "shard_ring" or "shard_storm" or "crystal_spiral" => CrystalQueenPose.Burst,
             "web_quake" or "crystal_ripple" => CrystalQueenPose.Stomp,
             _ => attack.Shape switch

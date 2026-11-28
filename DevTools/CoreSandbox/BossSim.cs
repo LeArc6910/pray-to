@@ -54,6 +54,7 @@ namespace CoreSandbox
             int reactionTicks = World.Ticks(reaction);
             var takenByAttack = new Dictionary<string, int>();
             var phaseStarts = new List<(int Phase, double Seconds)>();
+            var diedIn = new List<string>();
             int wakes = 0;
             double? killedAt = null;
             int dealt = 0;
@@ -80,7 +81,12 @@ namespace CoreSandbox
                         takenByAttack[cause] = takenByAttack.GetValueOrDefault(cause) + e.Amount;
                     }
                     if (e.Type == SimEventType.Hit && bots.Any(b => b.Player.Id == e.Source) && world.Bosses.Any(b => b.Id == e.Target)) dealt += e.Amount;
-                    if (e.Type == SimEventType.Died && bots.Any(b => b.Player.Id == e.Source)) bots.First(b => b.Player.Id == e.Source).Deaths++;
+                    if (e.Type == SimEventType.Died && bots.Any(b => b.Player.Id == e.Source))
+                    {
+                        bots.First(b => b.Player.Id == e.Source).Deaths++;
+                        var fallen = world.Bosses.FirstOrDefault();
+                        diedIn.Add(fallen == null ? "-" : fallen.State == BossState.Interlude ? "막간" : fallen.Phase.ToString());
+                    }
                     if (e.Type == SimEventType.BossAwake)
                     {
                         wakes++;
@@ -99,6 +105,7 @@ namespace CoreSandbox
                 : $"처치 못 함 ({seconds}초, 보스를 깨운 횟수 {wakes})");
             Console.WriteLine("  페이즈 시작: " + string.Join(", ", phaseStarts.Select(p => $"{p.Phase}페이즈 {p.Seconds:0.0}초")));
             Console.WriteLine($"  보스에게 준 피해 {dealt}");
+            if (diedIn.Count > 0) Console.WriteLine("  쓰러진 페이즈: " + string.Join(", ", diedIn.GroupBy(d => d).Select(g => $"{g.Key} {g.Count()}번")));
             foreach (var bot in bots) Console.WriteLine($"  {bot.Player.Name}: 사망 {bot.Deaths}, 받은 피해 {bot.Taken}, 마신 물약 {bot.Skills.Drunk}개, 구르기 {bot.Player.Rolls}번(흘린 타격 {bot.Player.Dodges}), 준 피해 {bot.Skills.Summary()}");
             Console.WriteLine("  받은 피해 출처:");
             foreach (var pair in takenByAttack.OrderByDescending(p => p.Value)) Console.WriteLine($"    {pair.Key,-8} {pair.Value}");
@@ -118,8 +125,9 @@ namespace CoreSandbox
             var boss = world.Bosses.FirstOrDefault();
             var target = boss?.Position ?? arena;
             float targetRadius = boss?.Definition.Radius ?? 0;
-            // A vein the boss would eat to rage is broken first (R2b, the vein eater).
-            var vein = boss == null ? null : world.Props.Where(p => p.Owner == boss.Id && p.Kind == PropKind.Vein)
+            // A vein the boss would eat to rage is broken first (R2b, the vein eater), and an interlude's eggs or a banner
+            // (R4a: the queen's eggs hatch unbroken; Morg's banner staggers him, or ends his interlude).
+            var vein = boss == null ? null : world.Props.Where(p => p.Owner == boss.Id && (p.Kind == PropKind.Vein || p.Kind == PropKind.Egg || p.Kind == PropKind.Banner))
                 .OrderBy(p => Vec2.Distance(p.Position, player.Position)).FirstOrDefault();
             if (vein != null)
             {
@@ -180,6 +188,8 @@ namespace CoreSandbox
                 // Green ground is where to be; a pull or push is walked against by getting out of what it is for (R3);
                 // a wall of water is read apart (below).
                 if (hazard.Safe || hazard.Shape == HazardShape.Pull || hazard.Shape == HazardShape.Push || hazard.Shape == HazardShape.Wave) continue;
+                // Bands that land one after another (R4a) are read together below.
+                if (hazard.Order > 0 && hazard.Shape == HazardShape.Line) continue;
                 if (!hazard.Contains(player.Position, World.PlayerRadius + 0.3f)) continue;
                 // A blast that spares the shaded (R2b): behind the nearest pillar from the boss.
                 if (hazard.Shades)
@@ -244,12 +254,27 @@ namespace CoreSandbox
             if (beams >= 2 && away.Length < 1.2f) away = outOfStar;
             // A wall of water that will cross where the bot stands (R3): into its gap, or ahead of a closing wall to the
             // middle it leaves.
-            foreach (var wave in world.Hazards.Where(h => h.Shape == HazardShape.Wave))
+            // Only the first of walls one after another (R4a, Morg's ranks): their gaps lie apart, so heading for both at
+            // once goes nowhere; the next is read once this one has passed.
+            foreach (var wave in world.Hazards.Where(h => h.Shape == HazardShape.Wave && world.Tick < h.ResolveTick).OrderBy(h => h.StartTick).Take(1))
             {
                 if (world.Tick + World.Ticks(1.5f) < wave.StartTick - reactionTicks || !world.WaveStrikes(wave, player.Position)) continue;
                 var side = new Vec2(-wave.Direction.Y, wave.Direction.X);
                 float across = Vec2.Dot(player.Position - wave.Position, side);
                 away += wave.Width > 0 ? side * (across > 0 ? -2 : 2) : wave.Direction * 2;
+            }
+            // Bands landing one after another (R4a, Morg's volley): in the next to land, step back into where the last one
+            // fell (or, the first, on into the next).
+            var bands = world.Hazards.Where(h => h.Order > 0 && h.Shape == HazardShape.Line && world.Tick - h.StartTick >= reactionTicks).OrderBy(h => h.ResolveTick).ToList();
+            if (bands.Count > 0 && bands[0].Contains(player.Position, World.PlayerRadius))
+            {
+                var next = bands[0];
+                var across = new Vec2(-next.Direction.Y, next.Direction.X);
+                var middle = next.Position + next.Direction * (next.Size / 2);
+                var later = bands.Count > 1 ? bands[1].Position + bands[1].Direction * (bands[1].Size / 2) : (Vec2?)null;
+                var on = later is Vec2 l ? (Vec2.Dot(l - middle, across) >= 0 ? across : across * -1)
+                    : world.FindBoss(next.Source) is Boss b ? (Vec2.Dot(b.Home - middle, across) >= 0 ? across : across * -1) : across;
+                away += (next.Order == 1 ? on : on * -1) * 3;
             }
             // Out of a boss's edge that bites, back toward its middle.
             var edged = world.Bosses.FirstOrDefault(b => !b.IsDead && World.InEdge(b, player.Position));

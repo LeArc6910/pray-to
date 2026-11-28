@@ -39,6 +39,8 @@ namespace Game.Client
             var sheet = AttackOf(hazard);
             var attack = sheet?.ForPhase(_bossPhaseInView);
             if (sheet != null) HeldWhy = $"{sheet.Id}:p{_bossPhaseInView}:h{attack.Hold}:d{hazard.Duration}:t{World.Ticks(attack.Telegraph)}";
+            // An order's marks fill together (R4a, WorldView.Order.cs).
+            if (attack != null && attack.Shape == AttackShape.Order) return OrderProgress(hazard, attack, progress);
             if (attack == null || attack.Hold <= 0) return progress;
             float seconds = progress * hazard.Duration / World.TicksPerSecond;
             if (hazard.Duration <= World.Ticks(attack.Telegraph) + 1) return progress;
@@ -52,6 +54,12 @@ namespace Game.Client
         {
             var body = Find(e.Source);
             if (body == null) return;
+            // An interlude beginning or over (R4a).
+            if (e.Amount == World.CueInterlude || e.Amount == World.CueInterludeOver)
+            {
+                ShowInterlude(e, body);
+                return;
+            }
             CuesSeen++;
             body.CueAt = Time.time;
             var feet = body.Position;

@@ -34,24 +34,7 @@ namespace Game.Core
 
         // A pillar rises at a spot for seconds (an attack's pool), unless the boss or another pillar is in the way. Too
         // many of the boss's things standing and its oldest raised pillar crumbles first.
-        void RaisePillar(Boss boss, Vec2 at, float seconds)
-        {
-            float radius = PropRadius(PropKind.Pillar);
-            var fromHome = at - boss.Home;
-            float limit = Math.Max(0, FloorRadius(boss) - radius);
-            if (fromHome.Length > limit) at = boss.Home + fromHome.Normalized * limit;
-            at = Collision.Resolve(Map, at, radius);
-            if (Vec2.Distance(at, boss.Position) < radius + boss.Definition.Radius + 0.2f) return;
-            if (PropsOf(boss, PropKind.Pillar).Any(p => Vec2.Distance(p.Position, at) < p.Radius + radius)) return;
-            var mine = _props.Where(p => p.Owner == boss.Id).ToList();
-            if (mine.Count >= BossTerrainSheet.MaxProps)
-            {
-                var oldest = mine.Where(p => p.Kind == PropKind.Pillar).OrderBy(p => p.Until < 0 ? 0 : 1).ThenBy(p => p.Id).FirstOrDefault();
-                if (oldest == null) return;
-                _props.Remove(oldest);
-            }
-            _props.Add(new BossProp(_nextId++, boss.Id, PropKind.Pillar, at, radius, 0, Tick + Ticks(seconds)));
-        }
+        void RaisePillar(Boss boss, Vec2 at, float seconds) => RaiseProp(boss, PropKind.Pillar, at, seconds);
 
         // Every tick of a fight: raised pillars whose time is up crumble.
         void WorkProps(Boss boss) => _props.RemoveAll(p => p.Owner == boss.Id && p.Until >= 0 && Tick >= p.Until);
@@ -126,7 +109,18 @@ namespace Game.Core
         // ---- Veins ----
 
         // What a breakable thing standing in the arena takes to break (a vein: a share of its boss's health).
-        float PropHealthFor(Boss boss, PropKind kind) => kind == PropKind.Vein ? Math.Max(1, boss.MaxHealth * VeinShare) : 0;
+        float PropHealthFor(Boss boss, PropKind kind)
+        {
+            float share = kind switch
+            {
+                PropKind.Vein => VeinShare,
+                PropKind.Crystal => CrystalShare,
+                PropKind.Egg => EggShare,
+                PropKind.Banner => BannerShare,
+                _ => 0,
+            };
+            return share > 0 ? Math.Max(1, boss.MaxHealth * share) : 0;
+        }
 
         // A player's blow on a vein: it takes the hit (no armor) and breaks at none left.
         void StrikeProp(BossProp prop, float damage)
@@ -137,6 +131,8 @@ namespace Game.Core
             {
                 _props.Remove(prop);
                 _events.Add(new SimEvent(SimEventType.Impact, prop.Owner, amount: 3, position: prop.Position));
+                // A banner broken outside the interlude leaves its boss staggering (R4a).
+                if (prop.Kind == PropKind.Banner && !prop.Interlude) BannerBroken(prop);
             }
         }
 

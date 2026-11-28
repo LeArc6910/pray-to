@@ -481,6 +481,8 @@ namespace Game.Client
                     // boss <id> stun: it stands stunned now, its core bare (R2b); breakveins: its veins are broken.
                     else if (words[2] == "stun") world.ForceStun(boss);
                     else if (words[2] == "breakveins") world.ForceBreakVeins(boss);
+                    // boss <id> interlude: its interlude starts now (R4a, the queen's eggs, Morg's legion).
+                    else if (words[2] == "interlude" && !world.ForceInterlude(boss)) throw new ArgumentException($"'{words[1]}' has no interlude or is not fighting");
                     else if (words[2] == "use" && !world.ForceAttack(boss, words[3])) throw new ArgumentException($"'{words[1]}' cannot use '{words[3]}' now (awake, someone in the arena?)");
                     // Its entrance (arenas.csv, 2026-11-17): asleep again, or coming in now (the whole way, or "again").
                     else if (words[2] == "sleep") world.ForceSleep(boss);
@@ -3029,6 +3031,18 @@ namespace Game.Client
                 json.Field("wavesShown", root.WavesShown);
                 json.Field("drags", world.Hazards.Count(h => h.Shape == HazardShape.Pull || h.Shape == HazardShape.Push));
                 json.Field("dragsShown", root.DragsShown);
+                // R4a (Docs/Bosses.md 순서·막간): crystals, eggs and banners standing and drawn, crystals lit now and the
+                // chimes heard, marks following, bands laid, and whether the boss is in its interlude.
+                json.Field("crystals", world.Props.Count(p => p.Kind == PropKind.Crystal));
+                json.Field("eggs", world.Props.Count(p => p.Kind == PropKind.Egg));
+                json.Field("banners", world.Props.Count(p => p.Kind == PropKind.Banner));
+                json.Field("crystalsShown", root.PropsShownOf(PropKind.Crystal));
+                json.Field("eggsShown", root.PropsShownOf(PropKind.Egg));
+                json.Field("bannersShown", root.PropsShownOf(PropKind.Banner));
+                json.Field("crystalsLit", root.CrystalsLit);
+                json.Field("chimes", root.ChimesHeard);
+                json.Field("orderMarks", world.Hazards.Count(h => h.Order > 0));
+                json.Field("interlude", fighting != null && fighting.State == BossState.Interlude);
                 json.Field("bossChasing", fighting != null && fighting.State == BossState.Telegraph && fighting.Attack != null && fighting.Attack.Chases);
                 json.Field("wading", player.Afflictions.Wading);
                 json.Field("snared", player.Afflictions.Snared);

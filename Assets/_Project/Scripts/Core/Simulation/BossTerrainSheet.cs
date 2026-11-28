@@ -45,6 +45,43 @@ namespace Game.Core
         // R3 (2026-11-28, the antlion): a sand pit that drags whoever is in it toward its middle (World.PitPull) and
         // bites there. A phase's first stands in the arena's middle, wide (World.BigPitRadius); the rest round it.
         Pit,
+        // R4a (2026-11-28, Docs/BossRedesign.md 5.3·5.5): the queen's crystal (lit in order and bursting, AttackShape.Order;
+        // a beam turns at it; a pounce breaks on it), her egg (broken in her interlude, or it hatches), Morg's banner
+        // (broken, he staggers; in his interlude, it ends the interlude). All three can be broken.
+        Crystal,
+        Egg,
+        Banner,
+    }
+
+    // What a boss's interlude asks (R4a, interlude column): its eggs broken before they hatch, or its legion's charges
+    // outlasted (or its banner broken).
+    public enum InterludeKind : byte
+    {
+        Eggs,
+        Legion,
+    }
+
+    // From Phase's roar, for Seconds the boss cannot be hurt: Eggs lays Count eggs round the arena that hatch What (a
+    // monster) unbroken at the end; Legion stands a banner before the boss and sends What (a wave attack of its own)
+    // Count times. Breaking every egg, or the banner, ends it at once.
+    public sealed class BossInterlude
+    {
+        public BossInterlude(int phase, InterludeKind kind, int count, float seconds, string what)
+        {
+            Phase = phase;
+            Kind = kind;
+            Count = count;
+            Seconds = seconds;
+            What = what;
+        }
+
+        public int Phase { get; }
+        public InterludeKind Kind { get; }
+        public int Count { get; }
+        public float Seconds { get; }
+        public string What { get; }
+        public MonsterDefinition Hatch { get; internal set; }
+        public BossAttack Charge { get; internal set; }
     }
 
     // How a boss rages in a phase (rage column, T9): it takes Hurt of its health (since the last) and then for Seconds
@@ -121,7 +158,9 @@ namespace Game.Core
                         "pillar" => PropKind.Pillar,
                         "vein" => PropKind.Vein,
                         "pit" => PropKind.Pit,
-                        _ => throw new FormatException($"props의 종류는 vent, pillar, vein, pit 가운데 하나입니다('{bits[0]}')."),
+                        "crystal" => PropKind.Crystal,
+                        "banner" => PropKind.Banner,
+                        _ => throw new FormatException($"props의 종류는 vent, pillar, vein, pit, crystal, banner 가운데 하나입니다('{bits[0]}')."),
                     };
                     int count = bits.Length == 2 ? SheetValues.ParseNumber(bits[1], "props") : 1;
                     if (bits.Length > 2 || count < 1) throw new FormatException($"props는 vent*3처럼 적습니다('{item}').");
@@ -131,6 +170,28 @@ namespace Game.Core
                 result[phase] = list;
             }
             return result;
+        }
+
+        // interlude column (R4a): "3:eggs:5:12:crystal_hatchling" (from phase 3's roar, five eggs, twelve seconds, what
+        // they hatch), "3:legion:3:15:phantom_ranks" (three charges of that wave attack over fifteen seconds).
+        public static BossInterlude Interlude(string cell, int phaseCount)
+        {
+            if (cell.Length == 0) return null;
+            var parts = cell.Split(':').Select(p => p.Trim()).ToArray();
+            if (parts.Length != 5) throw new FormatException($"interlude는 페이즈:종류:수:초:무엇으로 적습니다. 예: 3:eggs:5:12:crystal_hatchling('{cell}')");
+            int phase = SheetValues.ParseNumber(parts[0], "interlude");
+            if (phase < 2 || phase > phaseCount) throw new FormatException($"interlude의 페이즈는 2~{phaseCount}입니다.");
+            var kind = parts[1] switch
+            {
+                "eggs" => InterludeKind.Eggs,
+                "legion" => InterludeKind.Legion,
+                _ => throw new FormatException($"interlude의 종류는 eggs, legion 가운데 하나입니다('{parts[1]}')."),
+            };
+            int count = SheetValues.ParseNumber(parts[2], "interlude");
+            float seconds = SheetValues.ParseDecimal(parts[3], "interlude");
+            if (count < 1 || count > MaxProps - 1) throw new FormatException($"interlude의 수는 1~{MaxProps - 1}입니다.");
+            if (seconds < 5 || seconds > 20) throw new FormatException("interlude는 5~20초입니다(Docs/BossRedesign.md 4.2: 10~15초).");
+            return new BossInterlude(phase, kind, count, seconds, parts[4]);
         }
 
         // rage column: "2:hurt=0.1 seconds=20 rest=3;3:seconds=30". A later phase starts from the one before it.

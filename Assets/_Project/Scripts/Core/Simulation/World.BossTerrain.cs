@@ -102,9 +102,10 @@ namespace Game.Core
             var attack = boss.Definition.Attacks[hazard.Cause - 1].ForPhase(boss.Phase);
             if (attack.Pool == PoolKind.None || boss.Phase < attack.PoolFrom || attack.Linger <= 0) return;
             // A pillar rises where it landed (a trail's, where its last blast lands: R2b).
-            if (attack.Pool == PoolKind.Pillar)
+            if (attack.Pool == PoolKind.Pillar || attack.Pool == PoolKind.Crystal || attack.Pool == PoolKind.Banner)
             {
-                if (hazard.Shape == HazardShape.Circle && (attack.Shape != AttackShape.Trail || hazard.StripFrom != null)) RaisePillar(boss, hazard.Position, attack.Linger);
+                var kind = attack.Pool == PoolKind.Pillar ? PropKind.Pillar : attack.Pool == PoolKind.Crystal ? PropKind.Crystal : PropKind.Banner;
+                if (hazard.Shape == HazardShape.Circle && (attack.Shape != AttackShape.Trail || hazard.StripFrom != null)) RaiseProp(boss, kind, hazard.Position, attack.Linger);
                 return;
             }
             if (hazard.Shape == HazardShape.Line)
@@ -193,7 +194,13 @@ namespace Game.Core
 
         // How big each kind stands, and how much a breakable one takes (0: cannot be broken).
         // A vein breaks at a share of its boss's health (World.PropHealthFor); vents and pillars do not break.
-        public static float PropRadius(PropKind kind) => kind == PropKind.Pillar ? 0.9f : 0.8f;
+        public static float PropRadius(PropKind kind) => kind switch
+        {
+            PropKind.Pillar => 0.9f,
+            PropKind.Egg => 0.5f,
+            PropKind.Banner => 0.6f,
+            _ => 0.8f,
+        };
 
         // From a phase whose props the sheet gives, those replace whatever of the boss's stood before. Evenly round the
         // middle at 0.6 of the floor, from a turn rolled on a stream of its own (nothing else rolls differently).

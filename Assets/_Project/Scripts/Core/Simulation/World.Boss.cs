@@ -183,6 +183,10 @@ namespace Game.Core
 
             switch (boss.State)
             {
+                case BossState.Interlude:
+                    WorkInterlude(boss, fighters);
+                    break;
+
                 case BossState.Spent:
                 case BossState.Stun:
                     if (--boss.StateTicks <= 0) ChooseAttack(boss, fighters);
@@ -237,6 +241,12 @@ namespace Game.Core
                         _events.Add(new SimEvent(SimEventType.Attack, boss.Id, direction: Vec2.FromAngle(boss.VolleyAngle)));
                     }
                     if (--boss.StateTicks > 0) break;
+                    // Its interlude comes as the roar ends (R4a).
+                    if (boss.State == BossState.Roar && boss.InterludeNext && boss.Definition.Interlude != null)
+                    {
+                        StartInterlude(boss, fighters);
+                        break;
+                    }
                     if (boss.State == BossState.Recover && boss.RepeatNext && boss.Attack != null)
                     {
                         // The same blow again at once (boost repeat), wound up in less time and hitting for a share.
@@ -367,6 +377,7 @@ namespace Game.Core
                 case AttackTarget.Farthest:
                     return fighters.OrderByDescending(p => Vec2.Distance(p.Position, boss.Position)).First();
                 case AttackTarget.Random:
+                case AttackTarget.Banner:
                     return fighters[_random.Next(fighters.Count)];
                 default:
                     return fighters.OrderBy(p => Vec2.Distance(p.Position, boss.Position)).First();
@@ -382,7 +393,7 @@ namespace Game.Core
             if (aim.LengthSquared > 1e-6f) boss.Facing = aim.Normalized;
             boss.State = BossState.Telegraph;
             // A repeat is already its shorter copy (BossAttack.RepeatForm); a charge's later run takes AgainSeconds.
-            boss.StateTicks = Ticks(again ? attack.AgainSeconds : attack.Telegraph);
+            boss.StateTicks = Ticks(again ? attack.AgainSeconds : attack.Shape == AttackShape.Order ? OrderTelegraph(attack) : attack.Telegraph);
             if (!again && !repeat)
             {
                 boss.ChargesLeft = attack.Shape == AttackShape.Charge ? Math.Max(0, attack.Count - 1) : 0;
@@ -411,8 +422,9 @@ namespace Game.Core
             int laid = _hazards.Count;
             LayHazards(boss, attack, target, fighters, boss.Facing, resolve, cause);
             Falls(attack, laid);
-            // The first circle of a fight that raises a pillar harms no one: it shows what comes (R2b, like the first lava).
-            if (attack.Pool == PoolKind.Pillar && attack.Shape == AttackShape.Circle && boss.Phase >= attack.PoolFrom)
+            // The first circle of a fight that raises a pillar (a crystal, a banner: R4a) harms no one: it shows what comes
+            // (R2b, like the first lava).
+            if ((attack.Pool == PoolKind.Pillar || attack.Pool == PoolKind.Crystal || attack.Pool == PoolKind.Banner) && attack.Shape == AttackShape.Circle && boss.Phase >= attack.PoolFrom)
             {
                 if (boss.PillarTaughtTick < 0) boss.PillarTaughtTick = Tick;
                 if (boss.PillarTaughtTick == Tick)
@@ -540,6 +552,7 @@ namespace Game.Core
                 case AttackShape.Circle:
                     var centres = attack.Target == AttackTarget.Self ? new[] { boss.Position }
                         : attack.Target == AttackTarget.Middle ? new[] { boss.Home }
+                        : attack.Target == AttackTarget.Banner ? new[] { BannerSpot(boss, target.Position) ?? target.Position }
                         : attack.Target == AttackTarget.Each ? fighters.Select(p => p.Position).ToArray()
                         : new[] { target.Position };
                     foreach (var centre in centres)
@@ -633,6 +646,18 @@ namespace Game.Core
                 case AttackShape.Half:
                     LayHalf(boss, attack, resolve, cause);
                     break;
+                case AttackShape.Order:
+                    LayOrder(boss, attack, target, resolve, cause);
+                    break;
+                case AttackShape.Beam:
+                    LayBeam(boss, attack, facing, resolve, cause);
+                    break;
+                case AttackShape.Mark:
+                    LayMarks(boss, attack, target, fighters, resolve, cause);
+                    break;
+                case AttackShape.Bands:
+                    LayBands(boss, attack, resolve, cause);
+                    break;
                 case AttackShape.Burrow:
                 case AttackShape.Leap:
                     // Where it will come down, which is where the boss will stand.
@@ -702,10 +727,12 @@ namespace Game.Core
                     boss.RepeatsLeft = 0;
                     return;
                 case AttackShape.Summon:
+                    // Beside its banner when one stands (R4a, Morg's soldiers).
+                    var around = BannerSpot(boss, boss.Position) ?? boss.Position;
                     for (int i = 0; i < attack.Count; i++)
                     {
                         float angle = (i + _random.NextFloat() * 0.5f) * 2 * MathF.PI / attack.Count;
-                        var position = Collision.Resolve(Map, boss.Position + Vec2.FromAngle(angle) * attack.Spread, attack.Summon.Radius);
+                        var position = Collision.Resolve(Map, around + Vec2.FromAngle(angle) * attack.Spread, attack.Summon.Radius);
                         if (!Collision.Overlaps(Map, position, attack.Summon.Radius)) SpawnEnemy(attack.Summon, position).FromBoss = true;
                     }
                     break;
@@ -719,8 +746,11 @@ namespace Game.Core
                 boss.StateTicks = Ticks(attack.Shape == AttackShape.Orbit ? OrbitOpen : RepeatGap);
                 return;
             }
-            // A quicker phase rests less, but never so little that a spiral's later volleys go unfired.
+            // A quicker phase rests less, but never so little that a spiral's later volleys go unfired, or that a sequence
+            // (R4a) is still landing when the next comes.
             boss.StateTicks = Math.Max(Ticks(attack.Cooldown * Tempo(boss.Phase)), boss.VolleysLeft * Ticks(SpiralSeconds) + 1);
+            if (attack.Shape == AttackShape.Order || attack.Shape == AttackShape.Bands)
+                boss.StateTicks = (int)Math.Max(boss.StateTicks, SequenceLeft(boss, Cause(boss, attack)) + Ticks(attack.Cooldown * Tempo(boss.Phase) * 0.5f));
         }
 
         // Seconds between a spiral's volleys.
@@ -788,6 +818,18 @@ namespace Game.Core
                 boss.ChargesLeft = 0;
                 boss.State = BossState.Stun;
                 boss.StateTicks = Ticks(StunSeconds);
+                return;
+            }
+            // Into a crystal of its own (R4a): it shatters and the charge stops there.
+            var crystal = PillarHit(boss) == null ? CrystalHit(boss) : null;
+            if (crystal != null)
+            {
+                _props.Remove(crystal);
+                _events.Add(new SimEvent(SimEventType.Impact, boss.Id, amount: 3, position: crystal.Position));
+                EndCharge(boss, attack, boss.ChargeFrom);
+                boss.ChargesLeft = 0;
+                boss.State = BossState.Recover;
+                boss.StateTicks = Ticks(attack.Cooldown * Tempo(boss.Phase));
                 return;
             }
             bool blocked = Vec2.Distance(before, boss.Position) < step.Length * 0.3f;
@@ -858,6 +900,7 @@ namespace Game.Core
             boss.Cues = false;
             boss.Countered = false;
             boss.OpensPhase = true;
+            boss.InterludeNext = definition.Interlude != null && definition.Interlude.Phase == phase;
             CalmDown(boss);
             EdgeComes(boss);
             PlaceProps(boss);
@@ -889,6 +932,8 @@ namespace Game.Core
             CalmDown(boss);
             boss.Countered = false;
             boss.Cues = false;
+            boss.InterludeNext = false;
+            boss.ChargesToCome = 0;
         }
 
         void RemoveDefeatedBosses()
@@ -946,6 +991,8 @@ namespace Game.Core
                 if (Tick < hazard.ResolveTick)
                 {
                     // A wall on its way, a push out of a middle (R3); the rest as before.
+                    // A marked circle follows its player until it locks (R4a).
+                    if (hazard.Follows != 0) FollowMark(hazard);
                     if (hazard.Shape == HazardShape.Wave) WorkWave(hazard);
                     else if (hazard.Shape == HazardShape.Push) Pushes(hazard);
                     else Pending(hazard);

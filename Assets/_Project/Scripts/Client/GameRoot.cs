@@ -115,6 +115,8 @@ namespace Game.Client
         internal int ShadesShown => _view?.ShadesShown ?? 0;
         // R3: threads, walls of water and drags drawn now.
         internal int ThreadsShown => _view?.ThreadsShown ?? 0;
+        internal int CrystalsLit => _view?.CrystalsLit ?? 0;
+        internal int ChimesHeard => _view?.ChimesHeard ?? 0;
         internal int WavesShown => _view?.WavesShown ?? 0;
         internal int DragsShown => _view?.DragsShown ?? 0;
         internal bool RageShown => _view?.RageShown ?? false;

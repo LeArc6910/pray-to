@@ -71,7 +71,7 @@ namespace Game.Core.Tests
         }
 
         [TestCase("cave_warden", "rock_burst")]
-        [TestCase("crystal_queen", "crystal_spiral")]
+        [TestCase("crystal_queen", "shard_ring")]
         public void ABurstAllRoundStartsWhereTheWindUpSaidItWould(string bossId, string attackId)
         {
             var table = new Table();

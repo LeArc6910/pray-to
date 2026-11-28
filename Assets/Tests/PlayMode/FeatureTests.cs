@@ -1218,7 +1218,7 @@ namespace Game.Client.Tests
             }
             Feel.SkillFxHold = 0.14f;
             Lay("crystal_queen", "bite", HazardShape.Cone, -8, 2.6f, 3.2f, 90);
-            Lay("crystal_queen", "crystal_rain", HazardShape.Circle, -2.5f, 3.2f, 1.4f, 0);
+            Lay("crystal_queen", "resonance", HazardShape.Circle, -2.5f, 3.2f, 1.4f, 0);
             Lay("crystal_queen", "web_quake", HazardShape.Circle, 2, 3.2f, 2, 0);
             Lay("crystal_queen", "venom_share", HazardShape.Share, 6.8f, 2.6f, 1.8f, 0);
             Lay("crystal_queen", "crystal_cross", HazardShape.Line, -8, -3.2f, 8, 1.2f);

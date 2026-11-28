@@ -249,7 +249,6 @@ namespace Game.Core
         {
             var toward = target.Position - boss.Home;
             var way = toward.Length > 0.5f ? toward.Normalized : boss.Facing;
-            var side = new Vec2(-way.Y, way.X);
             float reach = boss.ArenaRadius + 1;
             float room = FloorRadius(boss) * 0.6f;
             var roll = new GameRandom(_forageSeed + (ulong)Tick, stream: 3000 + (ulong)boss.Id);
@@ -260,10 +259,13 @@ namespace Game.Core
                 if (!float.IsNaN(last) && MathF.Abs(offset - last) < attack.Width * 1.5f)
                     offset = last + (last > 0 ? -1 : 1) * attack.Width * 1.5f;
                 last = offset;
-                var start = boss.Home - way * reach + side * offset;
+                // Each wall after the first turned angle degrees on from the last (R4a, Morg's ranks criss-crossing).
+                var along = attack.Angle != 0 ? Vec2.FromAngle(way.Angle + i * attack.Angle * MathF.PI / 180f) : way;
+                var across = new Vec2(-along.Y, along.X);
+                var start = boss.Home - along * reach + across * offset;
                 long from = resolve + Ticks(attack.Spread * i);
-                AddWave(boss, cause, start, way, reach * 2, attack.Width, attack.Damage, from, from + Ticks(reach * 2 / attack.Speed));
-                if (attack.Width > 0) AddHazard(boss, cause, HazardShape.Line, start, way, reach * 2, attack.Width, 0, from).Safe = true;
+                AddWave(boss, cause, start, along, reach * 2, attack.Width, attack.Damage, from, from + Ticks(reach * 2 / attack.Speed));
+                if (attack.Width > 0) AddHazard(boss, cause, HazardShape.Line, start, along, reach * 2, attack.Width, 0, from).Safe = true;
             }
         }
 

@@ -78,6 +78,19 @@ namespace Game.Core
         // R3 (5.4, the tidal wave, a finisher): the half of the arena the boss raises its head toward is struck; the
         // other half is safe.
         Half,
+        // R4a (2026-11-28, Docs/BossRedesign.md 7.1 T8, the crystal queen's resonance): count of its crystals (BossProp,
+        // PropKind.Crystal; none standing, count rise round the target) light one by one spread seconds apart, then burst
+        // in that same order World.OrderBurstGap apart, radius round each: leave where comes first for where has been.
+        Order,
+        // R4a (5.3, the crown's light): a beam like a line that turns World.BeamTurn degrees where it meets a crystal of
+        // its own (at most World.BeamBends times), toward the arena's middle; count beams angle degrees apart.
+        Beam,
+        // R4a (5.5, Morg's marked volley, T12): a circle of radius on each of count players, following them until
+        // World.MarkLock before it lands: alone, walk out of it; together, keep away from whoever is marked.
+        Mark,
+        // R4a (5.5, Morg's volley of fire arrows, T8): the arena cut into count bands across the boss's facing, landing
+        // one after another spread seconds apart from the boss's side: step into the band that has just landed.
+        Bands,
     }
 
     // How plainly an attack is announced (2026-11-12, the vein eater). Marked is how every boss announced every attack
@@ -135,6 +148,10 @@ namespace Game.Core
         // R3 (2026-11-28, the antlion): a sand pit that drags whoever is in it toward its middle (World.PitPull) and
         // bites at the middle (HazardShape.Pit).
         Pit,
+        // R4a (2026-11-28): where it lands a crystal of the queen's (PropKind.Crystal) or a banner of Morg's
+        // (PropKind.Banner) stands the seconds given, breakable.
+        Crystal,
+        Banner,
     }
 
     public enum AttackTarget : byte
@@ -148,6 +165,9 @@ namespace Game.Core
         Self,
         // Centred on the middle of its arena (R3, the antlion's maw).
         Middle,
+        // Centred on its nearest standing banner (R4a, Morg's hellfire falls round its banner), or on someone at random
+        // with none standing.
+        Banner,
     }
 
     public sealed class BossAttack
@@ -256,7 +276,8 @@ namespace Game.Core
         public bool CanRepeat => !(Shape == AttackShape.Charge || Shape == AttackShape.Spiral || Shape == AttackShape.Summon
             || Shape == AttackShape.Counter || Shape == AttackShape.Vent || Shape == AttackShape.Refuge || Shape == AttackShape.Burrow && !Chases
             || Shape == AttackShape.Leap || Shape == AttackShape.Pluck || Shape == AttackShape.Orbit || Shape == AttackShape.Eat || Shape == AttackShape.Cover
-            || Shape == AttackShape.Tether || Shape == AttackShape.Wave || Shape == AttackShape.Close || Shape == AttackShape.Half);
+            || Shape == AttackShape.Tether || Shape == AttackShape.Wave || Shape == AttackShape.Close || Shape == AttackShape.Half
+            || Shape == AttackShape.Order || Shape == AttackShape.Beam || Shape == AttackShape.Mark || Shape == AttackShape.Bands);
 
         // Whether it marks ground that lands by itself when the telegraph ends (what a follow-up may be).
         public bool LaysAreas => Shape switch
@@ -411,6 +432,7 @@ namespace Game.Core
         {
             AttackShape.Cone => Length * 0.8f,
             AttackShape.Line => Length * 0.9f,
+            AttackShape.Beam => Length * 0.9f,
             AttackShape.Charge => Length,
             AttackShape.Circle => 14,
             AttackShape.Share => 14,
@@ -530,6 +552,10 @@ namespace Game.Core
         // How it rages in each phase (rage column; index by phase, null for not at all).
         public IReadOnlyList<BossRage> RageByPhase { get; internal set; } = BossTerrainSheet.NoRage;
         public BossRage RageIn(int phase) => phase >= 0 && phase < RageByPhase.Count ? RageByPhase[phase] : null;
+
+        // R4a (2026-11-28, Docs/BossRedesign.md 7.1 T9 막간): what it does as it comes into a phase, unhurt (interlude
+        // column), or null.
+        public BossInterlude Interlude { get; internal set; }
     }
 
     public sealed class BossData
@@ -618,7 +644,7 @@ namespace Game.Core
                         Whole(row, "material_count"),
                         row["element"].Length == 0 ? SkillTag.None : BossElement(row["element"])) { Level = Whole(row, "level"), Place = row["place"].Length == 0 ? null : row["place"], Bursts = Gait(row["gait"]), TelegraphTempo = Tempo(row["tempo"]), FinisherRest = FinisherRest(row["finisher_rest"]),
                         Edge = BossTerrainSheet.Edge(row["edge"], thresholds.Count + 1), PropsByPhase = BossTerrainSheet.Props(row["props"], thresholds.Count + 1),
-                        RageByPhase = BossTerrainSheet.Rage(row["rage"], thresholds.Count + 1) });
+                        RageByPhase = BossTerrainSheet.Rage(row["rage"], thresholds.Count + 1), Interlude = BossTerrainSheet.Interlude(row["interlude"], thresholds.Count + 1) });
                 });
             }
             return bosses;
@@ -704,6 +730,22 @@ namespace Game.Core
                 }
             }
             BuildPhases(bosses, boosts);
+            // An interlude's own (R4a): the monster its eggs hatch, or the attack its legion comes in.
+            foreach (var boss in bosses.Where(b => b.Interlude != null))
+            {
+                var interlude = boss.Interlude;
+                if (interlude.Kind == InterludeKind.Eggs)
+                {
+                    interlude.Hatch = monsters?.Monsters.FirstOrDefault(m => m.Id == interlude.What);
+                    if (interlude.Hatch == null) errors.Add($"{BossesFile}: '{boss.Id}'의 interlude 몬스터 '{interlude.What}'가 {MonsterSheet.File}에 없습니다.");
+                }
+                else
+                {
+                    interlude.Charge = boss.Attacks.FirstOrDefault(a => a.Id == interlude.What);
+                    if (interlude.Charge == null || interlude.Charge.Shape != AttackShape.Wave)
+                        errors.Add($"{BossesFile}: '{boss.Id}'의 interlude 공격 '{interlude.What}'는 그 보스의 wave 공격이어야 합니다.");
+                }
+            }
         }
 
         // Every phase's copy of every attack, once all are read (BossAttack.BuildPhases).
@@ -833,6 +875,19 @@ namespace Game.Core
                 case AttackShape.Half:
                     Need(attack.Damage > 0, "damage");
                     break;
+                case AttackShape.Order:
+                    // Every crystal lights before the first bursts.
+                    Need(attack.Radius > 0 && attack.Count > 0 && attack.Spread > 0 && attack.Damage > 0, "radius(터지는 원), count(수정 몇), spread(빛 사이 초), damage");
+                    break;
+                case AttackShape.Beam:
+                    Need(attack.Length > 0 && attack.Width > 0 && attack.Damage > 0 && attack.Count >= 0, "length, width, damage(count 줄이면 angle 사이)");
+                    break;
+                case AttackShape.Mark:
+                    Need(attack.Radius > 0 && attack.Count > 0 && attack.Damage > 0 && attack.Telegraph > World.MarkLock, $"radius, count(표적 수), damage, {World.MarkLock}초보다 긴 telegraph");
+                    break;
+                case AttackShape.Bands:
+                    Need(attack.Count >= 2 && attack.Spread > 0 && attack.Damage > 0, "count(띠 수, 둘 이상), spread(띠 사이 초), damage");
+                    break;
                 case AttackShape.Pluck:
                     Need(attack.Radius > 0 && attack.Damage > 0, "radius(거미줄이 없을 때의 원), damage");
                     break;
@@ -866,6 +921,8 @@ namespace Game.Core
                 throw new FormatException($"pull은 걸음({PlayerStats.BaseMoveSpeed})의 80%보다 느려야 거슬러 걸을 수 있습니다.");
             if (attack.Target == AttackTarget.Middle && attack.Shape != AttackShape.Circle)
                 throw new FormatException("target middle은 circle에만 씁니다.");
+            if (attack.Target == AttackTarget.Banner && attack.Shape != AttackShape.Circle)
+                throw new FormatException("target banner는 circle에만 씁니다.");
             if ((attack.Warning == AttackWarning.Near || attack.Warning == AttackWarning.Far)
                 && !(attack.Shape == AttackShape.Circle || attack.Shape == AttackShape.Cone || attack.Shape == AttackShape.Ring))
                 throw new FormatException($"warn near·far는 보스에서 재는 공격(circle, cone, ring)에만 씁니다({attack.Shape}).");
@@ -906,7 +963,9 @@ namespace Game.Core
                 "rock" => PoolKind.Rock,
                 "pillar" => PoolKind.Pillar,
                 "pit" => PoolKind.Pit,
-                _ => throw new FormatException($"pool은 비우거나 web, venom, lava, water, crack, rock, pillar, pit 가운데 하나와 초입니다('{cell}')."),
+                "crystal" => PoolKind.Crystal,
+                "banner" => PoolKind.Banner,
+                _ => throw new FormatException($"pool은 비우거나 web, venom, lava, water, crack, rock, pillar, pit, crystal, banner 가운데 하나와 초입니다('{cell}')."),
             };
             if (parts.Length != 2 && parts.Length != 3) throw new FormatException($"pool은 lava:6처럼, 늦게 깔면 lava:5:2(2페이즈부터)처럼 적습니다('{cell}').");
             float seconds = SheetValues.ParseDecimal(parts[1], "pool");
@@ -915,7 +974,7 @@ namespace Game.Core
             if (from < 1 || from > 3) throw new FormatException("pool의 페이즈는 1~3입니다.");
             bool circles = shape == AttackShape.Circle || shape == AttackShape.Trail || shape == AttackShape.Burrow || shape == AttackShape.Leap;
             // Ground (not webs or venom) may also lie along a charge's run and a cross's arms (2026-11-28, R2).
-            bool strips = (shape == AttackShape.Charge || shape == AttackShape.Cross) && kind >= PoolKind.Lava && kind != PoolKind.Pillar && kind != PoolKind.Pit;
+            bool strips = (shape == AttackShape.Charge || shape == AttackShape.Cross) && kind >= PoolKind.Lava && kind < PoolKind.Pillar;
             if (!circles && !strips)
                 throw new FormatException($"pool은 원으로 떨어지는 공격(circle, trail, burrow, leap)에, 용암·물·균열·바위는 charge·cross에도 씁니다({shape}).");
             return (kind, seconds, from);

@@ -21,7 +21,7 @@ namespace Game.Client
         static GeneralPose GeneralBlowOf(BossAttack attack) => attack.Id switch
         {
             "cleave" => GeneralPose.Cleave,
-            "hellfire" or "meteors" => GeneralPose.Command,
+            "hellfire" or "meteors" or "marked_volley" => GeneralPose.Command,
             "dark_cross" => GeneralPose.Stab,
             "flame_ring" => GeneralPose.Plant,
             "ember_spiral" => GeneralPose.Spin,

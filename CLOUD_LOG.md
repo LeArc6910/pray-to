@@ -12,6 +12,14 @@
 - **로컬 확인**: 로컬 세션이 읽고 체크한다
 
 
+## 2026-11-29 02:10 보스 재설계 R4a: 수정 거미 여왕·모르그(순서·막간)
+
+- **바뀐 것**: `Docs/BossRedesign.md` R4의 앞 절반. 공용 틀 T8 순서(새 모양 `order` 수정이 하나씩 빛난 뒤 같은 순서로 터짐, `bands` 띠가 하나씩 떨어짐)와 막간(`bosses.csv` 새 열 `interlude`: `eggs`·`legion`, `BossState.Interlude`), 새 모양 `beam`(수정에서 꺾이는 광선)·`mark`(따라다니다 멈추는 표적), 대상 `banner`, 물체 수정·알·군기(`pool` `crystal`·`banner`, 부술 수 있음, 군기를 부수면 1.5초 비틀거림), `wave`의 `angle`. 여왕(수정 꽂기·공명 순서·꺾이는 왕관의 빛·「왕관의 별자리」·덮치기가 수정에 박힘·알 막간, 뺌 다섯)과 모르그(군기 꽂기·불길 호령이 군기 둘레·환영 창진 벽·호령 표적·「불화살 일제 사격」·군단 막간). 코드 `World.BossOrder.cs`, 화면 `WorldView.Order.cs`(수정 빛·종소리·막간 글, 바닥 표시는 같이 채워 순서를 숨김), Fable 그림 연결(수정·알·군기·창병 대열), Playtest 명령 `boss <id> interlude`와 상태, 봇(`BossSim`: 알·군기 먼저, 띠, 먼저 오는 벽만, 쓰러진 페이즈 적기). 통신 판 0.124.0. 문서 `Docs/Bosses.md` "순서·막간", `Docs/BossRedesign.md` 8 진행 줄, `Docs/Commands.md`
+- **확인**: `dotnet test` 1315 통과(새 `BossOrderTests` 열둘), Unity·WebGL 컴파일 오류 0, `--hits` 어긋남 0. 봇(철 여섯 벌, 보스 레벨 +2, 전사 + 화염 마법사, 반응 0.5, `--build`, 600초, 시드 1~5, 잡은 판(쓰러짐 없이), 전 → 뒤): 여왕 늘 구름 5(4) → 5(5), 40% 놓침 5(3) → 5(4). 모르그 늘 구름 4(4) → 5(4), 40% 놓침 4(1) → 1(0). 첫 한 시간(`--hour 60 1..8`) 여덟 시드 모두 첫 보스를 잡음 6:24~15:54(전 기록 6:21~11:07, 시드 6이 쓰러짐 둘로 15:54 — 수호자·첫 한 시간 봇은 이번에 바꾸지 않았다)
+- **요청 대조**: 여왕 규칙·시트·시험·봇·그림 연결 ○ · 모르그 같음 ○ · T8 순서 공용 ○ · 막간 공용 ○ · T6 분신 —(이 둘에 쓰지 않음, R4b로) · 빛의 실 ✗ · 군기 둘레 부하 강화 ✗ · 막간 남은 초 띠 ✗ · 표적·빛 고리 그림과 화살비 소리 연결 ✗ · 여왕 매달린 자세 ✗ · **PlayMode 장면·`sweep.js` 구역·웹 점검 ✗**(7일 사용량 경고가 떠서 새 일을 멈춤)
+- **로컬에서 할 일**: 명령 한 줄을 다시 돌린다(새 파일 `World.BossOrder.cs`·`WorldView.Order.cs`·`BossOrderTests.cs`의 `.meta`가 생긴다). 여왕 공명 순서(수정 빛을 기억해 피하기)와 모르그 막간(군기 부수기)을 해 보고 손맛을 적는다
+- **로컬 확인**: [ ]
+
 ## 2026-11-29 01:45 보스 재설계 R4a 그림·소리(수정, 알, 군기, 환영 창병, 호령 표적, 빛 고리)
 
 - **바뀐 것**: R4a(수정 거미 여왕·모르그, `Docs/BossRedesign.md` 5.3·5.5)의 도트 그림과 소리만. `GroundArt.Crystal(장, lit)`·`Egg(장, cracks)`·`Banner(장)`과 발 줄 상수 `CrystalPivot`·`EggPivot`·`BannerPivot`(`GroundArt.R4a.cs`), `ForceArt.Phalanx(길이, 장)`·`PhalanxEnd(장)`·`Target(장)`·`Chime(장)`(`ForceArt.R4a.cs`), 소리 여덟(`CrystalChime`·`CrystalShatter`·`EggCrack`·`EggHatch`·`BannerPlant`·`BannerFall`·`WarHorn`·`ArrowRain`). `GroundArt`·`ForceArt`는 파일을 나누려고 `partial`로 바꿨다. 미리보기 `--only r4a`(`R4aPreview.cs`), `Docs/Bosses.md` "R4a 그림", `Docs/Commands.md`

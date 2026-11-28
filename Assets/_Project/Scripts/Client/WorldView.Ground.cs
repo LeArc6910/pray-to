@@ -34,8 +34,13 @@ namespace Game.Client
         }
 
         // A standing thing stands on its foot row (GroundArt.PropPivot); a vein shows its cracks as it is broken (R2b).
-        static Sprite PropSprite(PropKind kind, int frame, int cracks = 0) => cracks > 0 && kind == PropKind.Vein
+        static Sprite PropSprite(PropKind kind, int frame, int cracks = 0, int lit = 0) => cracks > 0 && kind == PropKind.Vein
             ? Sprites.Get($"fx/prop/{kind}/{frame}/{cracks}", () => GroundArt.VeinCracked(frame, cracks), new Vector2(0.5f, GroundArt.PropPivot(kind)))
+            // R4a: an egg cracks as it is struck; a crystal lights in its turn (four steps of light).
+            : cracks > 0 && kind == PropKind.Egg
+            ? Sprites.Get($"fx/prop/{kind}/{frame}/{cracks}", () => GroundArt.Egg(frame, cracks), new Vector2(0.5f, GroundArt.PropPivot(kind)))
+            : lit > 0 && kind == PropKind.Crystal
+            ? Sprites.Get($"fx/prop/{kind}/{frame}/lit{lit}", () => GroundArt.Crystal(frame, lit / 4f), new Vector2(0.5f, GroundArt.PropPivot(kind)))
             : Sprites.Get($"fx/prop/{kind}/{frame}", () => GroundArt.Prop(kind, frame), new Vector2(0.5f, GroundArt.PropPivot(kind)));
 
         static bool IsGround(HazardState hazard) => hazard.Shape == HazardShape.Lava || hazard.Shape == HazardShape.Water
@@ -162,6 +167,7 @@ namespace Game.Client
         {
             var bosses = _client.Others().Where(e => e.Kind == EntityKind.Boss && !e.IsDead).ToList();
             DrawEdge(bosses);
+            ReadLights();
             DrawProps();
             DrawRage(bosses);
         }
@@ -246,6 +252,8 @@ namespace Game.Client
                         Impact(new Vector3(prop.Position.X, prop.Position.Y, 0), 0.6f);
                         Hear(Sound.PillarRise, new Vector3(prop.Position.X, prop.Position.Y, 0), 0.8f);
                     }
+                    // A banner is driven into the floor (R4a).
+                    if (prop.Kind == PropKind.Banner) Hear(Sound.BannerPlant, new Vector3(prop.Position.X, prop.Position.Y, 0), 0.8f);
                 }
                 var known = _propsKnown[prop.Id];
                 if (prop.Health < known.Health) known.Struck = Time.time;
@@ -254,12 +262,13 @@ namespace Game.Client
                 // A pillar and a vein stand among the bodies (by their feet); a pillar rises, a struck vein shakes.
                 bool stands = prop.Kind != PropKind.Vent;
                 if (stands) sprite.sortingOrder = FootOrder(prop.Position.Y - prop.Radius * 0.5f);
-                float rise = prop.Kind == PropKind.Pillar ? Mathf.Clamp01((Time.time - known.Born) / PillarRiseSeconds) : 1;
+                float rise = prop.Kind == PropKind.Pillar || prop.Kind == PropKind.Crystal || prop.Kind == PropKind.Banner ? Mathf.Clamp01((Time.time - known.Born) / PillarRiseSeconds) : 1;
                 float shake = known.Struck >= 0 && Time.time - known.Struck < 0.15f ? Mathf.Sin(Time.time * 80) * 0.05f : 0;
                 sprite.transform.localPosition = new Vector3(prop.Position.X + shake, prop.Position.Y - (1 - rise) * prop.Radius, 0);
                 sprite.transform.localScale = new Vector3(1, Mathf.Max(0.05f, rise), 1);
-                int cracks = prop.Kind != PropKind.Vein ? 0 : prop.Health < 85 ? 2 : prop.Health < 170 ? 1 : 0;
-                sprite.sprite = PropSprite(prop.Kind, Mathf.FloorToInt(Time.time * 6 + prop.Id) % GroundArt.Frames, cracks);
+                int cracks = prop.Kind != PropKind.Vein && prop.Kind != PropKind.Egg ? 0 : prop.Health < 85 ? 2 : prop.Health < 170 ? 1 : 0;
+                int lit = prop.Kind == PropKind.Crystal ? Mathf.CeilToInt(CrystalLight(prop.Position) * 4) : 0;
+                sprite.sprite = PropSprite(prop.Kind, Mathf.FloorToInt(Time.time * 6 + prop.Id) % GroundArt.Frames, cracks, lit);
                 sprite.color = Color.white;
             }
             foreach (int id in _propSprites.Keys.Where(id => !_propsSeen.Contains(id)).ToList())
@@ -274,6 +283,9 @@ namespace Game.Client
                     // A pillar a charge broke: the crash, and the boss's core laid bare (it stands stunned).
                     bool stunned = _client.Others().Any(e => e.Kind == EntityKind.Boss && !e.IsDead && e.BossState == BossState.Stun);
                     if (gone.Kind == PropKind.Vein) Hear(Sound.VeinCrunch, at, 0.9f);
+                    else if (gone.Kind == PropKind.Crystal) Hear(Sound.CrystalShatter, at, 0.9f);
+                    else if (gone.Kind == PropKind.Egg) Hear(Sound.EggCrack, at, 0.9f);
+                    else if (gone.Kind == PropKind.Banner) Hear(Sound.BannerFall, at, 0.9f);
                     else Hear(Sound.PillarCrash, at, stunned ? 1 : 0.6f);
                     if (gone.Kind == PropKind.Pillar && stunned) Hear(Sound.CoreExposed, at, 0.9f);
                 }

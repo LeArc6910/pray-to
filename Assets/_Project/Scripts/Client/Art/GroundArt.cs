@@ -546,6 +546,9 @@ namespace Game.Client
         {
             PropKind.Pillar => (PillarHeight - PillarFoot - 0.5f) / PillarHeight,
             PropKind.Vein => (VeinHeight - VeinFoot - 0.5f) / VeinHeight,
+            PropKind.Crystal => CrystalPivot,
+            PropKind.Egg => EggPivot,
+            PropKind.Banner => BannerPivot,
             _ => 0.5f,
         };
 
@@ -553,7 +556,15 @@ namespace Game.Client
         public static PixelImage Prop(PropKind kind, int frame)
         {
             frame = (frame % Frames + Frames) % Frames;
-            return kind == PropKind.Pillar ? Pillar(frame) : kind == PropKind.Vein ? VeinCracked(frame, 0) : Vent(frame);
+            return kind switch
+            {
+                PropKind.Pillar => Pillar(frame),
+                PropKind.Vein => VeinCracked(frame, 0),
+                PropKind.Crystal => Crystal(frame, 0),
+                PropKind.Egg => Egg(frame, 0),
+                PropKind.Banner => Banner(frame),
+                _ => Vent(frame),
+            };
         }
 
         const int PillarWidth = 32, PillarHeight = 48, PillarFoot = 39;

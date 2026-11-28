@@ -151,13 +151,16 @@ namespace Game.Client
             bool moving = progress > 0;
             float alpha = moving ? 1 : 0.35f + 0.15f * Mathf.Sin(Time.time * 6);
             int frame = Mathf.FloorToInt(Time.time * 8 + wave.Id) % ForceArt.Frames;
+            bool phalanx = _bossInView?.Id == "mad_general";
             int ends = 0;
             for (int i = 0; i < pieces.Count; i++)
             {
                 var (from, to) = pieces[i];
                 var part = Part(parts, i, DarkOrder + 12);
                 // Laid from its right end to its left, so the picture's top (its foaming front) faces the way it runs.
-                Lay(part, front + side * to, front + side * from, $"fx/wave/{frame}", 8, px => ForceArt.WaveBand(px, frame));
+                // Morg's are ranks of phantom spearmen (R4a); the serpent's are water.
+                if (phalanx) Lay(part, front + side * to, front + side * from, $"fx/phalanx/{frame}", 8, px => ForceArt.Phalanx(px, frame));
+                else Lay(part, front + side * to, front + side * from, $"fx/wave/{frame}", 8, px => ForceArt.WaveBand(px, frame));
                 part.color = new Color(1, 1, 1, alpha);
                 // At the gap the wall curls over (the right-hand end drawn; the left one turned over).
                 if (wave.Width > 0)
@@ -165,7 +168,8 @@ namespace Game.Client
                     bool left = to <= 0;
                     var curl = Part(parts, pieces.Count + ends++, DarkOrder + 13);
                     var at = front + side * (left ? to : from);
-                    curl.sprite = Sprites.Centered($"fx/waveend/{frame}", () => ForceArt.WaveEnd(frame));
+                    curl.sprite = phalanx ? Sprites.Centered($"fx/phalanxend/{frame}", () => ForceArt.PhalanxEnd(frame))
+                        : Sprites.Centered($"fx/waveend/{frame}", () => ForceArt.WaveEnd(frame));
                     curl.transform.localPosition = new Vector3(at.X, at.Y, 0);
                     curl.transform.localRotation = Quaternion.Euler(0, 0, Mathf.Atan2(-side.Y, -side.X) * Mathf.Rad2Deg);
                     curl.transform.localScale = new Vector3(left ? 1 : -1, 1, 1);

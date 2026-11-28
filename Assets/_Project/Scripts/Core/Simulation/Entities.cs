@@ -761,6 +761,9 @@ namespace Game.Core
         Spent,
         // It ran into a pillar (BossProp) and stands stunned.
         Stun,
+        // R4a (2026-11-28, BossInterlude): it stands back out of reach while the arena tests the players (eggs to
+        // break, a legion's charges) until they are done or its time is up.
+        Interlude,
     }
 
     public sealed class Boss
@@ -794,7 +797,7 @@ namespace Game.Core
         public BossAttack Attack { get; internal set; }
         public bool IsDead => Health <= 0;
         // Out of reach while it roars, and while it is underground or in the air before a burrow or a leap comes down.
-        public bool Invulnerable => State == BossState.Roar || State == BossState.Enter || Away;
+        public bool Invulnerable => State == BossState.Roar || State == BossState.Enter || State == BossState.Interlude || Away;
         public bool Away => State == BossState.Telegraph && Attack != null && Attack.GoesAway;
 
         internal Vec2 ChargeDirection { get; set; }
@@ -847,6 +850,13 @@ namespace Game.Core
         internal long TaughtTick { get; set; } = -1;
         // The tick its edge came (World.EdgeGraceSeconds), or -1.
         internal long EdgeTick { get; set; } = -1;
+
+        // ---- R4a (2026-11-28): the interlude ----
+        // Its interlude comes when this roar ends (BossInterlude); its legion's charges still to come and the ticks to
+        // the next.
+        internal bool InterludeNext { get; set; }
+        internal int ChargesToCome { get; set; }
+        internal int ChargeTicks { get; set; }
     }
 
     // Something standing in a boss's arena (2026-11-28, R2, PropKind): a vent, a pillar, a vein. MaxHealth 0 cannot be
@@ -875,6 +885,8 @@ namespace Game.Core
         public bool Breakable => MaxHealth > 0;
         // The tick it crumbles at (a pillar an attack raised, PoolKind.Pillar); -1 while it stands for the phase.
         public long Until { get; }
+        // An interlude's (R4a: an egg to break, the banner that ends it), taken away when the interlude ends.
+        public bool Interlude { get; internal set; }
     }
 
     public enum HazardShape : byte
@@ -997,6 +1009,11 @@ namespace Game.Core
         public bool Spares { get; internal set; }
         // A blast that spares whoever a pillar of its boss's shields from its middle (AttackShape.Cover, R2b).
         public bool Shades { get; internal set; }
+        // R4a (T8): its place in a sequence that lands one after another (AttackShape.Order, Bands), from 1; 0 for none.
+        public int Order { get; internal set; }
+        // R4a (AttackShape.Mark): the player it follows until LockTick, 0 for none.
+        internal int Follows { get; set; }
+        internal long LockTick { get; set; }
 
         // Whether a circle of the given radius at point touches the area.
         public bool Contains(Vec2 point, float radius)
