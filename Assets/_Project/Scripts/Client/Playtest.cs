@@ -478,6 +478,9 @@ namespace Game.Client
                     else if (words[2] == "strike") world.Hurt(boss, player, 1);
                     // boss <id> rage: its rage starts now (R2, BossRage), as if hurt enough.
                     else if (words[2] == "rage") world.Enrage(boss);
+                    // boss <id> stun: it stands stunned now, its core bare (R2b); breakveins: its veins are broken.
+                    else if (words[2] == "stun") world.ForceStun(boss);
+                    else if (words[2] == "breakveins") world.ForceBreakVeins(boss);
                     else if (words[2] == "use" && !world.ForceAttack(boss, words[3])) throw new ArgumentException($"'{words[1]}' cannot use '{words[3]}' now (awake, someone in the arena?)");
                     // Its entrance (arenas.csv, 2026-11-17): asleep again, or coming in now (the whole way, or "again").
                     else if (words[2] == "sleep") world.ForceSleep(boss);
@@ -3004,6 +3007,15 @@ namespace Game.Client
                 json.Field("propsShown", root.PropsShown);
                 json.Field("raging", fighting?.Raging ?? false);
                 json.Field("rageShown", root.RageShown);
+                // R2b (Docs/Bosses.md 기둥·광맥·벽 돌기): pillars and veins standing and drawn, the shadows lit for the core
+                // overload, whether the boss is away in the wall, and the shots flying from it.
+                json.Field("pillars", world.Props.Count(p => p.Kind == PropKind.Pillar));
+                json.Field("veins", world.Props.Count(p => p.Kind == PropKind.Vein));
+                json.Field("pillarsShown", root.PropsShownOf(PropKind.Pillar));
+                json.Field("veinsShown", root.PropsShownOf(PropKind.Vein));
+                json.Field("shadesShown", root.ShadesShown);
+                json.Field("bossAway", fighting?.Away ?? false);
+                json.Field("bossShots", world.Projectiles.Count(p => !p.Friendly && fighting != null && p.Source == fighting.Id));
                 json.Field("wading", player.Afflictions.Wading);
                 json.Field("snared", player.Afflictions.Snared);
                 // Ordinary monsters' attacks (monster_attacks.csv, 2026-11-21): those near that fight from the sheet with

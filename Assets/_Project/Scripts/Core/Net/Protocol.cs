@@ -47,7 +47,7 @@ namespace Game.Core
 
         // Host and client must run the same rules and sheets, so a different version is refused (Docs/CrossPlay.md 버전 정책:
         // every change to the rules, the sheets or a message goes up; PC, phone and web of the same version play together).
-        public const string Version = "0.120.0";
+        public const string Version = "0.121.0";
 
         // Why a joiner of another version is refused, and who has to update: the older side.
         public static string VersionRefusal(string theirs)

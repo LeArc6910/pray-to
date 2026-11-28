@@ -470,7 +470,8 @@ namespace Game.Core
             var at = projectile.Position;
             var pierced = projectile.Pierced;
             bool touching = _enemies.Any(e => !e.IsDead && !e.Away && !pierced.Contains(e.Id) && Vec2.Distance(e.Position, at) <= projectile.Radius + e.Definition.Radius)
-                || _bosses.Any(b => !b.IsDead && !pierced.Contains(b.Id) && Vec2.Distance(b.Position, at) <= projectile.Radius + b.Definition.Radius);
+                || _bosses.Any(b => !b.IsDead && !pierced.Contains(b.Id) && Vec2.Distance(b.Position, at) <= projectile.Radius + b.Definition.Radius)
+                || TouchesBreakable(at, projectile.Radius);
             if (!touching && !ended) return false;
             // One that goes through hits what it touches and flies on, softer, while it has monsters left to pass; one
             // thrown to come back (TurnTicks) goes through everything, as hard, striking each once each way.
@@ -514,6 +515,7 @@ namespace Game.Core
                 HitBoss(player, boss, damage, critical, tags, cause);
                 if (elements > 0) AddElements(player, null, boss, critical, elements);
             }
+            HitProps(centre, radius, damage);
         }
 
         // damage is before the monster's resistance to the hit's elements and its armor. Knocks the enemy away from

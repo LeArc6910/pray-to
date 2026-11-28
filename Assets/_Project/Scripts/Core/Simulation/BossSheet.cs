@@ -49,6 +49,19 @@ namespace Game.Core
         // A blast over the whole arena that spares whoever stands on cooled rock (PoolKind.Rock, an edge's islands);
         // with no rock down, a ring of it is laid round the boss (radius tiles past its body) for the telegraph.
         Refuge,
+        // R2b (2026-11-28, Docs/BossRedesign.md 5.9, the vein eater's wall run): the boss digs into the arena's edge and
+        // cannot be hurt while it winds up; where it will come out shakes (a circle of radius past its body); it comes
+        // out there and throws count rocks fanned over angle at the nearest, at speed. Width times round the edge,
+        // spread degrees on each time, standing out of the wall World.OrbitOpen between (the moment to hit it).
+        Orbit,
+        // R2b (5.9, eating a vein): the boss runs to the nearest vein of its own (BossProp) through its telegraph and
+        // eats it, and rages (World.Enrage). Broken first, the vein is not there to eat and nothing comes of it. Only
+        // chosen while a vein stands.
+        Eat,
+        // R2b (5.1, the cave warden's core overload): a blast over the whole arena from the boss that spares whoever a
+        // pillar of its own shields (in the pillar's shadow from where the boss stood). With no pillar standing, two
+        // rise as it winds up (World.Shelters).
+        Cover,
     }
 
     // How plainly an attack is announced (2026-11-12, the vein eater). Marked is how every boss announced every attack
@@ -96,6 +109,10 @@ namespace Game.Core
         Water,
         Crack,
         Rock,
+        // R2b (2026-11-28, the cave warden): where it lands, a pillar of rock rises (BossProp, PropKind.Pillar) and
+        // stands the seconds given: it stops the boss's shots and stuns the boss that charges into it. A trail raises
+        // one where its last blast lands.
+        Pillar,
     }
 
     public enum AttackTarget : byte
@@ -201,7 +218,7 @@ namespace Game.Core
         // Whether it may come again straight after itself (boost repeat, and a raging boss's one more: World.Rage).
         public bool CanRepeat => !(Shape == AttackShape.Charge || Shape == AttackShape.Spiral || Shape == AttackShape.Summon
             || Shape == AttackShape.Counter || Shape == AttackShape.Vent || Shape == AttackShape.Refuge || Shape == AttackShape.Burrow
-            || Shape == AttackShape.Leap || Shape == AttackShape.Pluck);
+            || Shape == AttackShape.Leap || Shape == AttackShape.Pluck || Shape == AttackShape.Orbit || Shape == AttackShape.Eat || Shape == AttackShape.Cover);
 
         // Whether it marks ground that lands by itself when the telegraph ends (what a follow-up may be).
         public bool LaysAreas => Shape switch
@@ -211,7 +228,7 @@ namespace Game.Core
         };
 
         // A burrow or a leap: the boss is away (out of reach) while it winds up and comes down on the target.
-        public bool GoesAway => Shape == AttackShape.Burrow || Shape == AttackShape.Leap;
+        public bool GoesAway => Shape == AttackShape.Burrow || Shape == AttackShape.Leap || Shape == AttackShape.Orbit;
 
         public bool InPhase(int phase) => Phases.Count == 0 || Phases.Contains(phase);
 
@@ -767,6 +784,16 @@ namespace Game.Core
                 case AttackShape.Refuge:
                     Need(attack.Radius > 0 && attack.Damage > 0, "radius(바위가 없을 때 몸 둘레의 안전한 칸), damage");
                     break;
+                case AttackShape.Orbit:
+                    Need(attack.Radius > 0 && attack.Count > 0 && attack.Speed > 0 && attack.Angle > 0 && attack.Angle < 360 && attack.Width >= 1 && attack.Spread > 0 && attack.Damage > 0,
+                        "radius(돌 크기), count(돌 수), speed, angle(부채꼴), width(몇 번 나오나), spread(나올 때마다 도는 각), damage");
+                    break;
+                case AttackShape.Eat:
+                    Need(attack.Target == AttackTarget.Self, "target self");
+                    break;
+                case AttackShape.Cover:
+                    Need(attack.Damage > 0 && attack.Target == AttackTarget.Self, "damage, target self");
+                    break;
             }
             if ((attack.Warning == AttackWarning.Near || attack.Warning == AttackWarning.Far)
                 && !(attack.Shape == AttackShape.Circle || attack.Shape == AttackShape.Cone || attack.Shape == AttackShape.Ring))
@@ -806,7 +833,8 @@ namespace Game.Core
                 "water" => PoolKind.Water,
                 "crack" => PoolKind.Crack,
                 "rock" => PoolKind.Rock,
-                _ => throw new FormatException($"pool은 비우거나 web, venom, lava, water, crack, rock 가운데 하나와 초입니다('{cell}')."),
+                "pillar" => PoolKind.Pillar,
+                _ => throw new FormatException($"pool은 비우거나 web, venom, lava, water, crack, rock, pillar 가운데 하나와 초입니다('{cell}')."),
             };
             if (parts.Length != 2 && parts.Length != 3) throw new FormatException($"pool은 lava:6처럼, 늦게 깔면 lava:5:2(2페이즈부터)처럼 적습니다('{cell}').");
             float seconds = SheetValues.ParseDecimal(parts[1], "pool");
@@ -815,7 +843,7 @@ namespace Game.Core
             if (from < 1 || from > 3) throw new FormatException("pool의 페이즈는 1~3입니다.");
             bool circles = shape == AttackShape.Circle || shape == AttackShape.Trail || shape == AttackShape.Burrow || shape == AttackShape.Leap;
             // Ground (not webs or venom) may also lie along a charge's run and a cross's arms (2026-11-28, R2).
-            bool strips = (shape == AttackShape.Charge || shape == AttackShape.Cross) && kind >= PoolKind.Lava;
+            bool strips = (shape == AttackShape.Charge || shape == AttackShape.Cross) && kind >= PoolKind.Lava && kind != PoolKind.Pillar;
             if (!circles && !strips)
                 throw new FormatException($"pool은 원으로 떨어지는 공격(circle, trail, burrow, leap)에, 용암·물·균열·바위는 charge·cross에도 씁니다({shape}).");
             return (kind, seconds, from);

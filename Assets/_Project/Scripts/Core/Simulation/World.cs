@@ -415,6 +415,8 @@ namespace Game.Core
                 HitBoss(player, boss, RollDamage(stats, out bool critical) * more, critical, stats.AttackTags);
                 AddElements(player, null, boss, critical, more);
             }
+            // A boss's vein in the swing breaks a little (R2b).
+            if (SwingProps(player, reach, arc, () => RollDamage(stats, out _) * more)) hit = true;
             return hit;
         }
 

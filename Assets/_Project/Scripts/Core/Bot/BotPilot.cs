@@ -657,12 +657,25 @@ namespace Game.Core
         // left it (2026-11-22: kept out by the clouds a rooted mushroom throws again and again, the bot never reached
         // it and gave a request up).
         // A boss's ground (R2): lava and cracks are kept out of, water and cooled rock are not; a blast that spares rock
-        // is no danger on rock; a boss's edge that bites is (World.BadGround).
+        // is no danger on rock, nor one that spares the shaded behind a pillar (R2b); a boss's edge that bites is
+        // (World.BadGround).
         bool Danger(Vec2 at) => _world.Hazards.Any(h => h.Shape != HazardShape.Share && h.Shape != HazardShape.Web && h.Shape != HazardShape.Balm
             && h.Shape != HazardShape.Water && h.Shape != HazardShape.Rock
             && !Mild(h) && !(h.Damage == 0 && h.Mark == (byte)MonsterAttackShape.Blink + 1) && h.Contains(at, World.PlayerRadius + 0.1f)
-            && !(h.Spares && _world.OnRock(h.Source, at)))
+            && !(h.Spares && _world.OnRock(h.Source, at)) && !(h.Shades && _world.Shaded(h.Source, h.Position, at)))
             || _world.BadGround(at);
+
+        // The way to just behind the nearest pillar from a blast that spares the shaded, while one is coming and the bot
+        // is not shaded yet; null otherwise.
+        Vec2? ShadeFrom()
+        {
+            var blast = _world.Hazards.FirstOrDefault(h => h.Shades && h.Contains(_player.Position, 0));
+            if (blast == null || _world.Shaded(blast.Source, blast.Position, _player.Position)) return null;
+            var spots = _world.Props.Where(p => p.Owner == blast.Source && p.Kind == PropKind.Pillar)
+                .Select(p => p.Position + (p.Position - blast.Position).Normalized * (p.Radius + World.PlayerRadius + 0.2f)).ToList();
+            if (spots.Count == 0) return null;
+            return spots.OrderBy(at => Vec2.Distance(at, _player.Position)).First() - _player.Position;
+        }
 
         // Standing in a warning on the floor (not a share marker): toward the nearest spot out of every one.
         // Fighting a boss, not a spot outside its ground while there is one inside (2026-11-21: stepping out of its
@@ -672,6 +685,9 @@ namespace Game.Core
         Vec2? WayOutOfDanger(BotTarget target)
         {
             if (!Danger(_player.Position)) return null;
+            // A blast that spares the shaded (R2b, the warden's core overload): straight for the nearest pillar's shadow.
+            var shade = ShadeFrom();
+            if (shade != null) return shade;
             var boss = target.Aim == BotAim.BossFight ? BossOf(target.Id) : null;
             foreach (bool inside in new[] { true, false })
             {

@@ -120,6 +120,7 @@ namespace Game.Core
             boss.Phase = 1;
             boss.EmptyTicks = 0;
             boss.TaughtTick = -1;
+            boss.PillarTaughtTick = -1;
             boss.EdgeTick = -1;
             CalmDown(boss);
             PlaceProps(boss);
@@ -177,6 +178,7 @@ namespace Game.Core
             boss.EmptyTicks = 0;
             RunRage(boss);
             WorkEdge(boss);
+            WorkProps(boss);
 
             switch (boss.State)
             {
@@ -207,6 +209,8 @@ namespace Game.Core
                         boss.Cues = false;
                         _events.Add(new SimEvent(SimEventType.Cue, boss.Id, direction: boss.Facing));
                     }
+                    // Eating (R2b), it runs to the vein through its telegraph.
+                    if (boss.Attack?.Shape == AttackShape.Eat) RunToVein(boss);
                     if (--boss.StateTicks <= 0) Unleash(boss);
                     break;
 
@@ -281,7 +285,9 @@ namespace Game.Core
             if (fighters.Count == 0) return;
             // Its rage spent, it cowers first (R2).
             if (Spend(boss)) return;
-            var choices = boss.Definition.Attacks.Where(a => a.InPhase(boss.Phase) && a.Weight > 0).ToList();
+            // A vein to eat only while one of its own stands (R2b).
+            bool vein = VeinFor(boss) != null;
+            var choices = boss.Definition.Attacks.Where(a => a.InPhase(boss.Phase) && a.Weight > 0 && (a.Shape != AttackShape.Eat || vein)).ToList();
             // A finisher not long ago: not another yet (BossDefinition.FinisherRest), unless nothing else is left. A new
             // phase's opening blow is chosen among the rest.
             choices = Rested(boss, choices);
@@ -379,7 +385,10 @@ namespace Game.Core
                 boss.ChargesLeft = attack.Shape == AttackShape.Charge ? Math.Max(0, attack.Count - 1) : 0;
                 // Raging, every blow that can comes once more (R2, BossRage); not a finisher.
                 boss.RepeatsLeft = attack.Repeat + (boss.Raging && attack.CanRepeat && attack.Warning != AttackWarning.Strong ? 1 : 0);
+                // The wall run comes out width times, one after another (R2b).
+                if (attack.Shape == AttackShape.Orbit) boss.RepeatsLeft = Math.Max(0, (int)attack.Width - 1);
             }
+            if (attack.Shape == AttackShape.Orbit) NextOrbit(boss, attack, first: !repeat);
             // A late blow (boost hold) waits 0.4 to 1 of its hold past its telegraph, rolled from a stream of its own
             // (as the aim of a burst) so nothing else rolls differently for it; its tell comes CueSeconds before it lands.
             boss.Countered = false;
@@ -394,9 +403,18 @@ namespace Game.Core
             int cause = Cause(boss, attack);
             if (AimsRound(attack)) boss.AimStep = (int)(new GameRandom(_forageSeed + (ulong)Tick, stream: 40 + (ulong)boss.Id).NextUInt() % AimSteps);
 
+            Shelters(boss, attack);
+            if (attack.Shape == AttackShape.Eat) StartEating(boss, attack, resolve, cause);
             int laid = _hazards.Count;
             LayHazards(boss, attack, target, fighters, boss.Facing, resolve, cause);
             Falls(attack, laid);
+            // The first circle of a fight that raises a pillar harms no one: it shows what comes (R2b, like the first lava).
+            if (attack.Pool == PoolKind.Pillar && attack.Shape == AttackShape.Circle && boss.Phase >= attack.PoolFrom)
+            {
+                if (boss.PillarTaughtTick < 0) boss.PillarTaughtTick = Tick;
+                if (boss.PillarTaughtTick == Tick)
+                    for (int i = laid; i < _hazards.Count; i++) _hazards[i].Damage = 0;
+            }
             // Its follow-up (follow column) is marked now too and lands a moment after: one roll does not clear both.
             // Only in the follow-up's own phases (2026-11-28: the rings come from phase 2, so phase 1 lays one pattern).
             bool follows = attack.FollowUp != null && !again && !repeat && attack.FollowUp.InPhase(boss.Phase);
@@ -406,7 +424,7 @@ namespace Game.Core
                 LayHazards(boss, follow, target, fighters, boss.Facing, resolve + Ticks(attack.FollowDelay), Cause(boss, follow));
             }
             if (attack.Shape == AttackShape.Charge) boss.ChargeDirection = boss.Facing;
-            if (attack.GoesAway) boss.LandAt = LandingFor(boss, target.Position);
+            if (attack.GoesAway && attack.Shape != AttackShape.Orbit) boss.LandAt = LandingFor(boss, target.Position);
 
             // A later phase sometimes lays another area attack of this phase at once, on someone (else, when there is
             // anyone else), resolving a moment after. Not with a follow-up laid: at most two patterns at once (2026-11-28).
@@ -580,8 +598,15 @@ namespace Game.Core
                 case AttackShape.Refuge:
                     LayRefuge(boss, attack, resolve, cause);
                     break;
+                case AttackShape.Cover:
+                    AddHazard(boss, cause, HazardShape.Circle, boss.Position, facing, boss.ArenaRadius * 2 + ArenaMargin, 0, attack.Damage, resolve).Shades = true;
+                    break;
                 case AttackShape.Share:
                     AddHazard(boss, cause, HazardShape.Share, target.Position, facing, attack.Radius, 0, attack.Damage, resolve);
+                    break;
+                case AttackShape.Orbit:
+                    // Where it comes out of the wall shakes (World.NextOrbit set it).
+                    AddHazard(boss, cause, HazardShape.Circle, boss.LandAt, facing, boss.Definition.Radius + OrbitMark, 0, 0, resolve);
                     break;
                 case AttackShape.Burrow:
                 case AttackShape.Leap:
@@ -636,6 +661,12 @@ namespace Game.Core
                     _events.Add(new SimEvent(SimEventType.Impact, boss.Id, amount: (int)MathF.Ceiling(attack.Radius) + 2));
                     if (attack.Count > 0) Burst(boss, attack, 0.4f);
                     break;
+                case AttackShape.Orbit:
+                    ComeOutOfWall(boss, attack);
+                    break;
+                case AttackShape.Eat:
+                    Eat(boss);
+                    break;
                 case AttackShape.Counter:
                     // Answered, it rests as after any blow; left alone, it stands open (CounterOpening).
                     boss.State = BossState.Recover;
@@ -656,7 +687,8 @@ namespace Game.Core
             {
                 // A blow that comes again (boost repeat): a moment's follow-through, then its next wind-up (UpdateBoss).
                 boss.RepeatNext = true;
-                boss.StateTicks = Ticks(RepeatGap);
+                // Out of the wall it stands a moment before it digs in again (R2b): the moment to hit it.
+                boss.StateTicks = Ticks(attack.Shape == AttackShape.Orbit ? OrbitOpen : RepeatGap);
                 return;
             }
             // A quicker phase rests less, but never so little that a spiral's later volleys go unfired.
@@ -718,9 +750,11 @@ namespace Game.Core
                 AfflictPlayer(player, boss.Id, HurtPlayer(player, boss.Id, attack.Damage, Cause(boss, attack)));
             }
 
-            // Into a pillar of its own (R2): it stops there and stands stunned.
-            if (RanIntoPillar(boss))
+            // Into a pillar of its own (R2): the pillar breaks, the boss stops there and stands stunned, its core bare.
+            var pillar = PillarHit(boss);
+            if (pillar != null)
             {
+                _props.Remove(pillar);
                 EndCharge(boss, attack, boss.ChargeFrom);
                 _events.Add(new SimEvent(SimEventType.Impact, boss.Id, amount: 8));
                 boss.ChargesLeft = 0;
@@ -754,12 +788,15 @@ namespace Game.Core
             // Once its edge has come (R2), it keeps to the floor that is left, so no one has to follow it into the edge.
             float limit = Math.Max(0, FloorRadius(boss) - boss.Definition.Radius);
             if (fromHome.Length > limit) position = boss.Home + fromHome.Normalized * limit;
+            if (boss.State != BossState.Charge) position = OutOfPillars(boss, position);
             if (delta.LengthSquared > 1e-8f) boss.Facing = delta.Normalized;
             boss.Position = position;
         }
 
         internal void DamageBoss(Boss boss, int source, int amount, bool critical, int cause = 0, SkillTag tags = SkillTag.None)
         {
+            // Stunned (it ran into a pillar), its core is bare (R2b).
+            if (boss.State == BossState.Stun) amount = (int)MathF.Round(amount * StunTakenShare);
             boss.Health -= amount;
             _events.Add(new SimEvent(SimEventType.Hit, source, boss.Id, amount, critical, cause: cause, tags: tags));
             if (!boss.IsDead) Heat(boss, amount);
@@ -818,6 +855,8 @@ namespace Game.Core
             boss.OpensPhase = false;
             boss.FinisherReady = 0;
             boss.TaughtTick = -1;
+            boss.PillarTaughtTick = -1;
+            boss.EatVein = 0;
             boss.EdgeTick = -1;
             CalmDown(boss);
             boss.Countered = false;
@@ -894,6 +933,7 @@ namespace Game.Core
                 }
                 // A blast that spares cooled rock (AttackShape.Refuge).
                 if (hazard.Spares) hit.RemoveAll(p => OnRock(hazard.Source, p.Position));
+                if (hazard.Shades) hit.RemoveAll(p => Shaded(hazard.Source, hazard.Position, p.Position));
                 // A shared circle splits its damage among everyone in it; alone, one takes it all.
                 int damage = hazard.Shape == HazardShape.Share ? (int)MathF.Ceiling(hazard.Damage / (float)Math.Max(1, hit.Count)) : hazard.Damage;
                 foreach (var player in hit)

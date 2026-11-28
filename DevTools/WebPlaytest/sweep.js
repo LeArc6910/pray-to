@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu title testground hunt harvest zones towns time basics first firstphone hour bag combat hero roll weapons arts bosses patterns tempo ground veineater samurai knight warden antlion serpent titan voidlord wraith queen general spider arenas world farm life npc factory defense gear skills skillfx layers monsterfx hazards bossfx hits shots blast mobwarn map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
+// Sections: menu title testground hunt harvest zones towns time basics first firstphone hour bag combat hero roll weapons arts bosses patterns tempo ground props veineater samurai knight warden antlion serpent titan voidlord wraith queen general spider arenas world farm life npc factory defense gear skills skillfx layers monsterfx hazards bossfx hits shots blast mobwarn map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -1022,7 +1022,6 @@ async function veineater(browser) {
     ['burrow', '땅속 습격(땅으로 들어가 흙더미가 달려온다, 경고)', 1.6, true],
     ['cave_in', '갱도 붕괴(주먹을 들고 천장에서 바위가 떨어진다, 경고)', 1.5, true],
     ['spike_line', '종유석 솟기(드릴을 땅에 박는다)', 0.9, false],
-    ['drill_spin', '드릴 회전(몸을 말았다가 돈다)', 0.9, false],
     ['frenzy', '광폭 연속 돌진(붉어지고 김을 뿜는다)', 0.9, false],
     ['quake', '대지 분쇄(깊이 웅크렸다 뛰어오른다, 경고)', 1.8, true],
     ['call_beetles', '딱정벌레 부르기(천장을 향해 포효)', 0.9, false],
@@ -1220,13 +1219,12 @@ async function warden(browser) {
     ['slam', '내려찍기(두 주먹을 머리 위로)', 1.0, false],
     ['sweep', '휩쓸기(한 주먹을 뒤로 젖힘)', 0.9, false],
     ['rock_burst', '돌 파편(팔로 핵을 감쌈)', 0.6, false],
-    ['quake', '지진(한 발을 높이 듦)', 1.1, false],
+    ['quake', '바위 솟기(한 발을 높이 듦, 발밑에 기둥)', 1.1, false],
     ['charge', '돌진(머리를 낮춤)', 1.0, false],
     ['shockwave', '충격파(두 주먹을 발밑에)', 1.2, false],
     ['rock_trail', '바위 줄기(주먹을 낮게 끌어옴)', 0.8, false],
-    ['aftershock', '여진(한 주먹을 높이)', 1.1, false],
     ['meteor', '낙석(천장을 올려침)', 1.2, false],
-    ['cave_in', '천장 붕괴(필살기, 경고)', 1.5, true],
+    ['core_burst', '핵 폭주(필살기, 경고, 기둥 그늘만 안전)', 1.6, true],
   ];
   for (const [attack, name, telegraph, strong] of uses) {
     await game.send('heal; clear');
@@ -1708,6 +1706,112 @@ async function ground(browser) {
       s = await game.state();
       check(s.rock >= 1 || s.edgeShown, `화산 폭발: 안전한 바위가 있다 (바위 ${s.rock})`);
       await game.shot('ground-refuge', '화산 폭발(필살기): 식은 바위 위만 안전');
+    }
+    await game.context.close();
+  }
+}
+
+// ---------------------------------------------------------------- 기둥·광맥·결계 (2026-11-28, R2b, Docs/Bosses.md 기둥·광맥·벽 돌기)
+// The cave warden's pillars (its rock trail leaves one, phase 2 stands two, its rock rise lifts one under the feet), its
+// core bare when stunned, and its core overload lighting the shadows behind pillars as the only safe ground; the vein
+// eater's vein, its run through the wall (away, the spot shaking, then out throwing) and the vein eaten (rage); the
+// samurai's ring of petals and the silk mother's curtain of webs in phase 3. PC; the phone for pillars and the petals.
+async function props(browser) {
+  for (const profile of [Profiles.pc, Profiles.phone]) {
+    const pc = profile === Profiles.pc;
+    note(`\n## 기둥·광맥·결계 (${pc ? 'PC' : '휴대폰'})\n`);
+    const game = await open(browser, run, profile, url);
+    await game.startSolo();
+    await game.wait(1200);
+    await game.send('xp 2000000; equip void_sword void_helmet void_armor void_boots; heal');
+    await game.send('heal; goto boss cave_warden');
+    await game.until(t => has(t.banner, '동굴 수호자') || has(t.entrance, '동굴 수호자'), 8000, game.texts);
+    await game.wait(4500);
+    let s;
+    if (pc) {
+      await game.send('heal; clear; boss cave_warden use rock_trail');
+      await game.wait(1800);
+      s = await game.state();
+      check(s.pillars >= 1 && s.pillarsShown >= 1, `바위 줄기 끝에 기둥이 선다 (기둥 ${s.pillars}, 그림 ${s.pillarsShown})`);
+      await game.shot('props-pillar-trail', '바위 줄기 끝의 바위 기둥');
+    }
+    await game.send('heal; clear; boss cave_warden hurt 0.36');
+    await game.until(t => t.bossPhase === 2, 4000);
+    await game.wait(2500);
+    s = await game.state();
+    check(s.pillars >= 2 && s.pillarsShown >= 2, `2페이즈: 기둥 둘 (기둥 ${s.pillars}, 그림 ${s.pillarsShown})`);
+    await game.shot(pc ? 'props-pillars' : 'props-pillars-phone', '2페이즈: 바위 기둥 둘');
+    if (pc) {
+      await game.send('heal; boss cave_warden use quake');
+      await game.wait(1500);
+      await game.shot('props-pillar-rise', '바위 솟기: 발밑에서 기둥이 솟는다(첫 번은 피해 없음)');
+      await game.send('heal; boss cave_warden stun');
+      await game.wait(400);
+      s = await game.state();
+      check(s.bossState === 'Stun', `기둥에 박히면 기절 (${s.bossState})`);
+      await game.shot('props-core', '기절: 가슴 바위가 떨어져 핵이 드러난다');
+      await game.wait(2200);
+      await game.send('heal; clear; boss cave_warden hurt 0.33');
+      await game.until(t => t.bossPhase === 3, 4000);
+      await game.wait(2500);
+      await game.send('heal; clear; boss cave_warden use core_burst');
+      await game.wait(900);
+      s = await game.state();
+      check(s.pillars >= 1 && s.shadesShown >= 1, `핵 폭주: 기둥 그늘이 밝게 보인다 (기둥 ${s.pillars}, 그늘 ${s.shadesShown})`);
+      await game.shot('props-cover', '핵 폭주(필살기): 기둥 뒤 그늘만 안전');
+
+      await game.send('heal; clear; goto boss vein_eater');
+      await game.until(t => has(t.banner, '그룸') || has(t.entrance, '그룸'), 8000, game.texts);
+      await game.wait(4500);
+      await game.send('heal; clear; boss vein_eater hurt 0.36');
+      await game.until(t => t.bossPhase === 2, 4000);
+      await game.wait(2500);
+      s = await game.state();
+      check(s.veins === 1 && s.veinsShown === 1, `2페이즈: 광맥 하나 (광맥 ${s.veins}, 그림 ${s.veinsShown})`);
+      await game.shot('props-vein', '2페이즈: 빛나는 광맥');
+      await game.send('heal; boss vein_eater use wall_run');
+      await game.wait(350);
+      s = await game.state();
+      check(s.bossAway, `벽 돌기: 벽 속에 들어가 맞지 않는다 (${s.bossAway})`);
+      await game.shot('props-wall-shake', '벽 돌기: 나올 자리가 흔들린다');
+      await game.wait(600);
+      s = await game.state();
+      check(!s.bossAway && s.bossShots >= 1, `벽에서 나와 바위를 던진다 (돌 ${s.bossShots})`);
+      await game.shot('props-wall-out', '벽 돌기: 나와서 바위 던지기');
+      await game.wait(4000);
+      await game.send('heal; clear; boss vein_eater use eat_vein');
+      await game.wait(2400);
+      s = await game.state();
+      check(s.raging && s.veins === 0, `광맥을 먹으면 분노 (분노 ${s.raging}, 광맥 ${s.veins})`);
+      await game.shot('props-vein-eaten', '광맥을 먹었다: "분노!"');
+    }
+
+    await game.send('heal; clear; goto boss shrine_samurai');
+    await game.until(t => has(t.banner, '시구레') || has(t.entrance, '시구레'), 8000, game.texts);
+    await game.wait(4500);
+    await game.send('heal; clear; boss shrine_samurai hurt 0.36');
+    await game.until(t => t.bossPhase === 2, 4000);
+    await game.wait(2000);
+    await game.send('heal; clear; boss shrine_samurai hurt 0.33');
+    await game.until(t => t.bossPhase === 3, 4000);
+    await game.wait(3500);
+    s = await game.state();
+    check(Math.abs(s.floor - 7.5) < 0.01 && s.edgeShown, `시구레 3페이즈: 벚꽃 결계, 남은 바닥 7.5 (${s.floor}, 그림 ${s.edgeShown})`);
+    await game.shot(pc ? 'props-petal' : 'props-petal-phone', '시구레 3페이즈: 가장자리 꽃잎 벽');
+
+    if (pc) {
+      await game.send('heal; clear; goto boss silk_mother');
+      await game.until(t => has(t.banner, '아라네') || has(t.entrance, '아라네'), 8000, game.texts);
+      await game.wait(4500);
+      await game.send('heal; clear; boss silk_mother hurt 0.36');
+      await game.until(t => t.bossPhase === 2, 4000);
+      await game.wait(2000);
+      await game.send('heal; clear; boss silk_mother hurt 0.33');
+      await game.until(t => t.bossPhase === 3, 4000);
+      await game.wait(3500);
+      s = await game.state();
+      check(Math.abs(s.floor - 8) < 0.01 && s.edgeShown, `아라네 3페이즈: 거미줄 커튼, 남은 바닥 8 (${s.floor}, 그림 ${s.edgeShown})`);
+      await game.shot('props-web', '아라네 3페이즈: 가장자리 2칸 거미줄 커튼');
     }
     await game.context.close();
   }
@@ -3478,7 +3582,7 @@ const BossBlows = {
     'share 6.8 2.6 1.8 0 0 F crystal_queen venom_share', 'line -8 -3.2 8 1.2 0 F crystal_queen crystal_cross', 'circle 4 -3.4 1.3 0 0 F crystal_queen shard_hail'],
   general: ['cone -8 2.4 3.4 110 0 F mad_general cleave', 'circle -2.2 3.2 1.5 0 0 F mad_general hellfire', 'circle 1.6 3.2 1.4 0 0 F mad_general meteors',
     'ring 6 1 3.6 1.2 0 F mad_general ember_wake', 'line -8 -3.6 9 1.2 0 F mad_general dark_cross'],
-  stone: ['circle -6 2.6 2.5 0 0 F cave_warden slam', 'cone -1.5 1.6 4 120 30 F cave_warden sweep', 'circle 6.6 3.2 1.6 0 0 F cave_warden cave_in',
+  stone: ['circle -6 2.6 2.5 0 0 F cave_warden slam', 'cone -1.5 1.6 4 120 30 F cave_warden sweep', 'circle 6.6 3.2 1.6 0 0 F cave_warden meteor',
     'ring 5 -2 3.6 1.6 0 F cave_warden shockwave', 'circle -7 -3.4 1.1 0 0 F cave_warden rock_trail', 'circle -3.6 -3.4 1.1 0 0 F cave_warden rock_trail'],
   antlion: ['cone -8 2.6 3.2 90 0 F antlion bite', 'circle -2.2 3 2.2 0 0 F antlion pit', 'share 3 3.2 1.8 0 0 F antlion sandstorm',
     'circle 7 3.2 1.1 0 0 F antlion sand_trail', 'line -8 -3.4 8 1.4 0 F antlion sand_jet', 'ring 5 -2.4 3.4 1.4 0 F antlion quicksand'],
@@ -3499,7 +3603,7 @@ const BossBlows = {
     'circle 7 3.2 1.5 0 0 F lava_titan fire_rain', 'line -8 -3.4 9 1.6 0 F lava_titan lava_cross', 'circle 5 -2.4 1.6 0 0 F lava_titan meteor'],
   // F3: the stone bosses' own attacks by their own names (E6 looked at them only as the warden's).
   vein: ['cone -8 2.6 3.6 120 0 F vein_eater claw', 'circle -2.6 3 1.5 0 0 F vein_eater cave_in', 'circle 2.4 2.6 2.6 0 0 F vein_eater burrow',
-    'circle -6 -2.8 3.2 0 0 F vein_eater quake', 'circle 0.4 -3.4 1.2 0 0 F vein_eater spike_line', 'ring 5.6 -2.2 3.6 1.4 0 F vein_eater collapse_ring'],
+    'circle -6 -2.8 3.2 0 0 F vein_eater quake', 'circle 0.4 -3.4 1.2 0 0 F vein_eater spike_line', 'circle 5.6 -2.2 1.8 0 0 F vein_eater wall_run'],
   knight: ['cone -8 2.6 4.2 70 0 F black_knight smash', 'circle -2.4 3.2 1.5 0 0 F black_knight rubble', 'circle 2.6 2.6 2.8 0 0 F black_knight leap',
     'circle -5.6 -2.6 3.4 0 0 F black_knight quake', 'circle 0.6 -3.4 1.3 0 0 F black_knight shockwave', 'line 3 -3.6 7 1.6 0 F black_knight fissure'],
 };
@@ -9465,7 +9569,7 @@ async function towns(browser) {
   }
 }
 
-const Sections = { menu, title, testground, hunt, harvest, zones, towns, time, basics, first, firstphone, hour, bag, combat, hero, roll, weapons, arts, bosses, patterns, tempo, ground, veineater, samurai, knight, warden, antlion, serpent, titan, voidlord, wraith, queen, general, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, layers, monsterfx, hazards, bossfx, hits, shots, blast, mobwarn, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
+const Sections = { menu, title, testground, hunt, harvest, zones, towns, time, basics, first, firstphone, hour, bag, combat, hero, roll, weapons, arts, bosses, patterns, tempo, ground, props, veineater, samurai, knight, warden, antlion, serpent, titan, voidlord, wraith, queen, general, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, layers, monsterfx, hazards, bossfx, hits, shots, blast, mobwarn, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

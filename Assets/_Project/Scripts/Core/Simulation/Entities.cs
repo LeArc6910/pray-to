@@ -828,6 +828,12 @@ namespace Game.Core
         internal long FinisherReady { get; set; }
         // A late blow still to give its tell (SimEventType.Cue) as it comes within World.CueSeconds.
         internal bool Cues { get; set; }
+        // R2b: the tick the first pillar-raising circle of this fight was laid (it harms no one), -1 before.
+        internal long PillarTaughtTick { get; set; } = -1;
+        // R2b: where round the arena's edge (radians from its middle) its wall run comes out next (AttackShape.Orbit).
+        internal float OrbitAngle { get; set; }
+        // R2b: the vein it runs to eat (AttackShape.Eat), 0 for none.
+        internal int EatVein { get; set; }
         // Its noto counter was struck and it is answering (World.Counter).
         public bool Countered { get; internal set; }
 
@@ -847,8 +853,9 @@ namespace Game.Core
     // broken.
     public sealed class BossProp
     {
-        internal BossProp(int id, int owner, PropKind kind, Vec2 position, float radius, float health)
+        internal BossProp(int id, int owner, PropKind kind, Vec2 position, float radius, float health, long until = -1)
         {
+            Until = until;
             Id = id;
             Owner = owner;
             Kind = kind;
@@ -866,6 +873,8 @@ namespace Game.Core
         public float Health { get; internal set; }
         public float MaxHealth { get; }
         public bool Breakable => MaxHealth > 0;
+        // The tick it crumbles at (a pillar an attack raised, PoolKind.Pillar); -1 while it stands for the phase.
+        public long Until { get; }
     }
 
     public enum HazardShape : byte
@@ -930,7 +939,7 @@ namespace Game.Core
         public float Size { get; }
         // Cone angle in degrees, line width, or a ring's inner (safe) radius.
         public float Width { get; }
-        public int Damage { get; }
+        public int Damage { get; internal set; }
         public long StartTick { get; }
         public long ResolveTick { get; internal set; }
         // A monster's own (2026-11-21): drawn from the monster's state on the screen, so it is not sent (Attached); what
@@ -968,6 +977,8 @@ namespace Game.Core
         internal Vec2? StripFrom { get; set; }
         // A blast that spares whoever stands on cooled rock (AttackShape.Refuge).
         public bool Spares { get; internal set; }
+        // A blast that spares whoever a pillar of its boss's shields from its middle (AttackShape.Cover, R2b).
+        public bool Shades { get; internal set; }
 
         // Whether a circle of the given radius at point touches the area.
         public bool Contains(Vec2 point, float radius)

@@ -117,6 +117,15 @@ namespace CoreSandbox
             if (player.IsDead) return;
             var boss = world.Bosses.FirstOrDefault();
             var target = boss?.Position ?? arena;
+            float targetRadius = boss?.Definition.Radius ?? 0;
+            // A vein the boss would eat to rage is broken first (R2b, the vein eater).
+            var vein = boss == null ? null : world.Props.Where(p => p.Owner == boss.Id && p.Kind == PropKind.Vein)
+                .OrderBy(p => Vec2.Distance(p.Position, player.Position)).FirstOrDefault();
+            if (vein != null)
+            {
+                target = vein.Position;
+                targetRadius = vein.Radius;
+            }
             var toTarget = target - player.Position;
 
             // A slime in the way gets hit first.
@@ -125,7 +134,7 @@ namespace CoreSandbox
 
             var input = Vec2.Zero;
             var escape = dodge ? Escape(world, player, reactionTicks) : Vec2.Zero;
-            float gap = toTarget.Length - (boss?.Definition.Radius ?? 0) - World.PlayerRadius;
+            float gap = toTarget.Length - targetRadius - World.PlayerRadius;
             if (escape.LengthSquared > 0)
             {
                 input = escape;
@@ -147,7 +156,7 @@ namespace CoreSandbox
             // Walking (not escaping), it goes round a boss's lava, cracks and biting edge rather than through (R2).
             if (dodge && escape.LengthSquared == 0 && input.LengthSquared > 0) input = RoundGround(world, player, input);
             RollBot.Move(world, player, input, facing, escape, dodge);
-            bool inReach = slime != null || (boss != null && gap <= FightSim.Reach(player));
+            bool inReach = slime != null || ((boss != null || vein != null) && gap <= FightSim.Reach(player));
             world.SetAttacking(player.Id, inReach);
         }
 
@@ -169,6 +178,14 @@ namespace CoreSandbox
                 // and off it the bot heads for the nearest rock.
                 if (hazard.Shape == HazardShape.Water || hazard.Shape == HazardShape.Rock) continue;
                 if (!hazard.Contains(player.Position, World.PlayerRadius + 0.3f)) continue;
+                // A blast that spares the shaded (R2b): behind the nearest pillar from the boss.
+                if (hazard.Shades)
+                {
+                    if (world.Shaded(hazard.Source, hazard.Position, player.Position)) continue;
+                    var shade = NearestShade(world, hazard, player.Position);
+                    if (shade != null) away += (shade.Value - player.Position).Normalized * 2;
+                    continue;
+                }
                 if (hazard.Spares)
                 {
                     if (world.OnRock(hazard.Source, player.Position)) continue;
@@ -241,6 +258,14 @@ namespace CoreSandbox
                 if (!Bad(player.Position + dir * 0.7f)) return dir * way.Length;
             }
             return Vec2.Zero;
+        }
+
+        // The spot just behind the nearest pillar of the boss's, from where its blast comes.
+        static Vec2? NearestShade(World world, Hazard blast, Vec2 from)
+        {
+            var spots = world.Props.Where(p => p.Owner == blast.Source && p.Kind == PropKind.Pillar)
+                .Select(p => p.Position + (p.Position - blast.Position).Normalized * (p.Radius + World.PlayerRadius + 0.2f)).ToList();
+            return spots.Count == 0 ? (Vec2?)null : spots.OrderBy(s => Vec2.Distance(s, from)).First();
         }
 
         // The middle of the nearest cooled rock of the boss's (a pool, or an edge's island).

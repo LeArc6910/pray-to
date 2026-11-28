@@ -33,7 +33,10 @@ namespace Game.Client
             return Sprites.Centered($"fx/edge/{kind}/{o}/{f}/{frame}", () => GroundArt.Edge(kind, o, f, frame));
         }
 
-        static Sprite PropSprite(PropKind kind, int frame) => Sprites.Centered($"fx/prop/{kind}/{frame}", () => GroundArt.Prop(kind, frame));
+        // A standing thing stands on its foot row (GroundArt.PropPivot); a vein shows its cracks as it is broken (R2b).
+        static Sprite PropSprite(PropKind kind, int frame, int cracks = 0) => cracks > 0 && kind == PropKind.Vein
+            ? Sprites.Get($"fx/prop/{kind}/{frame}/{cracks}", () => GroundArt.VeinCracked(frame, cracks), new Vector2(0.5f, GroundArt.PropPivot(kind)))
+            : Sprites.Get($"fx/prop/{kind}/{frame}", () => GroundArt.Prop(kind, frame), new Vector2(0.5f, GroundArt.PropPivot(kind)));
 
         static bool IsGround(HazardState hazard) => hazard.Shape == HazardShape.Lava || hazard.Shape == HazardShape.Water
             || hazard.Shape == HazardShape.Crack || hazard.Shape == HazardShape.Rock;
@@ -155,6 +158,7 @@ namespace Game.Client
             var bosses = _client.Others().Where(e => e.Kind == EntityKind.Boss && !e.IsDead).ToList();
             DrawEdge(bosses);
             DrawProps();
+            DrawShades();
             DrawRage(bosses);
         }
 
@@ -203,6 +207,15 @@ namespace Game.Client
         }
 
         readonly HashSet<int> _propsSeen = new HashSet<int>();
+        // R2b: when each standing thing was first seen (a pillar rises), what each was (a pillar crumbles in dust as it
+        // goes) and the health a vein had (struck, it shakes).
+        readonly Dictionary<int, (float Born, PropKind Kind, Vec2 At, byte Health, float Struck)> _propsKnown = new Dictionary<int, (float, PropKind, Vec2, byte, float)>();
+
+        // How long a pillar takes to rise out of the floor.
+        const float PillarRiseSeconds = 0.25f;
+
+        // Standing things seen now, for the playtests (each kind).
+        public int PropsShownOf(PropKind kind) => _propsKnown.Values.Count(p => p.Kind == kind);
 
         void DrawProps()
         {
@@ -216,15 +229,96 @@ namespace Game.Client
                     // A vent is a hole in the floor, under everyone.
                     sprite.sortingOrder = 35;
                     _propSprites[prop.Id] = sprite;
+                    _propsKnown[prop.Id] = (Time.time, prop.Kind, prop.Position, prop.Health, -1);
+                    // A pillar grinds up out of the floor in a burst of dust (R2b).
+                    if (prop.Kind == PropKind.Pillar)
+                    {
+                        Impact(new Vector3(prop.Position.X, prop.Position.Y, 0), 0.6f);
+                        Hear(Sound.PillarRise, new Vector3(prop.Position.X, prop.Position.Y, 0), 0.8f);
+                    }
                 }
-                sprite.transform.localPosition = new Vector3(prop.Position.X, prop.Position.Y, 0);
-                sprite.sprite = PropSprite(prop.Kind, Mathf.FloorToInt(Time.time * 6 + prop.Id) % GroundArt.Frames);
+                var known = _propsKnown[prop.Id];
+                if (prop.Health < known.Health) known.Struck = Time.time;
+                known.Health = prop.Health;
+                _propsKnown[prop.Id] = known;
+                // A pillar and a vein stand among the bodies (by their feet); a pillar rises, a struck vein shakes.
+                bool stands = prop.Kind != PropKind.Vent;
+                if (stands) sprite.sortingOrder = FootOrder(prop.Position.Y - prop.Radius * 0.5f);
+                float rise = prop.Kind == PropKind.Pillar ? Mathf.Clamp01((Time.time - known.Born) / PillarRiseSeconds) : 1;
+                float shake = known.Struck >= 0 && Time.time - known.Struck < 0.15f ? Mathf.Sin(Time.time * 80) * 0.05f : 0;
+                sprite.transform.localPosition = new Vector3(prop.Position.X + shake, prop.Position.Y - (1 - rise) * prop.Radius, 0);
+                sprite.transform.localScale = new Vector3(1, Mathf.Max(0.05f, rise), 1);
+                int cracks = prop.Kind != PropKind.Vein ? 0 : prop.Health < 85 ? 2 : prop.Health < 170 ? 1 : 0;
+                sprite.sprite = PropSprite(prop.Kind, Mathf.FloorToInt(Time.time * 6 + prop.Id) % GroundArt.Frames, cracks);
+                sprite.color = Color.white;
             }
             foreach (int id in _propSprites.Keys.Where(id => !_propsSeen.Contains(id)).ToList())
             {
                 Object.Destroy(_propSprites[id].gameObject);
                 _propSprites.Remove(id);
+                // Gone: a pillar crumbles, a vein shatters (or is eaten), in dust where it stood.
+                if (_propsKnown.TryGetValue(id, out var gone) && gone.Kind != PropKind.Vent)
+                {
+                    var at = new Vector3(gone.At.X, gone.At.Y, 0);
+                    Impact(at, gone.Kind == PropKind.Pillar ? 0.9f : 0.5f);
+                    // A pillar a charge broke: the crash, and the boss's core laid bare (it stands stunned).
+                    bool stunned = _client.Others().Any(e => e.Kind == EntityKind.Boss && !e.IsDead && e.BossState == BossState.Stun);
+                    if (gone.Kind == PropKind.Vein) Hear(Sound.VeinCrunch, at, 0.9f);
+                    else Hear(Sound.PillarCrash, at, stunned ? 1 : 0.6f);
+                    if (gone.Kind == PropKind.Pillar && stunned) Hear(Sound.CoreExposed, at, 0.9f);
+                }
+                _propsKnown.Remove(id);
             }
+        }
+
+        // ---- The cave warden's core overload (AttackShape.Cover, R2b): while it winds up, the shadow behind each of
+        // its pillars (from where the blast comes) is lit pale as the only safe ground. ----
+
+        readonly List<SpriteRenderer> _shades = new List<SpriteRenderer>();
+        static readonly Color ShadeColor = new Color(0.65f, 0.95f, 1f, 0.32f);
+
+        // Shadows shown now, for the playtests.
+        public int ShadesShown => _shades.Count(s => s.enabled);
+
+        void DrawShades()
+        {
+            HazardState? blast = null;
+            foreach (var mark in _marks.Values)
+            {
+                if (mark.State.Shape == HazardShape.Circle && AttackOf(mark.State)?.Shape == AttackShape.Cover)
+                {
+                    blast = mark.State;
+                    break;
+                }
+            }
+            int used = 0;
+            if (blast != null)
+            {
+                var from = blast.Value.Position;
+                foreach (var prop in _client.Props())
+                {
+                    if (prop.Kind != PropKind.Pillar) continue;
+                    var way = prop.Position - from;
+                    if (way.LengthSquared < 1e-4f) continue;
+                    var along = way.Normalized;
+                    float width = 2 * (prop.Radius - World.ShadeMargin), length = blast.Value.Size;
+                    if (used == _shades.Count)
+                    {
+                        var made = Renderer(_root.transform, "Shade", Shapes.Square, ShadeColor);
+                        made.sortingOrder = 34;
+                        _shades.Add(made);
+                    }
+                    var shade = _shades[used++];
+                    shade.enabled = true;
+                    var middle = prop.Position + along * (length / 2);
+                    shade.transform.localPosition = new Vector3(middle.X, middle.Y, 0);
+                    shade.transform.localRotation = Quaternion.Euler(0, 0, Mathf.Atan2(along.Y, along.X) * Mathf.Rad2Deg);
+                    shade.transform.localScale = new Vector3(length, width, 1);
+                    float pulse = 0.5f + 0.5f * Mathf.Sin(Time.time * 6);
+                    shade.color = new Color(ShadeColor.r, ShadeColor.g, ShadeColor.b, ShadeColor.a * (0.7f + 0.3f * pulse));
+                }
+            }
+            for (int i = used; i < _shades.Count; i++) _shades[i].enabled = false;
         }
 
         // A raging boss glows white-hot under itself, pulsing; the moment it starts it flares (SimEventType.Rage).
@@ -256,8 +350,11 @@ namespace Game.Client
         void ShowRage(SimEvent e, Vector3 at)
         {
             bool on = e.Amount != 0;
-            _floating.Add(new Floating { Position = at + new Vector3(0, 1.4f, 0), Text = on ? "과열!" : "식는다", Color = on ? GroundRageColor : new Color(0.7f, 0.7f, 0.75f) });
-            Hear(on ? Sound.Overheat : Sound.Sizzle, at, on ? 0.9f : 0.6f);
+            // The vein eater rages on what it ate (R2b); the lava titan overheats.
+            bool eater = _bossInView?.Id == "vein_eater";
+            string text = eater ? (on ? "분노!" : "가라앉는다") : on ? "과열!" : "식는다";
+            _floating.Add(new Floating { Position = at + new Vector3(0, 1.4f, 0), Text = text, Color = on ? GroundRageColor : new Color(0.7f, 0.7f, 0.75f) });
+            Hear(on ? eater ? Sound.Enrage : Sound.Overheat : Sound.Sizzle, at, on ? 0.9f : 0.6f);
             if (on && Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.12f);
         }
     }

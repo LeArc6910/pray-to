@@ -19,11 +19,11 @@ namespace Game.Client
         {
             "slam" => WardenPose.Slam,
             "sweep" => WardenPose.Sweep,
-            "rock_burst" or "rock_storm" => WardenPose.Burst,
+            // R2b: the core overload flings its arms open, its core blazing (core_burst); the rock rise is stamped up.
+            "rock_burst" or "core_burst" => WardenPose.Burst,
             "quake" => WardenPose.Stomp,
-            "aftershock" => WardenPose.Punch,
             "rock_trail" => WardenPose.Gouge,
-            "shockwave" or "cave_in" => WardenPose.Pound,
+            "shockwave" => WardenPose.Pound,
             "meteor" => WardenPose.Uppercut,
             _ => attack.Shape switch
             {
@@ -35,11 +35,11 @@ namespace Game.Client
             },
         };
 
-        static WardenPose WardenWindUpOf(BossAttack attack) => attack.Id == "cave_in" ? WardenPose.Gather : WardenArt.WindUpOf(WardenBlowOf(attack));
+        static WardenPose WardenWindUpOf(BossAttack attack) => attack.Id == "core_burst" ? WardenPose.Gather : WardenArt.WindUpOf(WardenBlowOf(attack));
 
         // How far through the telegraph the blow lands: at the end for the floor blows (the fists meet the floor as the
         // mark fills), early for the roof (it punches the roof, and the rocks it brings down land as the marks fill).
-        static float WardenStrikeAt(BossAttack attack) => attack.Id == "meteor" ? 0.35f : attack.Id == "cave_in" ? 0.5f : 1;
+        static float WardenStrikeAt(BossAttack attack) => attack.Id == "meteor" ? 0.35f : 1;
 
         // The frame of a blow so many seconds after its first, each frame for its own time; -1 past its end.
         static int WardenBlowFrame(WardenPose blow, float seconds)
@@ -282,8 +282,13 @@ namespace Game.Client
                     if (Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.25f);
                     Hear(Sound.Boom, at, 0.6f);
                     return true;
+                case "core_burst":
+                    // The core overload: a white-amber flash over everything, the floor shaken (R2b).
+                    Impact(at, 1.4f);
+                    ScreenFlash(new Color(1, 0.85f, 0.55f, 0.35f), 0.08f);
+                    Hear(Sound.Boom, at, 1);
+                    return true;
                 case "shockwave":
-                case "aftershock":
                     // A ring of broken floor rolling out: dust and stones all round the band.
                     BlastLanded(hazard, FxRamp.Dust, sparks: false, light: false);
                     c.Inner = hazard.Width * Ppu;
@@ -303,10 +308,9 @@ namespace Game.Client
                     Hear(Sound.Thump, at, 0.7f);
                     return true;
                 case "meteor":
-                case "cave_in":
                 {
-                    // Rock from the roof shattering; the cave-in harder.
-                    bool hard = id == "cave_in";
+                    // Rock from the roof shattering.
+                    bool hard = false;
                     BlastLanded(hazard, FxRamp.Dust, sparks: false, light: false, wave: false);
                     c.Big = hard;
                     AddBossFx(BossFx.Slam, at, c);

@@ -101,6 +101,12 @@ namespace Game.Core
             if (boss == null || boss.IsDead || hazard.Cause > boss.Definition.Attacks.Count) return;
             var attack = boss.Definition.Attacks[hazard.Cause - 1].ForPhase(boss.Phase);
             if (attack.Pool == PoolKind.None || boss.Phase < attack.PoolFrom || attack.Linger <= 0) return;
+            // A pillar rises where it landed (a trail's, where its last blast lands: R2b).
+            if (attack.Pool == PoolKind.Pillar)
+            {
+                if (hazard.Shape == HazardShape.Circle && (attack.Shape != AttackShape.Trail || hazard.StripFrom != null)) RaisePillar(boss, hazard.Position, attack.Linger);
+                return;
+            }
             if (hazard.Shape == HazardShape.Line)
             {
                 if (attack.Shape == AttackShape.Cross) LayGround(boss, hazard.Cause, attack.Pool, hazard.Position, hazard.Direction, hazard.Size, hazard.Width, attack.Linger, attack.Damage);
@@ -179,8 +185,8 @@ namespace Game.Core
         // ---- Things standing in the arena (props column) ----
 
         // How big each kind stands, and how much a breakable one takes (0: cannot be broken).
+        // A vein breaks at a share of its boss's health (World.PropHealthFor); vents and pillars do not break.
         public static float PropRadius(PropKind kind) => kind == PropKind.Pillar ? 0.9f : 0.8f;
-        static float PropHealth(PropKind kind) => kind == PropKind.Vent ? 0 : 400;
 
         // From a phase whose props the sheet gives, those replace whatever of the boss's stood before. Evenly round the
         // middle at 0.6 of the floor, from a turn rolled on a stream of its own (nothing else rolls differently).
@@ -196,7 +202,7 @@ namespace Game.Core
             {
                 float radius = PropRadius(kinds[i]);
                 var at = Collision.Resolve(Map, boss.Home + Vec2.FromAngle(turn + i * 2 * MathF.PI / kinds.Count) * reach, radius);
-                _props.Add(new BossProp(_nextId++, boss.Id, kinds[i], at, radius, PropHealth(kinds[i])));
+                _props.Add(new BossProp(_nextId++, boss.Id, kinds[i], at, radius, PropHealthFor(boss, kinds[i])));
             }
         }
 
@@ -204,9 +210,6 @@ namespace Game.Core
         bool Blocked(Projectile shot) => !shot.Friendly && _props.Any(p => p.Kind == PropKind.Pillar && p.Owner == shot.Source
             && Vec2.Distance(p.Position, shot.Position) <= p.Radius + shot.Radius);
 
-        // A charge that runs into a pillar of its own stops and the boss stands stunned.
-        bool RanIntoPillar(Boss boss) => _props.Any(p => p.Kind == PropKind.Pillar && p.Owner == boss.Id
-            && Vec2.Distance(p.Position, boss.Position) <= p.Radius + boss.Definition.Radius);
 
         // ---- Vents and the blast that spares rock ----
 

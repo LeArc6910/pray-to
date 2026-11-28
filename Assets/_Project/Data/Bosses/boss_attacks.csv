@@ -1,16 +1,14 @@
 boss,id,name,phases,shape,target,telegraph,damage,radius,length,angle,width,count,spread,speed,cooldown,weight,summon,warn,pool,follow,boost
 cave_warden,slam,내려찍기,,circle,nearest,1.0,184,2.0,,,,1,,,1.0,30,,,,,2:repeat=1;3:repeat=2
 cave_warden,sweep,휩쓸기,,cone,nearest,0.9,161,,3.5,100,,,,,0.8,25,,,,,3:repeat=1
-cave_warden,rock_burst,돌 파편,1|2,burst,self,0.6,51,0.3,,,,10,,7,1.0,20,,,,,2:count=14
-cave_warden,quake,지진,2|3,circle,each,1.1,166,1.8,,,,1,,,1.0,20,,,,,3:count=2 spread=1.5
+cave_warden,rock_burst,돌 파편,,burst,self,0.6,51,0.3,,,,10,,7,1.0,20,,,,,2:count=14;3:count=18 repeat=1
+cave_warden,quake,바위 솟기,2|3,circle,nearest,1.1,166,1.4,,,,1,,,1.0,20,,,pillar:14,,3:count=2 spread=2.5
 cave_warden,charge,돌진,2|3,charge,farthest,1.0,184,,10,,2.4,,,16,1.2,20,,,,,3:count=2
-cave_warden,rock_storm,돌 폭풍,3,burst,self,0.6,51,0.3,,,,18,,7,1.0,15,,,,,
-cave_warden,meteor,낙석,3,circle,random,1.2,261,1.6,,,,4,3.5,,1.0,15,,,,,
+cave_warden,meteor,낙석,3,circle,random,1.2,261,1.6,,,,4,3.5,,1.0,15,,,pillar:8,,
 cave_warden,call_slimes,슬라임 부르기,3,summon,self,0.8,,,,,,3,3,,1.0,10,slime,,,,
 cave_warden,shockwave,충격파,2|3,ring,self,1.2,209,2.2,6,,,,,,1.0,18,,,,,
-cave_warden,rock_trail,바위 줄기,,trail,nearest,0.8,161,1.1,8,,,5,,8,0.9,18,,,,,3:count=7 length=10
-cave_warden,aftershock,여진,2|3,ring,nearest,1.1,161,2.0,5.5,,,,,,1.0,16,,,,,
-cave_warden,cave_in,천장 붕괴,3,circle,each,1.5,146,1.4,,,,3,2.6,,1.1,16,,strong,,,
+cave_warden,rock_trail,바위 줄기,,trail,nearest,0.8,161,1.1,8,,,5,,8,0.9,18,,,pillar:12,,3:count=7 length=10
+cave_warden,core_burst,핵 폭주,3,cover,self,1.6,146,,,,,,,,1.1,16,,strong,,,
 crystal_queen,bite,물어뜯기,,cone,nearest,0.7,290,,3.2,90,,,,,0.7,30,,,,crystal_ripple:0.5,3:repeat=1
 crystal_queen,crystal_rain,수정 비,2|3,circle,random,1.2,372,1.4,,,,5,4.5,,1.0,25,,,,,
 crystal_queen,shard_ring,수정 가시,1|2,burst,self,0.6,81,0.3,,,,12,,8,0.9,20,,,,,2:count=16
@@ -90,16 +88,16 @@ crown_wraith,deep_share,깊은 수압,2|3,share,random,1.1,681,1.8,,,,,,,1.0,14,
 crown_wraith,call_wisps,도깨비불 부르기,3,summon,self,0.8,,,,,,3,3,,1.0,10,tide_wisp,,,,
 crown_wraith,soul_ripple,넋의 파문,2|3,ring,nearest,0.5,175,1.2,7,,,,,,0.9,0,,,,,
 vein_eater,claw,드릴 발톱,,cone,nearest,0.8,413,,3.6,120,,,,,0.8,30,,none,,,3:repeat=1
-vein_eater,rock_throw,바위 던지기,,burst,nearest,0.9,144,0.45,,40,,3,,10,0.9,22,,none,,,2:count=5
+vein_eater,rock_throw,바위 던지기,1,burst,nearest,0.9,144,0.45,,40,,3,,10,0.9,22,,none,,,2:count=5
 vein_eater,tunnel_rush,굴착 돌진,1|2,charge,farthest,1.0,438,,11,,2.6,,,16,1.2,18,,none,,,2:count=2
-vein_eater,burrow,땅속 습격,2|3,burrow,nearest,1.6,352,2.6,,,,8,,8,1.3,16,,strong,,collapse_ring:0.6,
+vein_eater,burrow,땅속 습격,2|3,burrow,nearest,1.6,352,2.6,,,,8,,8,1.3,16,,strong,,,
 vein_eater,cave_in,갱도 붕괴,3,circle,each,1.5,352,1.5,,,,3,2.6,,1.1,18,,strong,,,
 vein_eater,spike_line,종유석 솟기,,trail,nearest,0.9,380,1.2,10,,,6,,10,0.9,20,,none,,,3:count=8 length=12
-vein_eater,drill_spin,드릴 회전,2|3,spiral,self,0.9,103,0.35,,20,5,6,,7,1.4,14,,none,,,
 vein_eater,frenzy,광폭 연속 돌진,3,charge,nearest,0.9,256,,9,,2.4,3,,18,1.4,18,,none,,,
-vein_eater,quake,대지 분쇄,3,leap,farthest,1.8,351,3.2,,,,12,,9,1.6,14,,strong,,collapse_ring:0.6,
+vein_eater,quake,대지 분쇄,3,leap,farthest,1.8,351,3.2,,,,12,,9,1.6,14,,strong,,,
 vein_eater,call_beetles,딱정벌레 부르기,3,summon,self,0.9,,,,,,3,3,,1.0,10,cave_beetle,none,,,
-vein_eater,collapse_ring,무너지는 갱도,2|3,ring,nearest,0.5,185,2.6,8.5,,,,,,0.9,0,,,,,
+vein_eater,wall_run,벽 돌기,2|3,orbit,nearest,0.7,115,0.45,,40,3,3,100,10,1.0,10,,,,,3:width=4 spread=80 count=4
+vein_eater,eat_vein,광맥 먹기,2|3,eat,self,2.0,,,,,,,,,1.0,14,,,,,
 shrine_samurai,iai,거합 베기,,cone,nearest,0.9,556,,4.0,150,,,,,0.6,30,,,,,3:repeat=1 hold=0.5
 shrine_samurai,issen,일섬,,charge,farthest,1.1,567,,10,,1.6,,,40,0.8,24,,,,,3:count=2
 shrine_samurai,juji,십자 베기,,cross,nearest,1.0,520,,5,45,1.2,,,,0.7,18,,,,zanzetsu:0.5,
