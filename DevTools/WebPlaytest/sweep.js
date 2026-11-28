@@ -278,6 +278,9 @@ async function menu(browser) {
   check(heard.recordedSets >= 80, `녹음 효과음 세트가 빌드에 들어 있다 (${heard.recordedSets}세트, 발밑 ${heard.ground})`);
   // The recorded music (2026-11-26): the field plays its CC0 loop, not the one made in code.
   check(/^music_/.test(heard.musicClip || ''), `녹음 배경음악이 나온다 (${heard.musicClip || '없음'})`);
+  // Louder music (2026-11-28): the tune plays at its trim (0.77~1) of the menu's setting, not 0.55 as before, never over it.
+  check(heard.musicTarget > heard.musicSetting * 0.7 && heard.musicTarget <= heard.musicSetting + 1e-4 && heard.effectsDuck === 1,
+    `배경음악 크기가 설정의 0.7~1배 (${(+heard.musicTarget).toFixed(2)} / 설정 ${(+heard.musicSetting).toFixed(2)}, 효과음 ${heard.effectsDuck})`);
   await game.shot('no-darkness-devinfo', '어둠 없이, 개발 정보 창(왼쪽 아래)');
   await leaveGame(game);
   await game.until(s => !s.playing, 8000);
@@ -870,6 +873,13 @@ async function patterns(browser) {
     if (woken !== id) {
       await game.send(`heal; goto boss ${id}`);
       await game.until(t => has(t.banner, '등장') || has(t.entrance, id), 6000, game.texts);
+      if (!woken) {
+        // A boss's ground (2026-11-28): a field monster put beside the player in the arena is set back outside it.
+        await game.send('spawn slime 1.5 0');
+        await game.wait(500);
+        const g = await game.state();
+        check(g.onBossGround && g.bossGroundMobs === 0, `보스 둘레에 일반 몬스터가 남지 않는다 (둘레 안 ${g.onBossGround}, 몬스터 ${g.bossGroundMobs})`);
+      }
       woken = id;
     }
     await game.wait(1500);

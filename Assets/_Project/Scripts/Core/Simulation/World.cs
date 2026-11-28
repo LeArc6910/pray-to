@@ -213,6 +213,7 @@ namespace Game.Core
                 KeepOutOfPlaces(enemy);
                 KeepOutOfCamps(enemy);
                 KeepOutOfDungeonRooms(enemy);
+                KeepOutOfBossGrounds(enemy);
             }
             UpdateElites();
             UpdateBosses();
@@ -883,6 +884,8 @@ namespace Game.Core
                     || Map[x, y] == TileType.Lava
                     // Not on the roads or in the places of the story (World.Story.cs).
                     || Structures.IsWay(Map[x, y]) || Map[x, y] == TileType.Waypoint || Places.Any(p => Vec2.Distance(position, p.Center) <= p.Radius + 2)
+                    // Nor round a boss's arena (World.BossGround.cs).
+                    || InBossGround(position)
                     || Vec2.Distance(position, Spawn) < _config.SpawnDistance
                     || _players.Any(p => Vec2.Distance(p.Position, position) < _config.SpawnDistance)
                     // A world of rooms: wanderers only, between the rooms with no pack, off the roads (World.Packs.cs).

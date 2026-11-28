@@ -405,6 +405,8 @@ namespace Game.Core
         public float SpeedScale { get; internal set; } = 1;
         // 0 for an ordinary monster, RiftMonster or RiftGuardian for one a rift brought.
         public int Rift { get; internal set; }
+        // Called by a boss (summon): it may stand on the boss's ground (World.BossGround.cs).
+        public bool FromBoss { get; internal set; }
         public float Damage => Definition.Damage * Power * (Empowered ? 1 + EmpowerShare : 1);
         // The band of gear its hits are weighed against (Difficulty): its kind's, a rift's the last.
         public int Band => Rift != 0 ? DamageBands.Bands : Definition.Band;

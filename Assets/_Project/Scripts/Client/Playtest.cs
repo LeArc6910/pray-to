@@ -2869,6 +2869,8 @@ namespace Game.Client
                 json.Field("recordedSets", Recordings.SetCount);
                 // The recorded music (2026-11-26): the loop playing now, music_<place> when it is a recording.
                 json.Field("musicClip", Music.ClipNow);
+                // How loud it is meant to be against the menu's setting, and the effects under a boss's song (2026-11-28).
+                json.Field("musicTarget", Music.TargetNow).Field("musicSetting", Settings.MusicVolume / (float)Settings.MaxVolume).Field("effectsDuck", Sounds.Duck);
                 // Timber walls round the player (a shop's, 2026-11-11, WorldGenerator.CarveShops).
                 int timber = 0, px = TileMap.Cell(player.Position.X), py = TileMap.Cell(player.Position.Y);
                 for (int ty = py - 4; ty <= py + 4; ty++)
@@ -2938,6 +2940,10 @@ namespace Game.Client
                 // What the silk mother's blows left on the floor: webs and pools of venom (in the world, and drawn), and
                 // whether the player is caught in a web (2026-11-13).
                 json.Field("pools", world.Hazards.Count(h => h.Lingers));
+                // A boss's ground (2026-11-28, World.BossGround.cs): the field's monsters standing on it (none should), and
+                // whether the player is on it.
+                json.Field("bossGroundMobs", world.Enemies.Count(e => !e.IsDead && !e.FromBoss && world.InBossGround(e.Position)));
+                json.Field("onBossGround", world.InBossGround(player.Position));
                 json.Field("poolsShown", root.PoolsShown);
                 json.Field("snared", player.Afflictions.Snared);
                 // Ordinary monsters' attacks (monster_attacks.csv, 2026-11-21): those near that fight from the sheet with

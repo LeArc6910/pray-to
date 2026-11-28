@@ -416,7 +416,7 @@ namespace Game.Core
                 at = TileMap.Center(x, y);
                 if (Collision.Overlaps(Map, at, 0.45f, monster: true)) continue;
                 if (_players.Any(p => !p.IsDead && Vec2.Distance(p.Position, at) < SurgeNear)) continue;
-                if (Quiet(at) || InSafePlace(at) || !WandererSpot(x, y)) continue;
+                if (Quiet(at) || NoFieldSpawn(at) || !WandererSpot(x, y)) continue;
                 int steps = _huntFlow.DistanceAt(x, y);
                 if (steps == FlowField.Unreached || steps > most) continue;
                 return at;
@@ -601,7 +601,7 @@ namespace Game.Core
                     int fx = x + dx, fy = y + dy;
                     if (!Map.InBounds(fx, fy) || Map.BlocksMonsters(fx, fy) || Map[fx, fy] == TileType.Water || Map[fx, fy] == TileType.Lava) continue;
                     var floor = TileMap.Center(fx, fy);
-                    if (Vec2.Distance(floor, player) < 3 || FearsLight(floor) || InSafePlace(floor)) continue;
+                    if (Vec2.Distance(floor, player) < 3 || FearsLight(floor) || NoFieldSpawn(floor)) continue;
                     float distance = Vec2.Distance(floor, middle);
                     if (distance >= bestDistance) continue;
                     foreach (var (sx, sy) in new[] { (0, 1), (1, 0), (0, -1), (-1, 0) })
@@ -783,7 +783,7 @@ namespace Game.Core
             if (roster.Count < RaidLeast) return false;
             var spots = Spread(spot.Value, new List<Vec2>(), roster.Count, PaceRandom,
                 at => Map.InBounds(TileMap.Cell(at.X), TileMap.Cell(at.Y)) && !Map.IsSolid(TileMap.Cell(at.X), TileMap.Cell(at.Y))
-                    && !Collision.Overlaps(Map, at, 0.45f, monster: true) && !InSafePlace(at) && _players.All(p => Vec2.Distance(p.Position, at) >= SurgeNear - 4));
+                    && !Collision.Overlaps(Map, at, 0.45f, monster: true) && !NoFieldSpawn(at) && _players.All(p => Vec2.Distance(p.Position, at) >= SurgeNear - 4));
             if (spots.Count < Math.Min(RaidLeast, roster.Count)) return false;
             _events.Add(new SimEvent(SimEventType.Ambush, player.Id, amount: RaidHowl, position: spot.Value));
             int before = _enemies.Count;

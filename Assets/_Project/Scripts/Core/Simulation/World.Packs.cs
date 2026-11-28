@@ -299,7 +299,7 @@ namespace Game.Core
             pack.Elite = EliteRank.None;
             pack.Affixes = RiftAffix.None;
             pack.Fallen = Array.Empty<bool>();
-            if (InSafePlace(room.Center)) return;
+            if (NoFieldSpawn(room.Center)) return;
             var random = PackRandom(room, pack.Slot, pack.Day);
             var choices = PackChoices(room.Center, room.Biome, BigRoom(room), room);
             if (choices.Count == 0) return;

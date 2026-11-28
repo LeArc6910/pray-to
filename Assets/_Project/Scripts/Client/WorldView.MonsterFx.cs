@@ -104,6 +104,10 @@ namespace Game.Client
         // The host's clock in seconds: marks made here run on it, so they stop when the host does (a playtest's picture).
         double MobNow => _client.HostTick / World.TicksPerSecond;
 
+        // A field monster's wind-up sound (2026-11-28, the owner: too loud; was 0.8, now -6 dB). A boss's wind-up has its
+        // own (WorldView.HearWarning, off for now); a bomber's fuse keeps this too, as it is a warning of the same kind.
+        public const float MonsterTellVolume = 0.4f;
+
         static Sound TellSound(Tell tell) => tell switch
         {
             Tell.Dash => Sound.MobDash,
@@ -227,7 +231,7 @@ namespace Game.Client
                 // (World.TelegraphOf).
                 body.MobTelegraph = World.TelegraphOf(view.Elite, view.Monster, attack) * (body.MobState == EnemyState.Charge ? World.AgainTelegraph : 1);
                 // A bomber's fuse is its own sound: beeps that come faster.
-                Hear(attack.Shape == MonsterAttackShape.Explode ? Sound.Fuse : TellSound(attack.Tell), body.Position, 0.8f);
+                Hear(attack.Shape == MonsterAttackShape.Explode ? Sound.Fuse : TellSound(attack.Tell), body.Position, MonsterTellVolume);
             }
             bool wasWinding = body.MobWinding;
             body.MobWinding = winding;

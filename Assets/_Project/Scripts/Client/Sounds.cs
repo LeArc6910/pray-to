@@ -30,6 +30,9 @@ namespace Game.Client
 
         // set: a recorded set to play first in place of the sound's own (a fire spell's burst, a mushroom picked, a
         // boss's own roar); the sound's own recording, or the sound made in code, while that set has no takes yet.
+        // How much of the effects' volume plays now: less under a boss's song (Music.BossEffectsLevel, 2026-11-28).
+        public static float Duck { get; set; } = 1;
+
         public static void Play(Sound sound, float volume = 1, string set = null)
         {
             if (!Settings.Sound || volume <= 0) return;
@@ -42,7 +45,7 @@ namespace Game.Client
             var source = NextSource();
             var recorded = Settings.RecordedSounds ? Recordings.Pick(set) ?? Recordings.Pick(Recordings.NameOf(sound)) : null;
             source.clip = recorded ?? Clip(sound);
-            source.volume = Mathf.Clamp01(volume * (recorded != null ? Recordings.GainOf(sound) : 1)) * Settings.Volume / Settings.MaxVolume;
+            source.volume = Mathf.Clamp01(volume * (recorded != null ? Recordings.GainOf(sound) : 1)) * Settings.Volume / Settings.MaxVolume * Duck;
             source.pitch = 1 + UnityEngine.Random.Range(-PitchJitter, PitchJitter);
             source.Play();
         }
@@ -62,7 +65,7 @@ namespace Game.Client
             var source = NextSource();
             source.clip = clip;
             float gain = Recordings.StepGain(ground) * UnityEngine.Random.Range(0.8f, 1f);
-            source.volume = Mathf.Clamp01(volume * gain) * Settings.Volume / Settings.MaxVolume;
+            source.volume = Mathf.Clamp01(volume * gain) * Settings.Volume / Settings.MaxVolume * Duck;
             source.pitch = 1 + UnityEngine.Random.Range(-0.05f, 0.05f);
             source.Play();
         }
@@ -96,7 +99,7 @@ namespace Game.Client
             SkillPlayed[id] = now;
             var source = NextSource();
             source.clip = clip;
-            source.volume = Mathf.Clamp01(volume * (recorded != null ? 0.7f : 1) * (1 - distance / Hearing)) * Settings.Volume / Settings.MaxVolume;
+            source.volume = Mathf.Clamp01(volume * (recorded != null ? 0.7f : 1) * (1 - distance / Hearing)) * Settings.Volume / Settings.MaxVolume * Duck;
             source.pitch = 1 + UnityEngine.Random.Range(-PitchJitter, PitchJitter) * 0.5f;
             source.Play();
             return true;
@@ -125,7 +128,7 @@ namespace Game.Client
             }
             var source = NextSource();
             source.clip = clip;
-            source.volume = Mathf.Clamp01(volume * (1 - distance / Hearing)) * Settings.Volume / Settings.MaxVolume;
+            source.volume = Mathf.Clamp01(volume * (1 - distance / Hearing)) * Settings.Volume / Settings.MaxVolume * Duck;
             source.pitch = 1 + UnityEngine.Random.Range(-PitchJitter, PitchJitter) * 2;
             source.Play();
         }

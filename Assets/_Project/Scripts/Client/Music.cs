@@ -18,8 +18,24 @@ namespace Game.Client
         const float FadeSeconds = 1.5f;
         const float IntoFightSeconds = 0.4f;
         const float OutOfFightSeconds = 3f;
-        // How loud each kind is at full volume, under the sound effects.
-        const float TuneLevel = 0.55f;
+        // How loud each kind is at full volume, under the sound effects. The tunes at full (2026-11-28, the owner: the
+        // music was hard to hear, a boss's nearly not at all; was 0.55, +5.2 dB): a source cannot go over 1, and the
+        // files peak under -0.8 dBFS and the made songs under 0.55, so nothing is pushed past full scale.
+        const float TuneLevel = 1f;
+        // The recordings evened out (Docs/SoundCredits.md 크기): each is RMS -19 dBFS, but they are not equally loud to
+        // the ear (EBU R128, -18.7 to -24.1 LUFS). The louder ones are brought down to -21 LUFS; the quieter ones cannot
+        // go over 1 and stay. The boss's is left whole (-20.3), a little over the rest, as it plays under the most sound.
+        static readonly Dictionary<string, float> Trims = new Dictionary<string, float>
+        {
+            ["music_harbor"] = 0.89f, ["music_hut"] = 0.77f, ["music_ice"] = 0.84f, ["music_kingdom"] = 0.97f,
+            ["music_lake"] = 0.86f, ["music_lava"] = 0.99f, ["music_mine"] = 0.98f, ["music_mushroom"] = 0.85f,
+            ["music_nest"] = 0.91f, ["music_ruins"] = 0.86f, ["music_sand"] = 0.89f, ["music_title"] = 0.83f,
+            ["music_village"] = 0.88f,
+        };
+        // The sound effects under a boss's song: a fight with a boss is the loudest, so they give the music room (-1.9 dB).
+        const float BossEffectsLevel = 0.8f;
+
+        static float TrimOf(AudioClip clip) => clip != null && Trims.TryGetValue(clip.name, out float trim) ? trim : 1;
         const float AmbienceLevel = 0.35f;
         const float HumLevel = 0.3f;
 
@@ -48,6 +64,10 @@ namespace Game.Client
 
         // For the playtests: the clip the music plays now, a recording's file name (music_cave) or a made song's key.
         public static string ClipNow => _tunes == null ? "" : _tunes[_current].clip != null ? _tunes[_current].clip.name : "";
+
+        // For the playtests: how loud the playing tune is meant to be (the menu's music setting times its trim), 0 to 1.
+        public static float TargetNow => _tunes == null || _tunes[_current].clip == null ? 0
+            : Settings.MusicVolume / (float)Settings.MaxVolume * TuneLevel * TrimOf(_tunes[_current].clip);
 
         // The song playing, by its key (MusicArt Song.Key); null for none.
         public static string Playing => _song?.Key;
@@ -144,12 +164,13 @@ namespace Game.Client
             for (int i = 0; i < _tunes.Length; i++)
             {
                 var source = _tunes[i];
-                float target = i == _current && source.clip != null ? music : 0;
+                float target = i == _current && source.clip != null ? music * TrimOf(source.clip) : 0;
                 source.volume = Mathf.MoveTowards(source.volume, target, TuneLevel * deltaTime / _fade);
                 if (target > 0 && !source.isPlaying) source.Play();
                 else if (target <= 0 && source.volume <= 0 && source.isPlaying) source.Stop();
             }
 
+            Sounds.Duck = _song?.Boss != null ? BossEffectsLevel : 1;
             float effects = Settings.Volume / (float)Settings.MaxVolume;
             if (ambience != _ambienceKind)
             {

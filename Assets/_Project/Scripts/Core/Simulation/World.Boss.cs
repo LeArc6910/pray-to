@@ -494,7 +494,7 @@ namespace Game.Core
                     {
                         float angle = (i + _random.NextFloat() * 0.5f) * 2 * MathF.PI / attack.Count;
                         var position = Collision.Resolve(Map, boss.Position + Vec2.FromAngle(angle) * attack.Spread, attack.Summon.Radius);
-                        if (!Collision.Overlaps(Map, position, attack.Summon.Radius)) SpawnEnemy(attack.Summon, position);
+                        if (!Collision.Overlaps(Map, position, attack.Summon.Radius)) SpawnEnemy(attack.Summon, position).FromBoss = true;
                     }
                     break;
             }

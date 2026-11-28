@@ -60,7 +60,7 @@ namespace Game.Core
                     _huntPacks.Remove(room.Index);
                     continue;
                 }
-                if (nearest > HuntWakeReach || InSafePlace(room.Center)) continue;
+                if (nearest > HuntWakeReach || NoFieldSpawn(room.Center)) continue;
                 if (pack == null)
                 {
                     pack = new Pack(_nextPackId++, room, -1, room.Center) { Active = true, Day = Today, Shares = true, Hunt = true };
