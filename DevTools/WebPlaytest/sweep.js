@@ -5260,8 +5260,19 @@ async function roll(browser) {
     // Twice in a row, quicker than the cooldown: one roll.
     await game.wait(600);
     const twice = await game.state();
-    await press();
-    await press();
+    if (game.touch) {
+      // Two taps straight on each other where the button is: game.press looks the button up and waits for the game
+      // to draw after each press, which on a slow machine takes longer than the cooldown itself.
+      const at = (await game.find('roll')).find(b => b.shown && b.enabled);
+      if (at) {
+        await game.tapAt(at.cx, at.cy);
+        await game.wait(150);
+        await game.tapAt(at.cx, at.cy);
+      }
+    } else {
+      await press();
+      await press();
+    }
     await game.wait(300);
     const once = await game.state();
     check(once.rolls === twice.rolls + 1, `${name}: 다시 쓰기 시간(0.9초) 안의 둘째 누름은 구르지 않는다 (${once.rolls - twice.rolls}번)`);
