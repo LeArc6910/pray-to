@@ -277,8 +277,10 @@ namespace Game.Client
         // Each shadow is a dark band cut out of the red warning (drawn over it: the warning lies at DarkOrder + 10,
         // so a shadow under it was hard to see, 2026-11-28 the person: "draw the safe room behind the pillars plainly,
         // in a colour or shadow of its own") with a bright cyan line along each long edge and across its far end.
+        // Built like a strip of ground (MakeGround): a root placed and turned along the shadow, its pieces scaled under it.
         sealed class Shade
         {
+            public Transform Root;
             public SpriteRenderer Fill, EdgeA, EdgeB, End;
         }
 
@@ -297,18 +299,18 @@ namespace Game.Client
             + string.Join(" ", _shades.Where(s => s.Fill.enabled).Select(s =>
             $"{s.Fill.transform.position.x:0.0},{s.Fill.transform.position.y:0.0}:{s.Fill.transform.lossyScale.x:0.0}x{s.Fill.transform.lossyScale.y:0.00}:a{s.Fill.color.a:0.00}:o{s.Fill.sortingOrder}:{s.Fill.sortingLayerName}:{(s.Fill.sprite == null ? "nosprite" : s.Fill.sprite.rect.width + "px/" + s.Fill.sprite.pixelsPerUnit)}"));
 
-        SpriteRenderer ShadePiece(string name, Color color, int order)
+        static SpriteRenderer ShadePiece(Transform root, string name, Color color, int order)
         {
-            var made = Renderer(_root.transform, name, Shapes.Square, color);
+            var made = Renderer(root, name, Shapes.Square, color);
             made.sortingOrder = order;
             return made;
         }
 
-        static void Lay(SpriteRenderer piece, Vec2 middle, float angle, float length, float width, Color color)
+        // A piece at (along, across) from the shadow's middle, length by width, in the root's turned frame.
+        static void Lay(SpriteRenderer piece, float along, float across, float length, float width, Color color)
         {
             piece.enabled = true;
-            piece.transform.localPosition = new Vector3(middle.X, middle.Y, 0);
-            piece.transform.localRotation = Quaternion.Euler(0, 0, angle);
+            piece.transform.localPosition = new Vector3(along, across, 0);
             piece.transform.localScale = new Vector3(length, width, 1);
             piece.color = color;
         }
@@ -336,29 +338,36 @@ namespace Game.Client
                     var way = prop.Position - from;
                     if (way.LengthSquared < 1e-4f) continue;
                     var along = way.Normalized;
-                    var across = new Vec2(-along.Y, along.X);
-                    float width = 2 * (prop.Radius - World.ShadeMargin), length = blast.Value.Size;
+                                        float width = 2 * (prop.Radius - World.ShadeMargin), length = blast.Value.Size;
                     if (used == _shades.Count)
+                    {
+                        var root = new GameObject("Shade").transform;
+                        root.SetParent(_root.transform, false);
                         _shades.Add(new Shade
                         {
-                            Fill = ShadePiece("Shade", ShadeColor, DarkOrder + 11),
-                            EdgeA = ShadePiece("ShadeEdge", ShadeEdgeColor, DarkOrder + 12),
-                            EdgeB = ShadePiece("ShadeEdge", ShadeEdgeColor, DarkOrder + 12),
-                            End = ShadePiece("ShadeEdge", ShadeEdgeColor, DarkOrder + 12),
+                            Root = root,
+                            Fill = ShadePiece(root, "Fill", ShadeColor, DarkOrder + 11),
+                            EdgeA = ShadePiece(root, "Edge", ShadeEdgeColor, DarkOrder + 12),
+                            EdgeB = ShadePiece(root, "Edge", ShadeEdgeColor, DarkOrder + 12),
+                            End = ShadePiece(root, "Edge", ShadeEdgeColor, DarkOrder + 12),
                         });
+                    }
                     var shade = _shades[used++];
-                    float angle = Mathf.Atan2(along.Y, along.X) * Mathf.Rad2Deg;
                     var middle = prop.Position + along * (length / 2);
-                    Lay(shade.Fill, middle, angle, length, width, new Color(ShadeColor.r, ShadeColor.g, ShadeColor.b, ShadeColor.a * (0.85f + 0.15f * pulse)));
+                    shade.Root.gameObject.SetActive(true);
+                    shade.Root.localPosition = new Vector3(middle.X, middle.Y, 0);
+                    shade.Root.localRotation = Quaternion.Euler(0, 0, Mathf.Atan2(along.Y, along.X) * Mathf.Rad2Deg);
+                    Lay(shade.Fill, 0, 0, length, width, new Color(ShadeColor.r, ShadeColor.g, ShadeColor.b, ShadeColor.a * (0.85f + 0.15f * pulse)));
                     var edge = new Color(ShadeEdgeColor.r, ShadeEdgeColor.g, ShadeEdgeColor.b, 0.65f + 0.35f * pulse);
-                    Lay(shade.EdgeA, middle + across * (width / 2), angle, length, ShadeEdge, edge);
-                    Lay(shade.EdgeB, middle - across * (width / 2), angle, length, ShadeEdge, edge);
-                    Lay(shade.End, prop.Position + along * length, angle, ShadeEdge, width + ShadeEdge, edge);
+                    Lay(shade.EdgeA, 0, width / 2, length, ShadeEdge, edge);
+                    Lay(shade.EdgeB, 0, -width / 2, length, ShadeEdge, edge);
+                    Lay(shade.End, length / 2, 0, ShadeEdge, width + ShadeEdge, edge);
                 }
             }
             for (int i = used; i < _shades.Count; i++)
             {
                 _shades[i].Fill.enabled = _shades[i].EdgeA.enabled = _shades[i].EdgeB.enabled = _shades[i].End.enabled = false;
+                _shades[i].Root.gameObject.SetActive(false);
             }
         }
 
