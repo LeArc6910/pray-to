@@ -289,6 +289,10 @@ namespace Game.Client
 
         // Shadows shown now, for the playtests.
         public int ShadesShown => _shades.Count(s => s.Fill.enabled);
+        // Where each shown shadow is and how big and clear, for the playtests (2026-11-28: the shadows counted as shown
+        // but none could be seen in the picture).
+        public string ShadeTrace => string.Join(" ", _shades.Where(s => s.Fill.enabled).Select(s =>
+            $"{s.Fill.transform.position.x:0.0},{s.Fill.transform.position.y:0.0}:{s.Fill.transform.lossyScale.x:0.0}x{s.Fill.transform.lossyScale.y:0.00}:a{s.Fill.color.a:0.00}:o{s.Fill.sortingOrder}:{s.Fill.sortingLayerName}:{(s.Fill.sprite == null ? "nosprite" : s.Fill.sprite.rect.width + "px/" + s.Fill.sprite.pixelsPerUnit)}"));
 
         SpriteRenderer ShadePiece(string name, Color color, int order)
         {

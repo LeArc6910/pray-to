@@ -3015,6 +3015,7 @@ namespace Game.Client
                 json.Field("veinsShown", root.PropsShownOf(PropKind.Vein));
                 json.Field("shadesShown", root.ShadesShown);
                 json.Field("bossAway", fighting?.Away ?? false);
+                json.Field("shadeTrace", root.ShadeTrace);
                 json.Field("bossShots", world.Projectiles.Count(p => !p.Friendly && fighting != null && p.Source == fighting.Id));
                 json.Field("wading", player.Afflictions.Wading);
                 json.Field("snared", player.Afflictions.Snared);

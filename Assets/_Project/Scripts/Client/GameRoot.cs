@@ -113,6 +113,7 @@ namespace Game.Client
         internal int PropsShown => _view?.PropsShown ?? 0;
         internal int PropsShownOf(PropKind kind) => _view?.PropsShownOf(kind) ?? 0;
         internal int ShadesShown => _view?.ShadesShown ?? 0;
+        internal string ShadeTrace => _view?.ShadeTrace ?? "";
         internal bool RageShown => _view?.RageShown ?? false;
         // Ordinary monsters' marks, pools, one-off effects, pieces and shots as drawn (WorldView.MonsterFx).
         internal int MonsterMarksShown => _view?.MonsterMarksShown ?? 0;
