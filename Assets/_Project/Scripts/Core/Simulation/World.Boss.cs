@@ -605,8 +605,7 @@ namespace Game.Core
                     {
                         var way = pillar.Position - boss.Position;
                         if (way.LengthSquared < 1e-4f) continue;
-                        AddHazard(boss, cause, HazardShape.Line, pillar.Position, way.Normalized, boss.ArenaRadius * 2,
-                            2 * (pillar.Radius - ShadeMargin), 0, resolve).Safe = true;
+                        AddHazard(boss, cause, HazardShape.Cone, pillar.Position, way.Normalized, ShadeLength, ShadeAngle, 0, resolve).Safe = true;
                     }
                     break;
                 case AttackShape.Share:

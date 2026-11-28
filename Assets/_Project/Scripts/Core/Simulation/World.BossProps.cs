@@ -18,8 +18,13 @@ namespace Game.Core
         public const float OrbitMark = 0.4f;
         // What share of the boss's health a vein takes to break.
         public const float VeinShare = 0.03f;
-        // How far inside a pillar's edge the way to a spot must pass for the spot to be in its shadow.
+        // How far inside a pillar's edge the way to a spot must pass for the spot to be in its shadow (no longer used by
+        // the shadow itself; kept for what reads it).
         public const float ShadeMargin = 0.15f;
+        // The shadow behind a pillar from the core overload (2026-11-28, the person's sketch: "not that long; a room just
+        // behind the pillar"): a fan from the pillar's middle, away from the blast, this long and this wide (degrees).
+        public const float ShadeLength = 3.5f;
+        public const float ShadeAngle = 80;
         // How near a vein the boss must come to eat it, past both their edges.
         const float EatReach = 0.3f;
 
@@ -78,23 +83,31 @@ namespace Game.Core
                 RaisePillar(boss, boss.Home + Vec2.FromAngle(turn + i * MathF.PI) * (FloorRadius(boss) * 0.6f), attack.Telegraph + 6);
         }
 
-        // Whether a pillar of the boss's stands between from and a spot (the spot in its shadow): the straight way from
-        // there to the spot passes through the pillar's middle part. For the blast that spares the shaded, the bots and
-        // the screen.
+        // Whether a spot is in a pillar's shadow from a blast at from: inside the fan that opens from the pillar's middle
+        // away from the blast (ShadeLength, ShadeAngle), the same fan the screen marks green. For the blast that spares
+        // the shaded, the bots and the screen.
         public bool Shaded(int bossId, Vec2 from, Vec2 at)
         {
             foreach (var pillar in _props.Where(p => p.Owner == bossId && p.Kind == PropKind.Pillar))
             {
-                var way = at - from;
-                float length = way.Length;
-                if (length < 1e-4f) continue;
-                var along = way / length;
-                float t = Vec2.Dot(pillar.Position - from, along);
-                if (t <= 0 || t >= length) continue;
-                var nearest = from + along * t;
-                if (Vec2.Distance(nearest, pillar.Position) <= pillar.Radius - ShadeMargin) return true;
+                if (ShadeOf(pillar, from) is Vec2 away && InShade(pillar.Position, away, at)) return true;
             }
             return false;
+        }
+
+        // The way a pillar's shadow opens from a blast at from, or null for a pillar on the blast.
+        static Vec2? ShadeOf(BossProp pillar, Vec2 from)
+        {
+            var way = pillar.Position - from;
+            return way.LengthSquared < 1e-4f ? (Vec2?)null : way.Normalized;
+        }
+
+        static bool InShade(Vec2 pillar, Vec2 away, Vec2 at)
+        {
+            var offset = at - pillar;
+            float distance = offset.Length;
+            if (distance > ShadeLength) return false;
+            return distance < 1e-4f || Vec2.Dot(offset / distance, away) >= MathF.Cos(ShadeAngle * 0.5f * MathF.PI / 180f);
         }
 
         // For the playtests: the boss stands stunned now, as after running into a pillar; its veins are broken.

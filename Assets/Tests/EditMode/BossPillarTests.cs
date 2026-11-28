@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using NUnit.Framework;
 
@@ -117,11 +118,15 @@ namespace Game.Core.Tests
             Walk(world, other, open);
             Assert.IsTrue(world.Shaded(boss.Id, boss.Position, player.Position));
             Assert.IsFalse(world.Shaded(boss.Id, boss.Position, other.Position));
+            // The shadow is a short fan right behind the pillar (the person's sketch), not a line to the wall.
+            var away = (pillar.Position - boss.Position).Normalized;
+            Assert.IsFalse(world.Shaded(boss.Id, boss.Position, pillar.Position + away * (World.ShadeLength + 1)), "too far behind");
+            Assert.IsTrue(world.Shaded(boss.Id, boss.Position, pillar.Position + Vec2.FromAngle(MathF.Atan2(away.Y, away.X) + 0.5f) * 2), "to one side, close");
             float hid = player.Health, stood = other.Health;
             Assert.IsTrue(world.ForceAttack(boss, "core"));
             // The shadow is marked green as the place to stand (AttackWarning.Safe): harmless, and covering whoever hides.
             var safe = world.Hazards.Single(h => h.Safe);
-            Assert.AreEqual(HazardShape.Line, safe.Shape);
+            Assert.AreEqual(HazardShape.Cone, safe.Shape);
             Assert.AreEqual(0, safe.Damage);
             Assert.IsTrue(safe.Contains(player.Position, 0), "the one hiding stands on it");
             Assert.IsFalse(safe.Contains(other.Position, 0));
