@@ -1350,9 +1350,7 @@ async function serpent(browser) {
 // warning sign. He comes in out of a rift opening in the altar's floor. A picture mid wind-up and one just as the blow
 // lands, for each attack, his entrance and his phases.
 async function voidlord(browser) {
-  note('
-## 공허의 군주 (PC)
-');
+  note('\n## 공허의 군주 (PC)\n');
   const game = await open(browser, run, Profiles.pc, url);
   await game.startSolo();
   await game.wait(1200);
