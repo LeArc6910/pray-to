@@ -199,6 +199,8 @@ namespace Game.Core
             PropKind.Pillar => 0.9f,
             PropKind.Egg => 0.5f,
             PropKind.Banner => 0.6f,
+            PropKind.Puddle => PuddleRadius,
+            PropKind.Gate => GateRadius,
             _ => 0.8f,
         };
 

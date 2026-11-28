@@ -170,6 +170,7 @@ namespace Game.Client
             ReadLights();
             DrawOrderFx();
             DrawProps();
+            DrawMirror();
             DrawRage(bosses);
         }
 
@@ -233,6 +234,8 @@ namespace Game.Client
             _propsSeen.Clear();
             foreach (var prop in _client.Props())
             {
+                // The images, puddles and gates of R4b are drawn by themselves (WorldView.Mirror.cs).
+                if (IsMirrorProp(prop.Kind)) continue;
                 _propsSeen.Add(prop.Id);
                 // A sand pit (R3) lies in the floor as a pit of ground does, as wide as it is.
                 if (prop.Kind == PropKind.Pit)

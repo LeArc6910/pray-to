@@ -106,8 +106,26 @@ namespace Game.Core
                 var from = boss.Position;
                 float left = attack.Length;
                 BossProp skip = null;
+                bool warped = false;
                 for (int bends = 0; left > 0.1f; bends++)
                 {
+                    // A gate of its own (R4b, the void lord): in at one, out of the other, once.
+                    var gate = warped ? default : PropsOf(boss, PropKind.Gate)
+                        .Where(p => p != skip)
+                        .Select(p => (Prop: p, Along: Vec2.Dot(p.Position - from, way)))
+                        .Where(c => c.Along > 0.3f && c.Along < left && MathF.Abs(Vec2.Dot(c.Prop.Position - from, new Vec2(-way.Y, way.X))) <= c.Prop.Radius)
+                        .OrderBy(c => c.Along).FirstOrDefault();
+                    var exit = gate.Prop == null ? null : OtherGate(boss, gate.Prop);
+                    if (exit != null)
+                    {
+                        AddHazard(boss, cause, HazardShape.Line, from, way, gate.Along, attack.Width, attack.Damage, resolve);
+                        left -= gate.Along;
+                        from = exit.Position;
+                        skip = exit;
+                        warped = true;
+                        bends--;
+                        continue;
+                    }
                     var hit = bends >= BeamBends ? default : PropsOf(boss, PropKind.Crystal)
                         .Where(p => p != skip)
                         .Select(p => (Prop: p, Along: Vec2.Dot(p.Position - from, way)))
@@ -223,7 +241,9 @@ namespace Game.Core
             float floor = FloorRadius(boss);
             var crowd = fighters.Count > 0 ? fighters.Aggregate(Vec2.Zero, (sum, p) => sum + p.Position) / fighters.Count : boss.Home;
             var back = (boss.Home - crowd).LengthSquared > 0.25f ? (boss.Home - crowd).Normalized : boss.Facing * -1;
-            if (interlude.Kind == InterludeKind.Eggs)
+            if (interlude.Kind == InterludeKind.Mist) StartMist(boss, interlude);
+            else if (interlude.Kind == InterludeKind.Maze) StartMaze(boss, interlude);
+            else if (interlude.Kind == InterludeKind.Eggs)
             {
                 // The queen hangs over the middle; her eggs lie evenly round it.
                 boss.Position = boss.Home;
@@ -245,6 +265,9 @@ namespace Game.Core
             }
             _events.Add(new SimEvent(SimEventType.Cue, boss.Id, amount: CueInterlude, direction: boss.Facing));
         }
+
+        // How long the images the wraith forms out of its mist last (R4b).
+        const float CloneMistSeconds = 12;
 
         // The Cue's Amount as an interlude starts and as it ends.
         public const int CueInterlude = 2;
@@ -270,8 +293,10 @@ namespace Game.Core
                 boss.ChargesToCome--;
                 boss.ChargeTicks = Ticks(Math.Max(1, (interlude.Seconds - LegionFirst - 2) / Math.Max(1, interlude.Count - 1)));
             }
+            if (interlude.Kind == InterludeKind.Mist) WorkMist(boss, interlude, fighters);
             var task = interlude.Kind == InterludeKind.Eggs ? PropKind.Egg : PropKind.Banner;
-            bool done = !_props.Any(p => p.Owner == boss.Id && p.Interlude && p.Kind == task);
+            // The mist and the maze (R4b) last their time.
+            bool done = (interlude.Kind == InterludeKind.Eggs || interlude.Kind == InterludeKind.Legion) && !_props.Any(p => p.Owner == boss.Id && p.Interlude && p.Kind == task);
             if (done || --boss.StateTicks <= 0) EndInterlude(boss, fighters);
         }
 
@@ -290,8 +315,15 @@ namespace Game.Core
             }
             _props.RemoveAll(p => p.Owner == boss.Id && p.Interlude);
             // The legion's charges not yet come do not come.
-            _hazards.RemoveAll(h => h.Source == boss.Id && (h.Shape == HazardShape.Wave && Tick < h.StartTick || h.Safe));
+            _hazards.RemoveAll(h => h.Source == boss.Id && (h.Shape == HazardShape.Wave && Tick < h.StartTick || h.Safe || h.Shape == HazardShape.Maze));
             boss.ChargesToCome = 0;
+            // Out of the mist with its images (R4b).
+            if (interlude.Kind == InterludeKind.Mist)
+            {
+                if (boss.CloneSpots.Count == 0) LayCloneSpots(boss, interlude.Count, Tick, 0);
+                _hazards.RemoveAll(h => h.Source == boss.Id && h.Damage == 0 && boss.CloneSpots.Any(s => Vec2.Distance(s, h.Position) < 1e-3f));
+                FormClones(boss, CloneMistSeconds);
+            }
             _events.Add(new SimEvent(SimEventType.Cue, boss.Id, amount: CueInterludeOver, direction: boss.Facing));
             if (fighters.Count > 0) ChooseAttack(boss, fighters);
             else

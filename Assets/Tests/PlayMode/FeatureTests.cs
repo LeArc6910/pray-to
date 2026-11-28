@@ -904,6 +904,45 @@ namespace Game.Client.Tests
             Assert.IsTrue(_root.Playing);
         }
 
+        // R4b (Docs/Bosses.md 분신·되감기·별 미로, 2026-11-28): the crown wraith with its two images (only its own crown
+        // gold) over its puddles; the void lord's rewind (the hourglass, the last blasts again in faint violet) and its
+        // star maze.
+        [UnityTest, Category(Screens.Category)]
+        public IEnumerator TheWraithSplitsAndTheVoidLordRewinds()
+        {
+            yield return Start();
+            Toughen();
+            var wraith = World.Bosses.FirstOrDefault(b => b.Definition.Id == "crown_wraith");
+            Assert.IsNotNull(wraith, "No crown wraith.");
+            Player.Position = wraith.Home + new Vec2(0, -4);
+            Player.Corrections++;
+            yield return new WaitForSecondsRealtime(7f);
+            World.Hurt(wraith, (int)(wraith.MaxHealth * 0.36f));
+            yield return new WaitForSecondsRealtime(wraith.Definition.Roar + 0.5f);
+            Assert.AreEqual(BossState.Interlude, wraith.State, "The mist interlude comes as its roar ends.");
+            yield return new WaitForSecondsRealtime(6.5f);
+            Assert.AreEqual(2, World.Props.Count(p => p.Kind == PropKind.Clone), "Out of the mist with two images.");
+            yield return Screens.Take("wraith-clones");
+
+            var lord = World.Bosses.FirstOrDefault(b => b.Definition.Id == "void_lord");
+            Assert.IsNotNull(lord, "No void lord.");
+            Player.Position = lord.Home + new Vec2(0, -4);
+            Player.Corrections++;
+            yield return new WaitForSecondsRealtime(7f);
+            Assert.IsTrue(World.ForceAttack(lord, "star_fall"));
+            yield return new WaitForSecondsRealtime(1.8f);
+            Assert.IsTrue(World.ForceAttack(lord, "rewind"));
+            yield return new WaitForSecondsRealtime(0.4f);
+            Assert.Greater(World.Hazards.Count(h => h.Echo), 0, "The star fall comes again.");
+            yield return Screens.Take("void-rewind");
+            yield return new WaitForSecondsRealtime(3f);
+            Assert.IsTrue(World.ForceInterlude(lord));
+            yield return new WaitForSecondsRealtime(1f);
+            Assert.AreEqual(4, World.Hazards.Count(h => h.Shape == HazardShape.Maze));
+            yield return Screens.Take("void-maze");
+            Assert.IsTrue(_root.Playing);
+        }
+
         // The lava titan (Docs/Bosses.md 용암 거인, 2026-11-28): under the lava of its caldera with only bubbles
         // showing, heaving itself out, then mid wind-up of its slam (both fists overhead) and of its fire rain (risen
         // white hot, the warning sign).

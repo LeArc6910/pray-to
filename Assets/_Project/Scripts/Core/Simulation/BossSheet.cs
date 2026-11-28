@@ -91,6 +91,18 @@ namespace Game.Core
         // R4a (5.5, Morg's volley of fire arrows, T8): the arena cut into count bands across the boss's facing, landing
         // one after another spread seconds apart from the boss's side: step into the band that has just landed.
         Bands,
+        // R4b (2026-11-28, Docs/BossRedesign.md 7.1 T6, the crown wraith's mirror images): the boss fades into mist
+        // through its wind-up (out of reach) while count + 1 spots round the arena show where it will form again; it
+        // forms at one of them and count images of itself (BossProp, PropKind.Clone) at the rest, for spread seconds.
+        // An image goes at one blow; a blow on the boss itself scatters them all. Its attacks with a boost mimic copy
+        // themselves from each image World.CloneLag apart, at World.CloneShare of the blow.
+        Clone,
+        // R4b (5.6, the sunken hands): a hand rises out of every puddle of the boss's (PropKind.Puddle; none down, under
+        // each player), radius round it, and holds whoever it catches World.HandHold seconds.
+        Hands,
+        // R4b (5.8, T8, the void lord's rewind): every blast of its own that landed in the last spread seconds lands
+        // again, newest first (the other way round), where it landed, at World.EchoShare (World.Rewind).
+        Rewind,
     }
 
     // How plainly an attack is announced (2026-11-12, the vein eater). Marked is how every boss announced every attack
@@ -259,6 +271,11 @@ namespace Game.Core
         // a walk, so it can be walked against (World.Drags).
         public float Pull { get; private set; }
 
+        // R4b (boost mimic=1): the boss's mirror images (AttackShape.Clone) lay it too, one after another. (boost
+        // behind=1): it vanishes and comes out behind its target before it winds up (the crown wraith's grasp).
+        public bool Mimic { get; private set; }
+        public bool Behind { get; private set; }
+
         // A burrow that chases (R3, T5, length its speed): the boss goes under and a mound (the antlion's sand, the
         // serpent's V of ripples) comes after the target at length tiles a second, stops World.MoundStop before the
         // end, and the boss bursts up where it stopped.
@@ -277,7 +294,8 @@ namespace Game.Core
             || Shape == AttackShape.Counter || Shape == AttackShape.Vent || Shape == AttackShape.Refuge || Shape == AttackShape.Burrow && !Chases
             || Shape == AttackShape.Leap || Shape == AttackShape.Pluck || Shape == AttackShape.Orbit || Shape == AttackShape.Eat || Shape == AttackShape.Cover
             || Shape == AttackShape.Tether || Shape == AttackShape.Wave || Shape == AttackShape.Close || Shape == AttackShape.Half
-            || Shape == AttackShape.Order || Shape == AttackShape.Beam || Shape == AttackShape.Mark || Shape == AttackShape.Bands);
+            || Shape == AttackShape.Order || Shape == AttackShape.Beam || Shape == AttackShape.Mark || Shape == AttackShape.Bands
+            || Shape == AttackShape.Clone || Shape == AttackShape.Hands || Shape == AttackShape.Rewind);
 
         // Whether it marks ground that lands by itself when the telegraph ends (what a follow-up may be).
         public bool LaysAreas => Shape switch
@@ -401,7 +419,7 @@ namespace Game.Core
             public char Op { get; }
             public float Value { get; }
 
-            public static readonly string[] Fields = { "count", "repeat", "tele", "again", "radius", "length", "angle", "width", "spread", "speed", "cooldown", "hold", "linger", "pull" };
+            public static readonly string[] Fields = { "count", "repeat", "tele", "again", "radius", "length", "angle", "width", "spread", "speed", "cooldown", "hold", "linger", "pull", "mimic", "behind" };
 
             float On(float now) => Op == '+' ? now + Value : Op == '*' ? now * Value : Value;
 
@@ -423,6 +441,8 @@ namespace Game.Core
                     case "hold": a.Hold = Math.Max(0, On(a.Hold)); break;
                     case "linger": a.Linger = Math.Max(0, On(a.Linger)); break;
                     case "pull": a.Pull = On(a.Pull); break;
+                    case "mimic": a.Mimic = On(a.Mimic ? 1 : 0) > 0; break;
+                    case "behind": a.Behind = On(a.Behind ? 1 : 0) > 0; break;
                 }
             }
         }
@@ -739,6 +759,19 @@ namespace Game.Core
                     interlude.Hatch = monsters?.Monsters.FirstOrDefault(m => m.Id == interlude.What);
                     if (interlude.Hatch == null) errors.Add($"{BossesFile}: '{boss.Id}'의 interlude 몬스터 '{interlude.What}'가 {MonsterSheet.File}에 없습니다.");
                 }
+                else if (interlude.Kind == InterludeKind.Mist)
+                {
+                    // R4b: what falls while the wraith is mist, a circle attack of its own.
+                    interlude.Charge = boss.Attacks.FirstOrDefault(a => a.Id == interlude.What);
+                    if (interlude.Charge == null || interlude.Charge.Shape != AttackShape.Circle)
+                        errors.Add($"{BossesFile}: '{boss.Id}'의 interlude 공격 '{interlude.What}'는 그 보스의 circle 공격이어야 합니다.");
+                    if (interlude.Count > World.MostClones) errors.Add($"{BossesFile}: '{boss.Id}'의 mist 분신은 {World.MostClones}까지입니다.");
+                }
+                else if (interlude.Kind == InterludeKind.Maze)
+                {
+                    // R4b: count rings of stars, nothing else.
+                    if (interlude.Count < 2) errors.Add($"{BossesFile}: '{boss.Id}'의 maze 고리는 둘 이상입니다.");
+                }
                 else
                 {
                     interlude.Charge = boss.Attacks.FirstOrDefault(a => a.Id == interlude.What);
@@ -797,9 +830,18 @@ namespace Game.Core
                     string field = text.Substring(0, at);
                     if (!BossAttack.Boost.Fields.Contains(field))
                         throw new FormatException($"boost의 '{field}'는 {string.Join(", ", BossAttack.Boost.Fields)} 중 하나여야 합니다.");
+                    // R4b: images copy what lands by itself; only a blow aimed straight from the boss comes from behind.
+                    if (field == "mimic" && !(shape == AttackShape.Circle || shape == AttackShape.Cone || shape == AttackShape.Line || shape == AttackShape.Ring))
+                        throw new FormatException("mimic은 circle, cone, line, ring에만 씁니다.");
+                    if (field == "behind" && !(shape == AttackShape.Cone || shape == AttackShape.Line))
+                        throw new FormatException("behind는 cone, line에만 씁니다.");
                     if (field == "repeat" && (shape == AttackShape.Charge || shape == AttackShape.Spiral || shape == AttackShape.Summon))
                         throw new FormatException("repeat는 돌진(count로), 나선, 부르기에는 쓰지 않습니다.");
-                    list.Add(new BossAttack.Boost(field, text[at], SheetValues.ParseDecimal(text.Substring(at + 1).Trim(), "boost")));
+                    // A pull may turn into a push (R4b, the void lord's gravity turned over): pull=-2.4.
+                    string number = text.Substring(at + 1).Trim();
+                    bool negative = field == "pull" && text[at] == '=' && number.StartsWith("-");
+                    float value = SheetValues.ParseDecimal(negative ? number.Substring(1) : number, "boost");
+                    list.Add(new BossAttack.Boost(field, text[at], negative ? -value : value));
                 }
                 result[phase] = list;
             }
@@ -888,6 +930,15 @@ namespace Game.Core
                 case AttackShape.Bands:
                     Need(attack.Count >= 2 && attack.Spread > 0 && attack.Damage > 0, "count(띠 수, 둘 이상), spread(띠 사이 초), damage");
                     break;
+                case AttackShape.Clone:
+                    Need(attack.Count >= 1 && attack.Count <= World.MostClones && attack.Spread > 0, $"count(분신 1~{World.MostClones}), spread(남는 초)");
+                    break;
+                case AttackShape.Hands:
+                    Need(attack.Radius > 0 && attack.Damage > 0, "radius(손이 솟는 원), damage");
+                    break;
+                case AttackShape.Rewind:
+                    Need(attack.Spread > 0 && attack.Spread <= World.EchoSeconds, $"spread(되감을 초, {World.EchoSeconds}초까지)");
+                    break;
                 case AttackShape.Pluck:
                     Need(attack.Radius > 0 && attack.Damage > 0, "radius(거미줄이 없을 때의 원), damage");
                     break;
@@ -915,8 +966,9 @@ namespace Game.Core
             if (attack.Pull != 0 && !(attack.Shape == AttackShape.Circle || attack.Shape == AttackShape.Cone || attack.Shape == AttackShape.Line
                 || attack.Shape == AttackShape.Ring || attack.Shape == AttackShape.Charge))
                 throw new FormatException($"pull은 circle, cone, line, ring, charge에만 씁니다({attack.Shape}).");
-            if (attack.Pull < 0 && !(attack.Shape == AttackShape.Ring || attack.Shape == AttackShape.Circle))
-                throw new FormatException("pull이 0보다 작으면(밀어냄) ring·circle에만 씁니다.");
+            // A cone pushes out from the boss within its radius (R4b, the void lord's gravity turned over).
+            if (attack.Pull < 0 && !(attack.Shape == AttackShape.Ring || attack.Shape == AttackShape.Circle || attack.Shape == AttackShape.Cone && attack.Radius > 0))
+                throw new FormatException("pull이 0보다 작으면(밀어냄) ring·circle, radius가 있는 cone에만 씁니다.");
             if (Math.Abs(attack.Pull) >= PlayerStats.BaseMoveSpeed * 0.8f)
                 throw new FormatException($"pull은 걸음({PlayerStats.BaseMoveSpeed})의 80%보다 느려야 거슬러 걸을 수 있습니다.");
             if (attack.Target == AttackTarget.Middle && attack.Shape != AttackShape.Circle)

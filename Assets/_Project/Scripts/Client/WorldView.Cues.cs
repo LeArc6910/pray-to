@@ -60,6 +60,8 @@ namespace Game.Client
                 ShowInterlude(e, body);
                 return;
             }
+            // Images formed, a blow from behind, a rewind (R4b).
+            if (ShowMirrorCue(e, body)) return;
             CuesSeen++;
             body.CueAt = Time.time;
             var feet = body.Position;

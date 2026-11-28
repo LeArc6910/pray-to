@@ -483,6 +483,8 @@ namespace Game.Client
                     else if (words[2] == "breakveins") world.ForceBreakVeins(boss);
                     // boss <id> interlude: its interlude starts now (R4a, the queen's eggs, Morg's legion).
                     else if (words[2] == "interlude" && !world.ForceInterlude(boss)) throw new ArgumentException($"'{words[1]}' has no interlude or is not fighting");
+                    // boss <id> clones [n]: it forms again with n images round the arena now (R4b, the crown wraith).
+                    else if (words[2] == "clones" && !world.ForceClones(boss, words.Length > 3 ? (int)Float(words[3]) : 2)) throw new ArgumentException($"'{words[1]}' is not fighting");
                     else if (words[2] == "use" && !world.ForceAttack(boss, words[3])) throw new ArgumentException($"'{words[1]}' cannot use '{words[3]}' now (awake, someone in the arena?)");
                     // Its entrance (arenas.csv, 2026-11-17): asleep again, or coming in now (the whole way, or "again").
                     else if (words[2] == "sleep") world.ForceSleep(boss);
@@ -3048,6 +3050,27 @@ namespace Game.Client
                 json.Field("ringsShown", root.RingsShown);
                 json.Field("volleysHeard", root.VolleysHeard);
                 json.Field("bands", world.Hazards.Count(h => h.Order > 0 && h.Shape == HazardShape.Line));
+                // R4b (Docs/Bosses.md 분신·되감기·별 미로): images, puddles and gates standing and drawn, hands, echoes and
+                // maze rings laid and drawn, the hourglass and the mist, puddle flashes and images broken, gravity turned.
+                json.Field("clones", world.Props.Count(p => p.Kind == PropKind.Clone));
+                json.Field("clonesShown", root.ClonesShown);
+                json.Field("clonesBroken", root.ClonesBroken);
+                json.Field("puddles", world.Props.Count(p => p.Kind == PropKind.Puddle));
+                json.Field("puddlesShown", root.PuddlesShown);
+                json.Field("puddleFlashes", root.PuddleFlashes);
+                json.Field("gates", world.Props.Count(p => p.Kind == PropKind.Gate));
+                json.Field("gatesShown", root.GatesShown);
+                json.Field("hands", world.Hazards.Count(h => fighting != null && h.Source == fighting.Id && h.Cause > 0 && fighting.Definition.Attacks[h.Cause - 1].Shape == AttackShape.Hands));
+                json.Field("handsShown", root.HandsShown);
+                json.Field("echoes", world.Hazards.Count(h => h.Echo));
+                json.Field("echoesShown", root.EchoesShown);
+                json.Field("mazeRings", world.Hazards.Count(h => h.Shape == HazardShape.Maze));
+                json.Field("mazeRingsShown", root.MazeRingsShown);
+                json.Field("starsShown", root.StarsShown);
+                json.Field("hourglassShown", root.HourglassShown);
+                json.Field("mistShown", root.MistShown);
+                json.Field("gravityTurned", root.GravityTurned);
+                json.Field("gravityRimShown", GameRoot.GravityRimShown);
                 json.Field("bossChasing", fighting != null && fighting.State == BossState.Telegraph && fighting.Attack != null && fighting.Attack.Chases);
                 json.Field("wading", player.Afflictions.Wading);
                 json.Field("snared", player.Afflictions.Snared);

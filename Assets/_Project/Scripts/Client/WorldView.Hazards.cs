@@ -81,11 +81,14 @@ namespace Game.Client
             HazardShape.Ring => HazardArt.Field(HazardForm.Donut, hazard.Size, hazard.Width, hazard.Direction.Angle),
             HazardShape.Cone => HazardArt.Field(HazardForm.Cone, hazard.Size, hazard.Width, hazard.Direction.Angle),
             HazardShape.Line => HazardArt.Field(HazardForm.Band, hazard.Size, hazard.Width, hazard.Direction.Angle),
+            HazardShape.Maze => HazardArt.Field(HazardForm.Gapped, hazard.Size, hazard.Width, hazard.Direction.Angle),
             _ => HazardArt.Field(HazardForm.Circle, hazard.Size, 0, 0),
         };
 
-        static WarnTone ToneOf(HazardState hazard) =>
-            hazard.Warning == AttackWarning.Safe ? WarnTone.Safe : hazard.Shape == HazardShape.Share ? WarnTone.Gather : hazard.Warning == AttackWarning.Far ? WarnTone.Cold
+        // A rewind's blasts come again in faint violet (R4b); the star maze's rings in gold.
+        WarnTone ToneOf(HazardState hazard) =>
+            hazard.Warning == AttackWarning.Safe ? WarnTone.Safe : hazard.Shape == HazardShape.Maze ? WarnTone.Rush
+            : AttackOf(hazard)?.Shape == AttackShape.Rewind ? WarnTone.Echo : hazard.Shape == HazardShape.Share ? WarnTone.Gather : hazard.Warning == AttackWarning.Far ? WarnTone.Cold
             : hazard.Harmful ? WarnTone.Danger : WarnTone.Rush;
 
         ShapeLayer MakeLayer(Transform parent, string name, HazardField field, int order)

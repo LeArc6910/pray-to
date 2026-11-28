@@ -26,8 +26,8 @@ namespace Game.Client
             "phantom_rush" => CrownWraithPose.Rush,
             "crown_ring" => CrownWraithPose.Flare,
             "storm_brand" => CrownWraithPose.Brand,
-            "deep_share" => CrownWraithPose.Smite,
-            "soul_ripple" => CrownWraithPose.Pulse,
+            "sunken_hands" => CrownWraithPose.Smite,
+            "mirror" => CrownWraithPose.Call,
             _ => attack.Shape switch
             {
                 AttackShape.Cone => CrownWraithPose.Rake,
@@ -62,7 +62,9 @@ namespace Game.Client
             int sector = SectorOf(facing);
             var pose = CrownWraithPose.Idle;
             int frame = Mathf.FloorToInt(Time.time * 5) % CrownWraithArt.FramesOf(CrownWraithPose.Idle);
-            body.Shape.color = Color.white;
+            // Gone to mist (R4b: its interlude, and the wind-up before its images form): barely there.
+            bool misty = body.BossState == BossState.Interlude || body.BossState == BossState.Telegraph && attack?.Shape == AttackShape.Clone;
+            body.Shape.color = misty ? new Color(1, 1, 1, 0.2f) : Color.white;
             int Through(CrownWraithPose p, float progress) => Mathf.Clamp(Mathf.FloorToInt(progress * CrownWraithArt.FramesOf(p)), 0, CrownWraithArt.FramesOf(p) - 1);
             if (dead)
             {
@@ -143,6 +145,8 @@ namespace Game.Client
             body.Shape.flipX = turned;
             body.Glow.flipX = turned;
             body.Top = -body.Feet + CrownWraithArt.BodyHeight / (float)Sprites.PixelsPerUnit;
+            // Its images wear the same pose (R4b, WorldView.Mirror.cs).
+            KeepWraithLook(view, pose, frame, phase, turned);
         }
 
         // While it winds up: sparks gathering in the clawed hand, the air crackling round it as it calls the bolts,
