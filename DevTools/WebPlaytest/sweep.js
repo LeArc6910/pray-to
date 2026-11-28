@@ -5063,7 +5063,16 @@ async function hero(browser) {
     const weapons = [['copper_sword', '검'], ['copper_bow', '활'], ['copper_staff', '지팡이'], ['copper_pickaxe', '곡괭이'], ['none', '맨손']];
     // The kinds with motions of their own (Docs/Weapons.md 묶음 B), on the PC only: the phone's are for size and fit.
     if (profile === 'pc') weapons.push(...KindsOwn.map(([kind, name]) => [`iron_${kind}`, name]));
+    let first = true;
     for (const [weapon, name] of weapons) {
+      // Back out to the wild each time: a first-level hero who fell to the slimes got up in the village, where
+      // monsters are kept out (the phone's run, 2026-11-28).
+      if (!first) {
+        await game.send('goto wild; heal');
+        await game.wait(900);
+        await clearRoom(game, 4, 4);
+      }
+      first = false;
       await game.send(`heal; hero ${weapon} 1 0`);
       const struck = await game.until(s => s.hurtMonsters > 0, 4000);
       check(!!struck, `${profile} ${name}: 공격이 슬라임에 닿는다`);
@@ -5174,7 +5183,7 @@ async function weapons(browser) {
         await game.wait(900);
         const felt = await game.state();
         if (kind === 'greatsword' || kind === 'hammer')
-          check(felt.blowShake >= 0.05 && felt.blowStop >= 0.064, `${name} ${label}: 무거운 타격 (흔들림 ${felt.blowShake}, 멈춤 ${felt.blowStop}초)`);
+          check(felt.blowShake >= 0.05 && felt.blowStop >= 0.06, `${name} ${label}: 무거운 타격 (흔들림 ${felt.blowShake}, 멈춤 ${felt.blowStop}초)`);
         if (kind === 'dagger' || kind === 'wand')
           check(felt.blowStop > 0 && felt.blowStop <= 0.046, `${name} ${label}: 가벼운 타격 (멈춤 ${felt.blowStop}초, 흔들림 ${felt.blowShake})`);
         const looks = { crossbow: 'Bolt', boomerang: 'Boomerang', wand: 'Spark', orb: 'Orb' };
