@@ -1774,9 +1774,10 @@ async function props(browser) {
       s = await game.state();
       check(s.bossAway, `벽 돌기: 벽 속에 들어가 맞지 않는다 (${s.bossAway})`);
       await game.shot('props-wall-shake', '벽 돌기: 나올 자리가 흔들린다');
-      await game.wait(600);
-      s = await game.state();
-      check(!s.bossAway && s.bossShots >= 1, `벽에서 나와 바위를 던진다 (돌 ${s.bossShots})`);
+      // Out of the wall for 0.9 s, then into it again (three runs): wait for the moment it stands out, rather than
+      // asking once at a fixed time the command's delay can push into the next run.
+      s = (await game.until(t => !t.bossAway && t.bossShots >= 1, 2500)) || await game.state();
+      check(!s.bossAway && s.bossShots >= 1, `벽에서 나와 바위를 던진다 (벽 밖 ${!s.bossAway}, 돌 ${s.bossShots})`);
       await game.shot('props-wall-out', '벽 돌기: 나와서 바위 던지기');
       await game.wait(4000);
       await game.send('heal; clear; boss vein_eater use eat_vein');
