@@ -190,6 +190,12 @@ namespace Game.Core
                     break;
 
                 case BossState.Telegraph:
+                    // A late blow gives its tell a moment before it comes (boost hold).
+                    if (boss.Cues && boss.StateTicks <= Ticks(CueSeconds))
+                    {
+                        boss.Cues = false;
+                        _events.Add(new SimEvent(SimEventType.Cue, boss.Id, direction: boss.Facing));
+                    }
                     if (--boss.StateTicks <= 0) Unleash(boss);
                     break;
 
@@ -263,6 +269,9 @@ namespace Game.Core
         {
             if (fighters.Count == 0) return;
             var choices = boss.Definition.Attacks.Where(a => a.InPhase(boss.Phase) && a.Weight > 0).ToList();
+            // A finisher not long ago: not another yet (BossDefinition.FinisherRest), unless nothing else is left. A new
+            // phase's opening blow is chosen among the rest.
+            choices = Rested(boss, choices);
             if (boss.OpensPhase)
             {
                 boss.OpensPhase = false;
@@ -270,6 +279,7 @@ namespace Game.Core
                 if (fresh.Count > 0) choices = fresh;
             }
             boss.Attack = _random.PickWeighted(choices, a => PhaseWeight(a, boss.Phase)).ForPhase(boss.Phase);
+            Finishing(boss, boss.Attack);
             boss.VolleysLeft = 0;
             boss.RepeatsLeft = 0;
             boss.RepeatNext = false;
@@ -277,6 +287,20 @@ namespace Game.Core
             boss.TargetId = PickTarget(boss, boss.Attack.Target, fighters).Id;
             boss.State = BossState.Approach;
             boss.StateTicks = Ticks(ApproachSeconds);
+        }
+
+        // The attacks it may choose now: no finisher while it rests from the last (unless only finishers are left).
+        List<BossAttack> Rested(Boss boss, List<BossAttack> choices)
+        {
+            if (Tick >= boss.FinisherReady) return choices;
+            var calm = choices.Where(a => a.Warning != AttackWarning.Strong).ToList();
+            return calm.Count > 0 ? calm : choices;
+        }
+
+        // A finisher chosen: the next waits its rest.
+        void Finishing(Boss boss, BossAttack attack)
+        {
+            if (attack.Warning == AttackWarning.Strong) boss.FinisherReady = Tick + Ticks(boss.Definition.FinisherRest);
         }
 
         // For the playtests: bosses stay asleep whoever walks in, so an arena can be looked at; a boss is put back to
@@ -342,11 +366,23 @@ namespace Game.Core
                 boss.ChargesLeft = attack.Shape == AttackShape.Charge ? Math.Max(0, attack.Count - 1) : 0;
                 boss.RepeatsLeft = attack.Repeat;
             }
+            // A late blow (boost hold) waits 0.4 to 1 of its hold past its telegraph, rolled from a stream of its own
+            // (as the aim of a burst) so nothing else rolls differently for it; its tell comes CueSeconds before it lands.
+            boss.Countered = false;
+            boss.Cues = false;
+            if (attack.Hold > 0 && !again && !repeat)
+            {
+                float roll = new GameRandom(_forageSeed + (ulong)Tick, stream: 1000 + (ulong)boss.Id).NextFloat();
+                boss.StateTicks += Ticks(attack.Hold * (HoldLeast + (1 - HoldLeast) * roll));
+                boss.Cues = true;
+            }
             long resolve = Tick + boss.StateTicks;
             int cause = Cause(boss, attack);
             if (AimsRound(attack)) boss.AimStep = (int)(new GameRandom(_forageSeed + (ulong)Tick, stream: 40 + (ulong)boss.Id).NextUInt() % AimSteps);
 
+            int laid = _hazards.Count;
             LayHazards(boss, attack, target, fighters, boss.Facing, resolve, cause);
+            Falls(attack, laid);
             // Its follow-up (follow column) is marked now too and lands a moment after: one roll does not clear both.
             // Only in the follow-up's own phases (2026-11-28: the rings come from phase 2, so phase 1 lays one pattern).
             bool follows = attack.FollowUp != null && !again && !repeat && attack.FollowUp.InPhase(boss.Phase);
@@ -362,16 +398,72 @@ namespace Game.Core
             // anyone else), resolving a moment after. Not with a follow-up laid: at most two patterns at once (2026-11-28).
             if (attack.LaysAreas && !follows && !again && !repeat && _random.NextFloat() < DoubleChance(boss.Phase))
             {
-                var others = boss.Definition.Attacks.Where(a => a != attack.Base && a.InPhase(boss.Phase) && a.Weight > 0 && a.LaysAreas).ToList();
+                var others = Rested(boss, boss.Definition.Attacks.Where(a => a != attack.Base && a.InPhase(boss.Phase) && a.Weight > 0 && a.LaysAreas).ToList());
                 if (others.Count > 0)
                 {
                     var second = _random.PickWeighted(others, a => PhaseWeight(a, boss.Phase)).ForPhase(boss.Phase);
+                    Finishing(boss, second);
+                    laid = _hazards.Count;
                     var victim = fighters.Count > 1 ? fighters.Where(p => p != target).ElementAt(_random.Next(fighters.Count - 1)) : target;
                     var toward = victim.Position - boss.Position;
                     var facing = toward.LengthSquared > 1e-6f ? toward.Normalized : boss.Facing;
                     LayHazards(boss, second, victim, fighters, facing, resolve + Ticks(SecondDelay), Cause(boss, second));
+                    Falls(second, laid);
                 }
             }
+        }
+
+        // ---- R1b (2026-11-28, Docs/BossRedesign.md 8): the late blow, the noto counter and the colours. ----
+
+        // Seconds before a late blow lands that its tell comes (SimEventType.Cue), and the least of its hold it waits.
+        public const float CueSeconds = 0.25f;
+        const float HoldLeast = 0.4f;
+
+        // The Cue's Amount when the noto counter answers a blow.
+        public const int CueCounter = 1;
+
+        // Struck in its noto stance, the boss answers this soon: its cuts are marked and land together.
+        public const float CounterSeconds = CueSeconds;
+        // Left alone through the stance, it stands open this long.
+        public const float CounterOpening = 1;
+
+        // A blow struck on a boss waiting in its noto stance (AttackShape.Counter): once, it turns to the striker and
+        // answers with count cuts right through itself, laid now and landing in CounterSeconds.
+        void Counter(Boss boss, Player striker)
+        {
+            if (boss.IsDead || boss.State != BossState.Telegraph || boss.Attack?.Shape != AttackShape.Counter || boss.Countered) return;
+            var attack = boss.Attack;
+            boss.Countered = true;
+            var aim = striker.Position - boss.Position;
+            if (aim.LengthSquared > 1e-6f) boss.Facing = aim.Normalized;
+            boss.StateTicks = Ticks(CounterSeconds);
+            int cause = Cause(boss, attack);
+            for (int i = 0; i < attack.Count; i++)
+            {
+                var along = Vec2.FromAngle(boss.Facing.Angle + i * MathF.PI / attack.Count);
+                AddHazard(boss, cause, HazardShape.Line, boss.Position - along * attack.Length, along, attack.Length * 2, attack.Width, attack.Damage, Tick + boss.StateTicks);
+            }
+            _events.Add(new SimEvent(SimEventType.Cue, boss.Id, amount: CueCounter, direction: boss.Facing));
+        }
+
+        // A colour's blow (AttackWarning.Near, Far) marks its hazards to hurt by how near one stands.
+        void Falls(BossAttack attack, int from)
+        {
+            if (attack.Warning != AttackWarning.Near && attack.Warning != AttackWarning.Far) return;
+            for (int i = from; i < _hazards.Count; i++) _hazards[i].Falloff = attack.Warning;
+        }
+
+        // What share of a colour's blow lands on whoever stands distance from its middle: red (Near) hurts least right
+        // beside the boss and most at its edge; blue (Far) the other way round, and nothing past its edge.
+        public const float NearLeast = 0.25f;
+        public const float FarLeast = 0.4f;
+
+        public static float FalloffShare(AttackWarning falloff, float distance, float size)
+        {
+            float t = size > 0 ? Math.Clamp(distance / size, 0, 1) : 1;
+            return falloff == AttackWarning.Near ? NearLeast + (1 - NearLeast) * t
+                : falloff == AttackWarning.Far ? 1 - (1 - FarLeast) * t
+                : 1;
         }
 
         // Seconds after the first that a second attack laid with it lands.
@@ -521,6 +613,12 @@ namespace Game.Core
                     _events.Add(new SimEvent(SimEventType.Impact, boss.Id, amount: (int)MathF.Ceiling(attack.Radius) + 2));
                     if (attack.Count > 0) Burst(boss, attack, 0.4f);
                     break;
+                case AttackShape.Counter:
+                    // Answered, it rests as after any blow; left alone, it stands open (CounterOpening).
+                    boss.State = BossState.Recover;
+                    boss.StateTicks = boss.Countered ? Ticks(attack.Cooldown * Tempo(boss.Phase)) : Ticks(CounterOpening);
+                    boss.RepeatsLeft = 0;
+                    return;
                 case AttackShape.Summon:
                     for (int i = 0; i < attack.Count; i++)
                     {
@@ -656,6 +754,8 @@ namespace Game.Core
             boss.Attack = null;
             boss.RepeatsLeft = 0;
             boss.RepeatNext = false;
+            boss.Cues = false;
+            boss.Countered = false;
             boss.OpensPhase = true;
             boss.State = BossState.Roar;
             boss.StateTicks = Ticks(definition.Roar);
@@ -677,6 +777,9 @@ namespace Game.Core
             boss.State = BossState.Dormant;
             boss.EmptyTicks = 0;
             boss.OpensPhase = false;
+            boss.FinisherReady = 0;
+            boss.Countered = false;
+            boss.Cues = false;
         }
 
         void RemoveDefeatedBosses()
@@ -745,6 +848,8 @@ namespace Game.Core
                 int damage = hazard.Shape == HazardShape.Share ? (int)MathF.Ceiling(hazard.Damage / (float)Math.Max(1, hit.Count)) : hazard.Damage;
                 foreach (var player in hit)
                 {
+                    if (hazard.Falloff != AttackWarning.Marked)
+                        damage = Math.Max(1, (int)MathF.Round(hazard.Damage * FalloffShare(hazard.Falloff, Vec2.Distance(player.Position, hazard.Position), hazard.Size)));
                     AfflictPlayer(player, hazard.Source, HurtPlayer(player, hazard.Source, damage, hazard.Cause));
                     Affect(player, hazard.Effect, hazard.EffectAmount, hazard.Position, hazard.Source, damage);
                 }

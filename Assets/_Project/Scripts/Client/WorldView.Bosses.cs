@@ -52,6 +52,7 @@ namespace Game.Client
         void TrackBoss(Body body, EntityView view)
         {
             _bossInView = view.Boss;
+            _bossPhaseInView = view.Phase;
             if (body.BossState != view.BossState || body.BossAttack != view.BossAttack)
             {
                 // A charge that runs again winds up straight out of the last run (World.StartTelegraph, again).
@@ -61,6 +62,8 @@ namespace Game.Client
                         || body.BossState == BossState.Recover && body.BossAttack != null && view.BossAttack != null
                            && body.BossAttack.Base == view.BossAttack.Base && view.BossAttack.Repeat > 0 && Time.time - body.BossSince < World.RepeatGap + 0.2f;
                 body.BossSince = Time.time;
+                // A new wind-up: its counter not struck yet (WorldView.Cues.cs).
+                if (view.BossState == BossState.Telegraph) body.Countered = false;
             }
             body.BossState = view.BossState;
             body.BossAttack = view.BossAttack;
@@ -81,6 +84,7 @@ namespace Game.Client
         {
             bool strong = view.BossState == BossState.Telegraph && view.BossAttack != null && view.BossAttack.Warning == AttackWarning.Strong;
             ShowWarningSign(body, strong);
+            ShowBadge(body, view);
             RunLater();
             EntranceExtras(body, view);
             if (body.Id == "vein_eater") VeinEaterExtras(body, view);
@@ -689,9 +693,18 @@ namespace Game.Client
                 pose = SamuraiPose.Walk;
                 frame = Mathf.FloorToInt(body.Walked * 16) % SamuraiArt.FramesOf(pose);
             }
+            else if (body.BossState == BossState.Telegraph && attack != null && attack.Shape == AttackShape.Counter)
+            {
+                // The noto stance (R1b): the blade home, low, the hand on the hilt, still; struck, the blade comes out at
+                // once for the answer (World.CounterSeconds).
+                if (body.Countered) (pose, frame) = (SamuraiPose.Pull, Through(SamuraiPose.Pull, (Time.time - body.CueAt) / World.CounterSeconds));
+                else (pose, frame) = (SamuraiPose.Sheathe, SheatheFrame(since));
+            }
             else if (body.BossState == BossState.Telegraph && attack != null)
             {
                 float length = TelegraphOf(body, attack);
+                // A late blow (boost hold) holds its wind-up until the host's cue (WorldView.Cues.cs).
+                since = WindSince(body, attack, since);
                 float progress = Mathf.Clamp01(since / length);
                 // The draw starts slow: held still in the stance, then the blade eased out of the scabbard over the last
                 // part of the telegraph. A cut from above takes the stance and eases the blade out quickly, then raises it.
@@ -720,11 +733,14 @@ namespace Game.Client
                 // the hand left on the hilt (zanshin), then let go.
                 // The cut itself: down from overhead, round from behind out of a dash, right round for the turn, or the
                 // plain draw across the front.
-                var cut = FromAbove(attack) ? SamuraiPose.Kiri
+                // Its noto stance left alone: it straightens, open (World.CounterOpening); struck, it cut right round.
+                if (attack.Shape == AttackShape.Counter && !body.Countered) (pose, frame) = (SamuraiPose.Idle, 0);
+                var cut = attack.Shape == AttackShape.Counter ? SamuraiPose.Whirl
+                    : FromAbove(attack) ? SamuraiPose.Kiri
                     : attack.Shape == AttackShape.Charge ? SamuraiPose.Sweep
                     : attack.Shape == AttackShape.Circle && attack.Target == AttackTarget.Self ? SamuraiPose.Whirl
                     : SamuraiPose.Draw;
-                float left = since;
+                float left = attack.Shape == AttackShape.Counter && !body.Countered ? -1 : since;
                 foreach (var part in new[] { cut, SamuraiPose.Chiburi, SamuraiPose.Noto })
                 {
                     for (int f = 0; f < SamuraiArt.FramesOf(part) && left >= 0; f++)
@@ -772,6 +788,7 @@ namespace Game.Client
             var feet = body.Position;
             if (view.BossState == BossState.Telegraph && attack != null)
             {
+                since = WindSince(body, attack, since);
                 float progress = Mathf.Clamp01(since / TelegraphOf(body, attack));
                 // Gathering itself: petals swirling in round it, more as the draw nears, a wide storm for the ultimate.
                 bool strong = attack.Warning == AttackWarning.Strong;
@@ -784,7 +801,7 @@ namespace Game.Client
                 }
                 // Just before the blade moves, the guard catches the light (over its head, for a cut from above): the
                 // last warning, and the beat to dodge on (2026-11-13).
-                if (!body.Glinted && since >= TelegraphOf(body, attack) - 0.16f && !attack.GoesAway)
+                if (!body.Glinted && since >= TelegraphOf(body, attack) - 0.16f && !attack.GoesAway && attack.Shape != AttackShape.Counter)
                 {
                     body.Glinted = true;
                     AddFlash(FromAbove(attack) ? feet + new Vector3(0, body.Top, 0) : feet + body.Hip, 0.5f, Color.white, FlashKind.Impact);

@@ -73,7 +73,8 @@ namespace Game.Client
             }
             else if (body.BossState == BossState.Telegraph && attack != null)
             {
-                float progress = Mathf.Clamp01(since / TelegraphOf(body, attack));
+                // A late blow (boost hold) holds its wind-up until the host's cue (WorldView.Cues.cs).
+                float progress = Mathf.Clamp01(WindSince(body, attack, since) / TelegraphOf(body, attack));
                 switch (attack.Shape)
                 {
                     case AttackShape.Charge:
@@ -172,7 +173,7 @@ namespace Game.Client
             var feet = body.Position;
             if (view.BossState == BossState.Telegraph && attack != null)
             {
-                float progress = Mathf.Clamp01(since / TelegraphOf(body, attack));
+                float progress = Mathf.Clamp01(WindSince(body, attack, since) / TelegraphOf(body, attack));
                 if (puff && progress > 0.5f)
                 {
                     // Pebbles skipping on the floor round its feet.

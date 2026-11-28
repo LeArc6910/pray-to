@@ -9,6 +9,8 @@ namespace Game.Client
         Danger,
         Rush,
         Gather,
+        // Blue (R1b, AttackWarning.Far): the black knight's blow that is worst close in.
+        Cold,
     }
 
     enum HazardForm : byte
@@ -70,6 +72,7 @@ namespace Game.Client
             Ramp("#FFE0D0", "#FF8A6A", "#FF4033", "#B8201E", "#5A1014"),
             Ramp("#FFF8D0", "#FFE880", "#FFD94D", "#C89A20", "#6A4A10"),
             Ramp("#FFF6D8", "#FFD060", "#FFB21E", "#C07A10", "#5E3A08"),
+            Ramp("#E0F4FF", "#8AD0FF", "#3A8CFF", "#1E4AB8", "#101E5A"),
         };
 
         // Light, middle and dark of what flies up, then the soot or frost left behind.

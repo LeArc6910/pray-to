@@ -552,6 +552,8 @@ namespace Game.Core
             if (!thorns) damage *= GearDealt(player, boss.Health, boss.MaxHealth, boss.Afflictions);
             int amount = Combat.Mitigate(damage, boss.Definition.Armor);
             DamageBoss(boss, player.Id, amount, critical, cause, tags);
+            // Struck in its noto stance, it answers (World.Counter); a thorn's sting is not a blow.
+            if (!thorns) Counter(boss, player);
             if (boss.IsDead) GearKill(player);
             else if (!thorns) GearAfterHit(player, boss.Afflictions, amount, critical);
             Leech(player, cause, amount);

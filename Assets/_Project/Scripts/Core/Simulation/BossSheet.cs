@@ -39,6 +39,10 @@ namespace Game.Core
         // little wider than itself, and they all burst together and are gone. With no web down, a circle of radius
         // under each player instead.
         Pluck,
+        // The boss sheathes its blade and waits (2026-11-28, R1b, the shrine samurai's noto counter): struck while it
+        // waits, it answers at once (World.CounterSeconds) with count cuts right through itself, each length out each
+        // way and width across; left alone, it stands open for World.CounterOpening when the telegraph ends.
+        Counter,
     }
 
     // How plainly an attack is announced (2026-11-12, the vein eater). Marked is how every boss announced every attack
@@ -50,6 +54,11 @@ namespace Game.Core
         Marked,
         Hidden,
         Strong,
+        // A colour over the boss that says where to be (2026-11-28, R1b, the black knight's last phase): Near, red, is
+        // a blow that hurts less the closer one stands (get in close); Far, blue, hurts more the closer (get away).
+        // Its area is marked on the ground in that colour (World.Falloff).
+        Near,
+        Far,
     }
 
     // How a boss shows what is coming while it winds up (Docs/Bosses.md 전조 말, 2026-11-11, the research report's
@@ -202,6 +211,11 @@ namespace Game.Core
         // How much of its telegraph a run after the first takes (World.AgainTelegraph unless a boost says).
         public float Again { get; private set; } = DefaultAgain;
         public const float DefaultAgain = 0.5f;
+        // The most seconds it may wait past its telegraph before it lands (boost hold, 2026-11-28 R1b: the late blow).
+        // The host waits 0.4 to 1 of it, rolled as the wind-up begins (World.StartTelegraph); its mark fills in its
+        // telegraph and then blinks while it waits, so the wait is not given away, and World.CueSeconds before the
+        // blow the boss gives its tell (SimEventType.Cue).
+        public float Hold { get; private set; }
         // What a repeated blow hits for, of the first's (Docs/Difficulty.md: a blow that follows at once is a share).
         public const float RepeatShare = 0.6f;
         // The shortest telegraphs a phase may bring an attack down to: an ordinary one, a strong one (the person's
@@ -265,6 +279,7 @@ namespace Game.Core
                     again.Telegraph = copy.AgainSeconds;
                     again.Damage = Math.Max(1, (int)MathF.Round(copy.Damage * RepeatShare));
                     again.Repeat = 0;
+                    again.Hold = 0;
                     copy.RepeatForm = again;
                 }
                 _phases[phase] = copy;
@@ -285,7 +300,7 @@ namespace Game.Core
             public char Op { get; }
             public float Value { get; }
 
-            public static readonly string[] Fields = { "count", "repeat", "tele", "again", "radius", "length", "angle", "width", "spread", "speed", "cooldown" };
+            public static readonly string[] Fields = { "count", "repeat", "tele", "again", "radius", "length", "angle", "width", "spread", "speed", "cooldown", "hold" };
 
             float On(float now) => Op == '+' ? now + Value : Op == '*' ? now * Value : Value;
 
@@ -304,6 +319,7 @@ namespace Game.Core
                     case "spread": a.Spread = On(a.Spread); break;
                     case "speed": a.Speed = On(a.Speed); break;
                     case "cooldown": a.Cooldown = On(a.Cooldown); break;
+                    case "hold": a.Hold = Math.Max(0, On(a.Hold)); break;
                 }
             }
         }
@@ -418,6 +434,11 @@ namespace Game.Core
         public IReadOnlyList<float> TelegraphTempo { get; internal set; } = DefaultTelegraphTempo;
         public static readonly IReadOnlyList<float> DefaultTelegraphTempo = new[] { 1f, 0.85f, 0.75f };
         public static readonly IReadOnlyList<float> MoveTempo = new[] { 1f, 1.1f, 1.2f };
+
+        // Seconds after a finisher (warn strong) starts before it may choose one again (bosses.csv finisher_rest,
+        // 2026-11-28, the person: "the finishers could wait a little longer"). 0 lets it choose one at once.
+        public float FinisherRest { get; internal set; } = DefaultFinisherRest;
+        public const float DefaultFinisherRest = 12;
     }
 
     public sealed class BossData
@@ -504,7 +525,7 @@ namespace Game.Core
                         Whole(row, "potion_count"),
                         row["material"],
                         Whole(row, "material_count"),
-                        row["element"].Length == 0 ? SkillTag.None : BossElement(row["element"])) { Level = Whole(row, "level"), Place = row["place"].Length == 0 ? null : row["place"], Bursts = Gait(row["gait"]), TelegraphTempo = Tempo(row["tempo"]) });
+                        row["element"].Length == 0 ? SkillTag.None : BossElement(row["element"])) { Level = Whole(row, "level"), Place = row["place"].Length == 0 ? null : row["place"], Bursts = Gait(row["gait"]), TelegraphTempo = Tempo(row["tempo"]), FinisherRest = FinisherRest(row["finisher_rest"]) });
                 });
             }
             return bosses;
@@ -598,6 +619,14 @@ namespace Game.Core
             foreach (var boss in bosses)
                 foreach (var attack in boss.Attacks)
                     attack.BuildPhases(boss.PhaseCount, boss.TelegraphTempo, BossDefinition.MoveTempo, boosts.TryGetValue(attack, out var b) ? b : none);
+        }
+
+        // finisher_rest column: seconds before a finisher may be chosen again, blank for the usual (12).
+        static float FinisherRest(string cell)
+        {
+            if (cell.Length == 0) return BossDefinition.DefaultFinisherRest;
+            float seconds = SheetValues.ParseDecimal(cell, "finisher_rest");
+            return seconds >= 0 && seconds <= 60 ? seconds : throw new FormatException("finisher_rest는 0~60초입니다.");
         }
 
         // tempo column: the telegraph factor of phases 2 and 3 ("0.85|0.75"), blank for the usual.
@@ -697,7 +726,13 @@ namespace Game.Core
                 case AttackShape.Pluck:
                     Need(attack.Radius > 0 && attack.Damage > 0, "radius(거미줄이 없을 때의 원), damage");
                     break;
+                case AttackShape.Counter:
+                    Need(attack.Length > 0 && attack.Width > 0 && attack.Count > 0 && attack.Damage > 0, "length, width, count(일섬 몇 줄), damage");
+                    break;
             }
+            if ((attack.Warning == AttackWarning.Near || attack.Warning == AttackWarning.Far)
+                && !(attack.Shape == AttackShape.Circle || attack.Shape == AttackShape.Cone || attack.Shape == AttackShape.Ring))
+                throw new FormatException($"warn near·far는 보스에서 재는 공격(circle, cone, ring)에만 씁니다({attack.Shape}).");
         }
 
         // The gait column: blank (walks) or burst.
@@ -714,7 +749,9 @@ namespace Game.Core
             "" => AttackWarning.Marked,
             "none" => AttackWarning.Hidden,
             "strong" => AttackWarning.Strong,
-            _ => throw new FormatException($"warn은 비우거나 none, strong 가운데 하나여야 합니다('{cell}')."),
+            "near" => AttackWarning.Near,
+            "far" => AttackWarning.Far,
+            _ => throw new FormatException($"warn은 비우거나 none, strong, near, far 가운데 하나여야 합니다('{cell}')."),
         };
 
         // The pool column: blank, or what a circle leaves behind and for how long, as web:6 or venom:4.5. Only the

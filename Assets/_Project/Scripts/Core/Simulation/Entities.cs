@@ -693,6 +693,10 @@ namespace Game.Core
         // A weapon art (World.WeaponArts.cs): Amount is the WeaponArtKind plus ArtPhase * 16, Direction the way it goes,
         // Position where it happens (the player, or an orb's well).
         Art,
+        // Source, a boss, strikes in World.CueSeconds (2026-11-28, R1b): the tell of a late blow (boost hold), so the
+        // screen holds the wind-up until now and swings in time; or its noto counter was struck and it answers (Amount
+        // World.CueCounter). Direction is the way it faces.
+        Cue,
     }
 
     public readonly struct SimEvent
@@ -811,6 +815,12 @@ namespace Game.Core
         public bool EntersAgain { get; internal set; }
         // Ticks into its rush-and-stop gait while it closes in (BossDefinition.Bursts).
         internal int GaitTicks { get; set; }
+        // The tick from which it may choose a finisher again (BossDefinition.FinisherRest).
+        internal long FinisherReady { get; set; }
+        // A late blow still to give its tell (SimEventType.Cue) as it comes within World.CueSeconds.
+        internal bool Cues { get; set; }
+        // Its noto counter was struck and it is answering (World.Counter).
+        public bool Countered { get; internal set; }
     }
 
     public enum HazardShape : byte
@@ -881,6 +891,9 @@ namespace Game.Core
         internal float LeavesSeconds { get; set; }
         internal float LeavesRadius { get; set; }
         public long ArmTick { get; internal set; }
+        // A boss's blow that hurts by how near one stands (AttackWarning.Near or Far, World.FalloffShare); Marked for
+        // the rest.
+        internal AttackWarning Falloff { get; set; }
         // 0 for a boss's; for a monster's, the attack shape that laid it plus one, or DeathFlash (what the wire
         // carries in place of the cause, HazardState.MonsterShape).
         public byte Mark { get; internal set; }

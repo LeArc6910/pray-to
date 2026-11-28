@@ -656,6 +656,9 @@ namespace Game.Core
         // For the playtests and tests: the player's hit on the monster, as a blow of theirs would land.
         internal void Hurt(Enemy enemy, Player by, float damage, SkillTag tags = SkillTag.None) => HitEnemy(by, enemy, damage, false, by.Position, tags);
 
+        // For the tests and playtests: the player's hit on the boss, as a blow of theirs would land (its noto counter answers).
+        internal void Hurt(Boss boss, Player by, float damage) => HitBoss(by, boss, damage, false, SkillTag.None);
+
         internal void Hurt(Boss boss, int amount)
         {
             if (!boss.IsDead) DamageBoss(boss, 0, amount, false);

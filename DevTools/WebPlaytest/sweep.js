@@ -928,6 +928,33 @@ async function tempo(browser) {
   check(s.finisher === '오의 천섬' && s.finisherShown, `필살기 이름 띠: 「오의 천섬」 (${s.finisher}, 보임 ${s.finisherShown})`);
   await game.shot('tempo-finisher', '오의 천섬의 이름 띠(보스 막대 밑)');
   await game.wait(3000);
+  // R1b (2026-11-28): the late iai of phase 3 waits past its telegraph by a roll only the host knows; its mark fills in
+  // the telegraph's time and then blinks while it waits, and the hilt flashes on the host's cue just before it lands.
+  let cues = (await game.state()).cues;
+  await game.send('heal; boss shrine_samurai use iai');
+  await game.wait(120);
+  s = await game.state();
+  check(s.bossAttack === 'iai' && s.bossWait >= 0.5 * 0.4 - 0.03, `3페이즈 거합은 예고보다 늦게 떨어진다(더 기다림 ${s.bossWait.toFixed(2)}초, 0.2~0.5)`);
+  await game.wait(Math.round((s.bossTelegraph + 0.05) * 1000));
+  s = await game.state();
+  check(s.heldFill >= 0.99 && s.heldBlinked, `늦은 거합의 표시는 예고 길이에 다 차고 깜박이며 기다린다(채움 ${s.heldFill}, 깜박임 ${s.heldBlinked})`);
+  await game.shot('tempo-late', '늦은 거합: 표시가 다 찬 뒤 깜박이며 기다린다');
+  await game.wait(900);
+  s = await game.state();
+  check(s.cues > cues, `내려치기 직전 단서(Cue)가 화면에 왔다 (${cues} → ${s.cues})`);
+  await game.wait(2000);
+  // The noto counter: the blossom over it while it waits; struck, it answers at once.
+  await game.send('heal; boss shrine_samurai use noto');
+  await game.wait(500);
+  s = await game.state();
+  check(s.bossAttack === 'noto' && s.badge === 'sakura', `납도 자세 위에 벚꽃 표지 (${s.bossAttack}, ${s.badge})`);
+  await game.shot('tempo-noto', '납도 반격 자세와 벚꽃 표지');
+  await game.send('heal; boss shrine_samurai strike');
+  await game.wait(100);
+  s = await game.state();
+  check(s.bossCountered, `납도 자세에 때리면 반격한다 (${s.bossCountered})`);
+  await game.shot('tempo-counter', '납도 반격: 사방 일섬 셋');
+  await game.wait(2500);
   // The five-fold draw (last: it may fell the player): four more runs to come as the first winds up.
   await game.send('heal; boss shrine_samurai use sanren');
   await game.wait(100);
@@ -935,6 +962,38 @@ async function tempo(browser) {
   check(s.bossAttack === 'sanren' && s.bossChargesLeft === 4, `3페이즈 오연 발도: 첫 돌진 뒤에 네 번 더 (${s.bossAttack}, 남은 ${s.bossChargesLeft})`);
   await game.shot('tempo-five', '오연 발도의 첫 예고');
   await game.context.close();
+
+  // The black knight (R1b): its hammer waits from phase 2; in phase 3 the helmet comes off, and its colour blows show a
+  // red (come close) or blue (get away) sign with their marks in that colour.
+  note('\n## 흑철 기사 늦은 망치·색 표지 (PC)\n');
+  const knight = await open(browser, run, Profiles.pc, url);
+  await knight.startSolo();
+  await knight.wait(1200);
+  await knight.send('equip void_sword void_helmet void_armor void_boots; heal');
+  await knight.send('heal; goto boss black_knight');
+  await knight.until(t => has(t.banner, '발두인') || has(t.entrance, '발두인'), 8000, knight.texts);
+  await knight.wait(4000);
+  await knight.send('heal; boss black_knight hurt 0.7');
+  await knight.until(t => t.bossPhase === 3, 5000);
+  await knight.wait(800);
+  s = await knight.state();
+  check(s.helmets >= 1, `3페이즈에 투구가 벗겨져 떨어진다 (${s.helmets})`);
+  await knight.shot('tempo-helmet', '3페이즈: 투구를 벗은 발두인과 떨어진 투구');
+  await knight.wait(3000);
+  await knight.send('heal; boss black_knight use smash');
+  await knight.wait(120);
+  s = await knight.state();
+  check(s.bossAttack === 'smash' && s.bossWait >= 0.6 * 0.4 - 0.03, `3페이즈 망치는 예고보다 늦게 떨어진다(더 기다림 ${s.bossWait.toFixed(2)}초)`);
+  await knight.wait(4500);
+  for (const [id, sign, what] of [['crimson', 'near', '붉은 표지(붙어라)'], ['azure', 'far', '푸른 표지(멀어져라)']]) {
+    await knight.send(`heal; boss black_knight use ${id}`);
+    await knight.wait(600);
+    s = await knight.state();
+    check(s.bossAttack === id && s.badge === sign, `${what} (${s.bossAttack}, ${s.badge})`);
+    await knight.shot(`tempo-${sign}`, what);
+    await knight.wait(4000);
+  }
+  await knight.context.close();
 }
 
 // ---------------------------------------------------------------- 광맥 포식자 그룸 (2026-11-12, Docs/Bosses.md)

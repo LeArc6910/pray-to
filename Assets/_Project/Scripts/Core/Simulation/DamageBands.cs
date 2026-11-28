@@ -157,7 +157,8 @@ namespace Game.Core
         public static HitKind KindOf(BossAttack attack)
         {
             if (attack.Shape == AttackShape.Summon || attack.Damage <= 0) return HitKind.None;
-            if (attack.Warning == AttackWarning.Strong) return HitKind.Ultimate;
+            // The noto counter answers a blow struck when it said not to: a finisher's share (2026-11-28, R1b).
+            if (attack.Warning == AttackWarning.Strong || attack.Shape == AttackShape.Counter) return HitKind.Ultimate;
             if (attack.Shape == AttackShape.Burst || attack.Shape == AttackShape.Spiral) return HitKind.Barrage;
             if (attack.Shape == AttackShape.Share) return HitKind.Share;
             if (attack.Shape == AttackShape.Charge && attack.Count >= 2) return HitKind.Combo;

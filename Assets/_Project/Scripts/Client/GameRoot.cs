@@ -99,6 +99,12 @@ namespace Game.Client
         internal int SkillFxLights => _view?.SkillFxLights ?? 0;
         internal int SkillShotsDrawn => _view?.SkillShotsDrawn ?? 0;
         internal bool WarningShown => _view != null && _view.WarningShown;
+        // R1b (WorldView.Cues.cs): cues and signs seen, a late blow's mark as drawn, helmets dropped.
+        internal int CuesSeen => _view?.CuesSeen ?? 0;
+        internal string BadgeShown => _view?.BadgeShown ?? "";
+        internal float HeldFill => _view?.HeldFill ?? -1;
+        internal bool HeldBlinked => _view != null && _view.HeldBlinked;
+        internal int HelmetsDropped => _view?.HelmetsDropped ?? 0;
         internal int PoolsShown => _view?.PoolsShown ?? 0;
         // Ordinary monsters' marks, pools, one-off effects, pieces and shots as drawn (WorldView.MonsterFx).
         internal int MonsterMarksShown => _view?.MonsterMarksShown ?? 0;

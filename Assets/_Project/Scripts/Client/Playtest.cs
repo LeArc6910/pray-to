@@ -37,7 +37,7 @@ namespace Game.Client
     //   teach [rank]              every skill of the player's classes at the rank, no points needed
     //   classes <id,id> [order]   other classes at once, no workbench needed; order: which of their skills in each slot
     //   hearts <person> <n>       that many hearts with the person (merchant, blacksmith, fisher)
-    //   spawn <monster> <dx> <dy> [health]                         boss <id> hurt <fraction of its health> | use <attack>
+    //   spawn <monster> <dx> <dy> [health]                         boss <id> hurt <fraction of its health> | use <attack> | strike
     //   bosses hold|wake          (asleep whoever walks in)        boss <id> sleep | enter [again]   (its entrance, arenas.csv)
     //   drop item <base> [rarity] [sockets] | rune | potion <id> | material <id>   (at the player's feet)
     //   goto spawn | <dx> <dy> | boss <id> | arena <id> (its middle) | pool | biome <name> | tile <type> | near <type>
@@ -474,6 +474,8 @@ namespace Game.Client
                 case "boss":
                     var boss = world.Bosses.FirstOrDefault(b => b.Definition.Id == words[1]) ?? throw new ArgumentException($"no boss '{words[1]}' standing");
                     if (words[2] == "hurt") world.Hurt(boss, Math.Max(1, (int)(boss.MaxHealth * Float(words[3]))));
+                    // boss <id> strike: the player's blow lands on it, as a swing would (its noto counter answers, R1b).
+                    else if (words[2] == "strike") world.Hurt(boss, player, 1);
                     else if (words[2] == "use" && !world.ForceAttack(boss, words[3])) throw new ArgumentException($"'{words[1]}' cannot use '{words[3]}' now (awake, someone in the arena?)");
                     // Its entrance (arenas.csv, 2026-11-17): asleep again, or coming in now (the whole way, or "again").
                     else if (words[2] == "sleep") world.ForceSleep(boss);
@@ -2964,6 +2966,16 @@ namespace Game.Client
                 json.Field("bossAttack", fighting?.Attack?.Id ?? "");
                 json.Field("bossTelegraph", fighting?.Attack?.Telegraph ?? 0);
                 json.Field("bossChargesLeft", fighting?.ChargesLeft ?? 0);
+                // R1b (2026-11-28): how much longer than its telegraph the boss's last mark waits (a late blow), whether its
+                // noto counter was struck, the cues and the sign over it seen, and a late blow's mark as drawn.
+                var lastMark = fighting == null ? null : world.Hazards.Where(h => h.Source == fighting.Id && !h.Lingers).OrderBy(h => h.Id).LastOrDefault();
+                json.Field("bossWait", lastMark == null || fighting.Attack == null ? 0 : (lastMark.ResolveTick - lastMark.StartTick) / (float)World.TicksPerSecond - fighting.Attack.Telegraph);
+                json.Field("bossCountered", fighting?.Countered ?? false);
+                json.Field("cues", root.CuesSeen);
+                json.Field("badge", root.BadgeShown);
+                json.Field("heldFill", root.HeldFill);
+                json.Field("heldBlinked", root.HeldBlinked);
+                json.Field("helmets", root.HelmetsDropped);
                 json.Field("finisher", GameRoot.FinisherName ?? "");
                 json.Field("finisherShown", GameRoot.FinisherShown.width > 0);
                 // What the silk mother's blows left on the floor: webs and pools of venom (in the world, and drawn), and

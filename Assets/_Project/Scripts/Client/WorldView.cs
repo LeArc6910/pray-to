@@ -128,6 +128,11 @@ namespace Game.Client
             // Winding up straight out of a charge to charge again (a chain of dashes), in less time.
             public bool BossAgain;
             public int BossPhase;
+            // R1b (WorldView.Cues.cs): when the host last told of a late blow or the noto counter coming (SimEventType.Cue),
+            // whether the counter was struck this stance, and the sign over it (the blossom, a colour).
+            public float CueAt = -1;
+            public bool Countered;
+            public SpriteRenderer Badge;
             public SpriteRenderer Sign;
             public SpriteRenderer Mound;
             public float DustAt;
@@ -1359,7 +1364,7 @@ namespace Game.Client
                 BossWarnExtras(hazard, view.Progress);
                 // The shape itself on the pixel grid: a two-pixel edge from the start, stripes over what has filled,
                 // the whole of it blinking at the last (E1, WorldView.Hazards.cs). Its size is the judged size.
-                DrawWarn(mark, hazard, view.Progress);
+                DrawWarn(mark, hazard, HeldProgress(hazard, view.Progress));
             }
 
             _gone.Clear();
@@ -2206,6 +2211,12 @@ namespace Game.Client
             if (ShowPoi(e) || ShowTravel(e) || ShowPace(e) || ShowDungeon(e)) return;
             switch (e.Type)
             {
+                case SimEventType.Cue:
+                    ShowCue(e);
+                    break;
+                case SimEventType.PhaseChanged:
+                    PhaseShown(e);
+                    break;
                 case SimEventType.Attack:
                     var attacker = Find(e.Source);
                     if (attacker == null) break;
