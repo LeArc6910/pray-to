@@ -425,7 +425,20 @@
 4. "뺌"은 시안대로, 필요하면 나중에 되살린다
 5. 묶음을 순서대로(R1 → R2 → R3 → R4)
 
-**진행**: R1을 둘로 나눴다. **R1a**(템포·강화·연타·필살기 이름)는 끝났다(`Docs/Bosses.md` "페이즈 템포와 강화"). **R1b**(시구레 납도 반격·늦은 거합·벚꽃 결계, 발두인 멈춘 망치·색 표지·투구 벗기, 아라네 실 잇기는 R3로, 거미줄 커튼)가 다음이다. 그림이 드는 것(납도 자세, 투구 벗기, 표지)은 Fable 하위 작업
+**진행**: R1을 둘로 나눴다. **R1a**(템포·강화·연타·필살기 이름)는 끝났다(`Docs/Bosses.md` "페이즈 템포와 강화"). **R1b**(시구레 납도 반격·늦은 거합, 발두인 멈춘 망치·색 표지·투구 벗기)가 다음이다. 벚꽃 결계·거미줄 커튼은 R2로, 아라네 실 잇기는 R3로 옮겼다. 그림이 드는 것은 Fable 하위 작업. 아래 "R1b 만들 때"
+
+### R1b 만들 때 (2026-11-28 R1a 세션이 조사한 것)
+
+| 할 일 | 고칠 곳 |
+|---|---|
+| **늦은 공격**(⑩ 시구레 3페이즈 거합, 발두인 2페이즈부터 망치·대지 강타): `boost`에 `hold=0.5`(더 기다리는 최대 초)를 더한다. 호스트는 `StartTelegraph`에서 `StateTicks`와 장판의 `resolve`에 0.4~1.0 × hold를 더한다(난수는 `AimStep`처럼 틱으로 씨앗) | `BossSheet.cs` `Boost.Fields`, `World.Boss.cs` `StartTelegraph` |
+| 바닥 표시가 박자를 들키지 않게: 표시는 원래 예고 길이(`attack.Telegraph`)에 다 차고 그 뒤엔 깜박이며 기다린다. 지금 진행도는 `WorldClient.Hazards()`가 `(now - (lands - Duration)) / Duration`으로 구하므로 화면 쪽(`WorldView.cs` 1362줄 `DrawWarn` 부르는 곳)에서 `AttackOf(hazard)?.ForPhase(보스 페이즈)`의 `Telegraph`로 다시 잰다 | `WorldView.cs`, `WorldView.Bosses.cs` `AttackOf` |
+| 단서(칼자루 번쩍·발 디딤 쿵): 내려치기 0.25초 전에 새 사건 `SimEventType.Cue`(목록 끝에 더하고 `Protocol.Version` 올림). 화면은 그 전까지 휘두르기 직전 자세를 붙잡고, `Cue`를 받으면 휘두르기를 0.25초에 맞춰 돈다 | `Entities.cs` `SimEventType`, `Protocol.cs`, `WorldView.Bosses.cs`(시구레), `WorldView.Knight.cs` |
+| **납도 반격**(⑦ 시구레 2페이즈부터): 새 모양 `counter`. 예고 동안 맞으면 바로 반격(필살 몫, 사방 일섬 셋), 안 맞으면 끝에 빈틈 1초. `DamageBoss`에서 보스가 `counter` 예고 중이면 반격으로 넘긴다 | `BossSheet.cs` `AttackShape`, `World.Boss.cs` |
+| **색 표지**(⑦ 발두인 3페이즈): `warn`에 `near`·`far`(붉음 = 붙어라: 가까울수록 덜 아픈 휩쓸기, 푸름 = 멀어져라). 거리로 피해를 줄이는 규칙이 새로 든다 | `BossSheet.cs` `AttackWarning`, `World.Boss.cs` 장판 피해 |
+| **투구 벗기**: 3페이즈 전환에 발두인 투구가 없는 그림, 시구레 납도 자세·벚꽃 표지, 붉은·푸른 표지 → **Fable 하위 세션**(`create_session`, `model: claude-fable-5-2`) | `KnightArt.cs`, `SamuraiArt.cs`, `EffectArt` |
+| 웹 점검: `tempo` 구역에 늦은 거합(표시가 다 찬 뒤 깜박이며 기다림), 납도 반격(때리면 반격), 색 표지 사진 | `sweep.js` `tempo`, `Playtest.cs` |
+| 벚꽃 결계·거미줄 커튼(아레나 바꾸기)은 R2의 지형 틀(T3)과 함께 만든다 | |
 
 ## 9. 평타를 바닥 표시 없이 전조로만 (점검만, 보류)
 
