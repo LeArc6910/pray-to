@@ -215,6 +215,7 @@ namespace Game.Core
                 KeepOutOfDungeonRooms(enemy);
                 KeepOutOfBossGrounds(enemy);
             }
+            RemoveOffGround();
             UpdateElites();
             UpdateBosses();
             UpdateMinions();

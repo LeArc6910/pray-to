@@ -37,6 +37,21 @@ namespace Game.Core.Tests
             Assert.GreaterOrEqual(Vec2.Distance(slime.Position, Home), Ground, "pushed out");
         }
 
+        // Rock right round the ground (the web check's cave arena): one pushed out cannot land back inside.
+        [Test]
+        public void APushIntoRockDoesNotLandBackInside()
+        {
+            var world = Arena();
+            int cx = TileMap.Cell(Home.X), cy = TileMap.Cell(Home.Y);
+            for (int y = cy - 30; y <= cy + 30; y++)
+                for (int x = cx - 30; x <= cx + 30; x++)
+                    if (world.Map.InBounds(x, y) && Vec2.Distance(TileMap.Center(x, y), Home) > Ground - 3 && Vec2.Distance(TileMap.Center(x, y), Home) < Ground + 3)
+                        world.Map[x, y] = TileType.Wall;
+            var slime = world.SpawnEnemy(Monsters.Shipped.Find("slime"), Home + new Vec2(0, -10));
+            world.Step();
+            Assert.IsFalse(world.Enemies.Any(e => !e.FromBoss && world.InBossGround(e.Position)));
+        }
+
         [Test]
         public void WhatTheBossCallsMayStay()
         {

@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace Game.Core
@@ -28,10 +30,36 @@ namespace Game.Core
                 var away = enemy.Position - boss.Home;
                 float distance = away.Length;
                 if (distance >= edge) continue;
-                var outward = distance > 1e-3f ? away / distance : new Vec2(0, -1);
-                enemy.Position = Collision.Resolve(Map, boss.Home + outward * edge, enemy.Definition.Radius, monster: true);
+                float angle = distance > 1e-3f ? away.Angle : -MathF.PI / 2;
+                var spot = OffGround(boss, angle, edge, enemy.Definition.Radius);
+                // An arena walled round by rock: no open floor outside near it, so it goes (seen in the web check, 2026-11-28).
+                if (spot == null) { _offGround.Add(enemy); return; }
+                enemy.Position = spot.Value;
                 if (enemy.State == EnemyState.Chase) enemy.State = EnemyState.Idle;
             }
+        }
+
+        readonly HashSet<Enemy> _offGround = new HashSet<Enemy>();
+
+        void RemoveOffGround()
+        {
+            if (_offGround.Count == 0) return;
+            _enemies.RemoveAll(_offGround.Contains);
+            _offGround.Clear();
+        }
+
+        // The open floor just outside a boss's ground, nearest the way it was pushed: straight out first, then turning
+        // either way, a little further each round. The resolved spot must still be outside (a wall can push it back in).
+        Vec2? OffGround(Boss boss, float angle, float edge, float radius)
+        {
+            for (float further = 0; further <= 6; further += 2)
+                for (int turn = 0; turn <= 12; turn++)
+                {
+                    float a = angle + (turn % 2 == 0 ? 1 : -1) * (turn + 1) / 2 * MathF.PI / 12;
+                    var at = Collision.Resolve(Map, boss.Home + Vec2.FromAngle(a) * (edge + further), radius, monster: true);
+                    if (Vec2.Distance(at, boss.Home) >= edge - 0.01f && !Collision.Overlaps(Map, at, radius, monster: true)) return at;
+                }
+            return null;
         }
     }
 }
