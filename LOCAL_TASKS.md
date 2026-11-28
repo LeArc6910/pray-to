@@ -2357,3 +2357,12 @@ DevTools/Local/setup.sh --commit
   - `Game.Client.Tests.FeatureTests.EveryKindHasItsOwnAttacks: A blow its shell turned shows a grey number.`
   - `Game.Client.Tests.FeatureTests.TheBagAndHudDraw: The food's buff has no icon.`
   - `Game.Client.Tests.FeatureTests.TheCaveWardenWakesAndWindsUp: Expected: True`
+
+### 2026-11-29 04:30 NPC 비켜 가기, NPC·몬스터 그림 시안 (로컬 세션, 사람 요청으로 코드까지)
+
+- 사람 요청(2026-11-29, 자러 가며 "확인이 꼭 필요한 것만 남기고 알아서"): ① 마을에서 NPC들이 서로 겹쳐 걷는 것 고치기 ② NPC 마을 도트와 대화 초상화를 로컬 AI로(초상화는 일반 2D 그림에 도트 느낌만 살짝) ③ 품질 낮은 오브젝트·일반 몬스터를 골라 로컬 AI로(예: 균사 어미)
+- ① **끝냄**(`4327617`): 그리기 전에 가까운 마을 사람·이야기 사람을 `Core/World/Crowd.cs`가 조금씩 떼어 놓는다(발 사이 0.7칸, 마주 오면 2칸 앞부터 각자 오른쪽으로 비킴, 서 있는 사람은 거의 안 움직임, 벽·물 위로는 안 밀고 0.45칸 넘게 안 밂). 상태가 없어 통신·기기 결과는 그대로. 경비병·노점 상인이 같은 자리를 둘이 고르지 않게. Unity EditMode `CrowdTests`·`TownTests` 9개 통과(하루 동안 0.35칸 안으로 붙는 쌍 51 → 0), 컴파일 에러 없음. `Docs/Towns.md`
+- ②③ **시안까지**(`Docs/NpcArtDrafts.md`): 초상화 넷 × 24장(세 가지 도트 정도), 마을 도트 셋 × 3, 몬스터 아홉(균사 어미·갓 거인·눈 거인·큰 모래 지렁이·신전 수호 석상·정동 골렘·잿불 대장장이·공허의 문지기·용암 투석꾼) × 3, 설치물 시험 여섯 × 2. 프롬프트 `DevTools/ArtImport/LocalAi/drafts_2026-11-29/`. GPU 잠금을 잡고 끝나면 ComfyUI를 끄고 풀었다
+- 설치물은 16px로 줄이면 뭉개져 지금 코드 그림이 낫다(바꾸지 않기를 권함). 생물군계 소품도 고르게 다듬어져 있어 손대지 않았다
+- **사람이 할 것**: 로컬 세션의 고르기 페이지(`art-review`, 포트 8766)에서 22세트를 고른다. 고르면 21명 초상화(표정 여섯)·마을 도트·몬스터 아홉을 만들어 넣는다(초상화와 마을 도트는 그림을 읽는 코드도 바꿔야 한다)
+- (클라우드 웹 점검) 마을에서 사람들이 겹치지 않는지: 새벽 마을·왕도 장면 사진(`sweep.js --only towns` 같은 마을 구역)
