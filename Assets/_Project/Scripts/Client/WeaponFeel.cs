@@ -1,3 +1,5 @@
+using Game.Core;
+
 namespace Game.Client
 {
     // How a weapon kind's blows feel on the screen (2026-11-28, the person: "every weapon its own feel; a greatsword or
@@ -37,7 +39,23 @@ namespace Game.Client
             HeavySound = heavySound;
         }
 
-        public static readonly WeaponFeel Sword = new WeaponFeel();
+        // Built through the constructor with an argument: `new WeaponFeel()` of a struct is its zeroed default, which
+        // made the sword's (and the bow's, staff's, pickaxe's, bare hands' and monsters') arc, swing and hit sounds,
+        // lunge, knock back and hit stop all nothing (2026-11-28, the owner: the void sword neither swished nor showed
+        // its cut; the weapon audit, ArtPreview --only weaponaudit, now looks at every weapon's).
+        public static readonly WeaponFeel Sword = new WeaponFeel(volume: 1);
+
+        // Whether every multiplier that must not be nothing is something (the weapon audit).
+        public bool Felt => Arc > 0 && Thin > 0 && Volume > 0 && Stop > 0 && Knock > 0 && Heavy > 0 && Lunge != 0;
+
+        // The sound of a basic attack let go: a bow's shot, a magic bolt's zap, a heavy whoosh on a finisher or a heavy
+        // weapon's every step, else the swing (WorldView's Attack event).
+        public Sound SwingSound(BasicAttackKind kind, bool finisher) =>
+            kind == BasicAttackKind.Arrow ? Sound.Shoot : kind == BasicAttackKind.Bolt ? Sound.Zap
+            : finisher || HeavySound ? Sound.Heavy : Sound.Swing;
+
+        // The sound of a blow landing on someone else (WorldView's Hit event): a heavy one's thump, a crit, or the hit.
+        public Sound HitSound(bool heavy, bool critical) => heavy || HeavySound && !critical ? Sound.Thump : critical ? Sound.Crit : Sound.Hit;
 
         public static WeaponFeel Of(HeroStyle style) => style switch
         {

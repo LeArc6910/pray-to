@@ -5275,6 +5275,8 @@ async function hero(browser) {
     const weapons = [['copper_sword', '검'], ['copper_bow', '활'], ['copper_staff', '지팡이'], ['copper_pickaxe', '곡괭이'], ['none', '맨손']];
     // The kinds with motions of their own (Docs/Weapons.md 묶음 B), on the PC only: the phone's are for size and fit.
     if (profile === 'pc') weapons.push(...KindsOwn.map(([kind, name]) => [`iron_${kind}`, name]));
+    // The void sword (2026-11-28, the owner: no cut and no swish in the test ground): every sword-feel weapon had lost both.
+    if (profile === 'pc') weapons.push(['void_sword', '공허 검']);
     let first = true;
     for (const [weapon, name] of weapons) {
       // Back out to the wild each time: a first-level hero who fell to the slimes got up in the village, where
@@ -5285,6 +5287,7 @@ async function hero(browser) {
         await clearRoom(game, 4, 4);
       }
       first = false;
+      const before = await game.state();
       await game.send(`heal; hero ${weapon} 1 0`);
       const struck = await game.until(s => s.hurtMonsters > 0, 4000);
       check(!!struck, `${profile} ${name}: 공격이 슬라임에 닿는다`);
@@ -5295,6 +5298,13 @@ async function hero(browser) {
       for (let i = 0; i < (own ? 4 : 6); i++) {
         await game.wait(own ? 230 : 170);
               await game.shot(`hero-${profile}-${weapon}-${i}`, `${name} 연타 ${i + 1}`);
+      }
+      // Every attack let go is heard, and a swing draws its arc (the weapon audit's web half, Docs/WeaponAudit.md).
+      {
+        const after = await game.state();
+        const sounds = after.ownAttackSounds - before.ownAttackSounds, arcs = after.ownArcs - before.ownArcs;
+        const swings = !/bow|staff|crossbow|boomerang|wand|orb/.test(weapon);
+        check(sounds >= 2 && (!swings || arcs >= 2), `${profile} ${name}: 공격 소리 ${sounds}번${swings ? `, 베는 호 ${arcs}번` : ''}`);
       }
       if (own) {
         // Its own motion, done within its time between blows (weapon_kinds.csv speed: 0.5 s at 1).

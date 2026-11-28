@@ -3016,6 +3016,8 @@ namespace Game.Client
                 json.Field("blowShake", view != null ? Mathf.Round(view.LastBlowShake * 1000) / 1000f : 0);
                 json.Field("blowStop", view != null ? Mathf.Round(view.LastBlowStop * 1000) / 1000f : 0);
                 json.Field("kindShots", view?.KindShotsShown ?? 0);
+                json.Field("ownAttackSounds", view?.OwnAttackSounds ?? 0);
+                json.Field("ownArcs", view?.OwnArcsShown ?? 0);
                 json.Field("lastShotLook", view != null ? view.LastShotLook.ToString() : "-");
                 json.Field("orbBursts", view?.OrbBurstsShown ?? 0);
                 json.Field("mobShots", root.MonsterShotsDrawn);

@@ -99,6 +99,8 @@ dotnet run --project DevTools/ArtPreview -- --only portraits
 dotnet run --project DevTools/ArtPreview -- --only title
 # 무기 종류를 주인공이 든 모습(out/weapons_held.png), 종류마다 연타 1·2·3단 다섯 장씩(out/weapons_combo.png, 시간도 출력), 종류마다 탄(out/weapons_shots.png). Docs/Weapons.md 묶음 B. 아이콘 줄은 --only gear의 out/weapons.png
 dotnet run --project DevTools/ArtPreview -- --only weapons
+# 무기 점검: 무기마다 연타 1~3단의 호·탄 그림, 휘두르기·맞힘 소리, 손에 든 그림, 종류의 동작·느낌(out/weapon_audit.md, 빠지면 실패). Docs/WeaponAudit.md
+dotnet run --project DevTools/ArtPreview -- --only weaponaudit
 # 무기 고유 기술: 종류마다 실제 이펙트 프로그램 네 순간(out/weapon_arts.png). Docs/Weapons.md 묶음 C
 dotnet run --project DevTools/ArtPreview -- --only weaponarts
 # 그림 린트만(몇 초): 외딴 픽셀·색 수·흔들림·쌍둥이를 세고 out/lint.md에 적는다. 기준(lint-baseline.txt)보다 늘면 실패

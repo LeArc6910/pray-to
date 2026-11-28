@@ -2182,6 +2182,10 @@ namespace Game.Client
         public float LastBlowShake { get; private set; }
         public float LastBlowStop { get; private set; }
         public int KindShotsShown { get; private set; }
+        // One's own basic attacks let go with a sound to hear, and swings drawn with an arc to see (the weapon audit's
+        // web half, 2026-11-28: the sword's feel had made both nothing).
+        public int OwnAttackSounds { get; private set; }
+        public int OwnArcsShown { get; private set; }
         public ShotLook LastShotLook { get; private set; }
 
         // Where an orb's shot stops it bursts (World: weapon_kinds.csv burst 1.3 tiles): a flash and a ring of its
@@ -2250,8 +2254,9 @@ namespace Game.Client
                     // The finisher's heavier whoosh as loud as the swings before it (2026-11-28, the owner: the last
                     // swing was too loud; the made-in-code whoosh is longer and louder than the recorded swing).
                     bool heavySwing = kind == BasicAttackKind.Swing && (finisher || feel.HeavySound);
-                    Hear(kind == BasicAttackKind.Arrow ? Sound.Shoot : kind == BasicAttackKind.Bolt ? Sound.Zap : heavySwing ? Sound.Heavy : Sound.Swing, attacker.Position,
-                        (heavySwing ? FinisherSwingVolume : 1) * feel.Volume);
+                    float swingVolume = (heavySwing ? FinisherSwingVolume : 1) * feel.Volume;
+                    Hear(feel.SwingSound(kind, finisher), attacker.Position, swingVolume);
+                    if (attacker == _self && swingVolume > 0) OwnAttackSounds++;
                     if (finisher && attacker == _self) _shake = Mathf.Max(_shake, 0.04f * feel.Heavy);
                     if (feel.Kick > 0 && attacker == _self) _shake = Mathf.Max(_shake, feel.Kick * (finisher ? 1.6f : 1));
                     // Shots show as their projectile (a finisher's is bigger), with a puff where it leaves; only swings
@@ -2273,6 +2278,7 @@ namespace Game.Client
                     // The second cut comes back up: the crescent mirrored across the way it points. The finisher is bigger.
                     float arc = feel.Arc * (finisher ? FinisherSwingScale(attacker) : 1);
                     attacker.Swing.transform.localScale = new Vector3(arc, arc * feel.Thin * (step == 1 ? -1 : 1), 1);
+                    if (attacker == _self && arc > 0 && feel.Thin > 0) OwnArcsShown++;
                     break;
                 case SimEventType.Hit:
                     var target = Find(e.Target);
@@ -2349,7 +2355,7 @@ namespace Game.Client
                         if (heavy || e.Critical) Shockwave(landed, heavy ? 1.3f + target.Diameter * 0.3f : 0.9f + target.Diameter * 0.2f, e.Critical && !heavy ? ImpactGold : ImpactWhite);
                         _combatUntil = Time.time + CombatHold;
                     }
-                    Hear(hurtsMe ? Sound.Hurt : heavy || blowFeel.HeavySound && !e.Critical ? Sound.Thump : e.Critical ? Sound.Crit : Sound.Hit, target.Position, hurtsMe ? 1 : blowFeel.Volume);
+                    Hear(hurtsMe ? Sound.Hurt : blowFeel.HitSound(heavy, e.Critical), target.Position, hurtsMe ? 1 : blowFeel.Volume);
                     if (target.Kind == BodyKind.Player && !guarded) Groan(target, e, hurtsMe);
                     break;
                 case SimEventType.Rolled:

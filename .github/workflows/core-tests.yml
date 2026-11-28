@@ -24,6 +24,10 @@ jobs:
       - name: Draw the pixel art
         run: dotnet run --project DevTools/ArtPreview -- "$RUNNER_TEMP/art"
 
+      # Every weapon's basic attack drawn, sounded and held (Docs/WeaponAudit.md): fails when any is missing a piece.
+      - name: Audit the weapons
+        run: dotnet run --project DevTools/ArtPreview -- --only weaponaudit
+
       - name: Keep the pixel art pictures
         uses: actions/upload-artifact@v4
         with:

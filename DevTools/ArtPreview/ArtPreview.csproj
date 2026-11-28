@@ -13,6 +13,8 @@
 
   <ItemGroup>
     <Compile Include="../../Assets/_Project/Scripts/Client/Art/**/*.cs" />
+    <!-- How each weapon kind's blows feel and sound (the weapon audit, WeaponAudit.cs). -->
+    <Compile Include="../../Assets/_Project/Scripts/Client/WeaponFeel.cs" />
     <ProjectReference Include="../Game.Core/Game.Core.csproj" />
   </ItemGroup>
 
