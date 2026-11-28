@@ -125,6 +125,8 @@ namespace Game.Client
                     ['q'] = style.Pants == 0 ? legs : legs.Scale(0.8f),
                     // A cheek's flush (a woman's face).
                     ['k'] = skin.Main.Mix(Rgba.Hex("#E0606A"), 0.45f),
+                    // A lash, as dark as the outline.
+                    ['l'] = Ink,
                 },
             };
         }
@@ -161,6 +163,11 @@ namespace Game.Client
                 char beside = face[y][x + outward];
                 face[y][x] = beside == 'H' || beside == 'h' ? beside : '.';
             }
+            // A lash: the eye's line carried out a pixel at its top corner (over hair or skin, never past the head).
+            void Lash(int y, int x)
+            {
+                if (y >= 0 && y < face.Length && face[y][x] != '.') face[y][x] = 'l';
+            }
             void Flush(int y, int x)
             {
                 if (y < face.Length && Skin(face[y][x])) face[y][x] = 'k';
@@ -174,14 +181,19 @@ namespace Game.Client
                     Chin(chin, 8, 1);
                     Flush(eyes, 2);
                     Flush(eyes, 9);
+                    Lash(eyes - 1, 2);
+                    Lash(eyes - 1, 9);
                     break;
                 case Look.DownSide:
                     Chin(chin, 8, 1);
                     Flush(eyes, 9);
+                    Lash(eyes - 1, 3);
+                    Lash(eyes - 1, 9);
                     break;
                 case Look.Side:
                     Chin(chin, 9, 1);
                     Flush(eyes, 7);
+                    Lash(eyes - 2, 9);
                     break;
             }
             var result = new string[rows.Length];
