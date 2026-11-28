@@ -97,6 +97,10 @@ namespace Game.Client
         Sting,
         Puff,
         Chime,
+        // A boss's ground (2026-11-28, R2a): a bubble swelling in lava and bursting, small and dull; a heart
+        // overheating (the rage coming on): a low swell rising under a hiss, to a thud.
+        LavaBubble,
+        Overheat,
         // A player's short groan when struck (2026-11-28, by the character's gender, Docs/Gender.md): made in code a
         // low and a higher voiced "uh" falling, until the recordings are in (voice_player_*_hurt).
         GruntMale,
@@ -573,6 +577,24 @@ namespace Game.Client
                     parts.Add(Noise(0.05f, 0.2f, 0.4f, 0.85f, decay: 4, seed: 66));
                     parts.Add(Tone(Wave.Sine, 0, 0.08f, 300, 160, 0.3f, decay: 5));
                     level = 0.4f;
+                    break;
+                case Sound.LavaBubble:
+                    parts.Add(Tone(Wave.Sine, 0, 0.1f, 140, 330, 0.7f, attack: 0.012f, decay: 2.5f));
+                    parts.Add(Noise(0.09f, 0.04f, 0.45f, 0.3f, attack: 0.001f, decay: 7, seed: 71));
+                    parts.Add(Tone(Wave.Sine, 0.13f, 0.07f, 210, 470, 0.4f, attack: 0.006f, decay: 3.5f));
+                    parts.Add(Noise(0.19f, 0.03f, 0.25f, 0.35f, attack: 0.001f, decay: 7, seed: 72));
+                    parts.Add(Noise(0.1f, 0.24f, 0.12f, 0.9f, attack: 0.03f, decay: 4, seed: 73));
+                    level = 0.4f;
+                    break;
+                case Sound.Overheat:
+                    parts.Add(Tone(Wave.Saw, 0, 0.55f, 62, 150, 0.5f, attack: 0.3f, decay: 0.6f, vibrato: 0.05f, vibratoRate: 13));
+                    parts.Add(Tone(Wave.Sine, 0, 0.55f, 124, 300, 0.3f, attack: 0.35f, decay: 0.5f));
+                    parts.Add(Noise(0, 0.6f, 0.45f, 0.93f, attack: 0.4f, decay: 1, seed: 74));
+                    parts.Add(Tone(Wave.Sine, 0.52f, 0.3f, 130, 42, 0.9f, attack: 0.004f, decay: 3.5f));
+                    parts.Add(Noise(0.52f, 0.12f, 0.6f, 0.25f, decay: 6, seed: 75));
+                    parts.Add(Noise(0.55f, 0.45f, 0.35f, 0.96f, attack: 0.01f, decay: 3.5f, seed: 76));
+                    Crackle(parts, 0.6f, 0.3f, 4, 0.25f, 77);
+                    level = 0.6f;
                     break;
                 case Sound.Sting:
                     parts.Add(Noise(0, 0.07f, 0.8f, 0.92f, attack: 0.001f, decay: 7, seed: 67));

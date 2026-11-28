@@ -89,6 +89,7 @@ namespace Game.Client
                     mark.Edge.color = Color.Lerp(new Color(0.45f, 0.3f, 0.28f), Color.white, cool) * new Color(1, 1, 1, dim);
                     mark.Fill.color = new Color(GroundLavaColor.r, GroundLavaColor.g, GroundLavaColor.b, cool * dim * (0.12f + 0.06f * Mathf.Sin(Time.time * 5 + hazard.Id)));
                     if (Feel.Bits && hazard.Harmful && Random.value < 0.05f) Ember(hazard);
+                    if (hazard.Harmful && cool > 0.5f) Bubble(hazard);
                     break;
                 case HazardShape.Rock:
                     float set = Mathf.Clamp01(age / 0.6f);
@@ -104,6 +105,23 @@ namespace Game.Client
                     mark.Fill.color = new Color(GroundCrackColor.r, GroundCrackColor.g, GroundCrackColor.b, fade * (0.08f + 0.06f * Mathf.Sin(Time.time * 7 + hazard.Id)));
                     break;
             }
+        }
+
+        // Lava bubbling: a small burst now and then from one of the harmful pools near enough to be on the screen, never
+        // two within BubbleGap of each other however much lava lies about.
+        const float BubbleGap = 0.9f, BubbleNear = 9;
+        float _bubbleAfter;
+        public int BubblesHeard { get; private set; }
+
+        void Bubble(HazardState hazard)
+        {
+            if (Time.time < _bubbleAfter || Random.value > 0.04f) return;
+            var at = hazard.Width > 0 ? hazard.Position + hazard.Direction * (hazard.Size / 2) : hazard.Position;
+            var place = new Vector3(at.X, at.Y, 0);
+            if (Vector2.Distance(place, _self.Position) > BubbleNear + hazard.Size) return;
+            _bubbleAfter = Time.time + BubbleGap + Random.value * 1.4f;
+            BubblesHeard++;
+            Hear(Sound.LavaBubble, place, 0.55f);
         }
 
         // A spark off lava, rising and going out.
@@ -239,7 +257,7 @@ namespace Game.Client
         {
             bool on = e.Amount != 0;
             _floating.Add(new Floating { Position = at + new Vector3(0, 1.4f, 0), Text = on ? "과열!" : "식는다", Color = on ? GroundRageColor : new Color(0.7f, 0.7f, 0.75f) });
-            Hear(on ? Sound.Sizzle : Sound.Squelch, at, on ? 0.9f : 0.5f);
+            Hear(on ? Sound.Overheat : Sound.Sizzle, at, on ? 0.9f : 0.6f);
             if (on && Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.12f);
         }
     }

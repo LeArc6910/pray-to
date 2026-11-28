@@ -79,6 +79,8 @@ dotnet run --project DevTools/ArtPreview -- --only shot
 dotnet run --project DevTools/ArtPreview -- --only bossfx
 # R1b 그림 한 장(out/r1b/sheet.png·_gray): 시구레 납도 자세 여덟 방향과 벚꽃 표지, 발두인 투구 벗은 다섯 방향·자세와 떨어진 투구, 붉은·푸른 색 표지
 dotnet run --project DevTools/ArtPreview -- --only r1b
+# 보스의 땅 그림 한 장(out/ground/sheet.png·_gray, R2a): 용암 원·띠, 식은 바위, 얕은 물, 균열 띠·원, 용암 가장자리와 섬, 분출구 각 4장, 함께 놓은 장면. 소리 lavabubble.wav·overheat.wav도 같은 폴더에
+dotnet run --project DevTools/ArtPreview -- --only ground
 # 타격 이펙트(E7): out/hitfx/hits.png·hits_gray.png(줄마다 원소의 보통·강한 타격, 왼쪽에서 맞음), report.txt. 12조각·빛 1개·0.4초를 넘으면 실패. 웹 점검은 sweep.js --only hits
 dotnet run --project DevTools/ArtPreview -- --only hitfx
 # 게임의 UI 스킨만(out/ui/: skin.png 조각 전부, windows.png 지금 화면에 입힌 모습, pixels.png 정수 배 틀, encounters.png·encounters_phone.png 상점·상자·작업대·모루·대화 창, growth.png·growth_phone.png 스킬·특성 트리·캐릭터 창, records.png·records_phone.png 일지·지도, bag_hud.png·bag_hud_phone.png 가방·HUD·쓰러짐 카드·메뉴. Docs/UiRework.md U1~U7)
