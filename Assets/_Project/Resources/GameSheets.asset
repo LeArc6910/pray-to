@@ -20,12 +20,22 @@ MonoBehaviour:
   materials: {fileID: 4900000, guid: 1c07207f72ae79a41815814172249cf6, type: 3}
   recipes: {fileID: 4900000, guid: 62df96d7c2c9ba64988b9fcfeedc40ea, type: 3}
   sets: {fileID: 4900000, guid: 16ef75a922bbe4043ad7b40be0ccdc20, type: 3}
+  weaponKinds: {fileID: 4900000, guid: 72976ef2d81d2a647b2edbf8de305559, type: 3}
   tiles: {fileID: 4900000, guid: 3a417955f3f67d54bbd05ac5f9926a52, type: 3}
   crops: {fileID: 4900000, guid: 5adddb4bb9f54f6438c96249f8e2436f, type: 3}
   machines: {fileID: 4900000, guid: e6ba977065c4e364b9f8e11dbb9a170e, type: 3}
+  terrain: {fileID: 4900000, guid: 3574c4340d1dff2478f67bc4361e6427, type: 3}
+  rooms: {fileID: 4900000, guid: 325f2496bd2f00d4ca45c9b73d194f2d, type: 3}
+  roomRoles: {fileID: 4900000, guid: 3512bcd024401974394faeff1b42f8c3, type: 3}
+  pois: {fileID: 4900000, guid: e9c2fd31d5aaff0429abd7b3a1c7cdf9, type: 3}
+  dungeons: {fileID: 4900000, guid: d1c7d4ad1661f4e4bb4580da1026e5fc, type: 3}
+  dungeonGraphs: {fileID: 4900000, guid: 3232b97301c010441a48bb843f22825d, type: 3}
   monsters: {fileID: 4900000, guid: 40686204d9b9dc740bbcdff13af5c326, type: 3}
+  monsterAttacks: {fileID: 4900000, guid: c973f5d03aece004eba2b734ccec3925, type: 3}
+  packs: {fileID: 4900000, guid: 1a422e5e8a2bb4648a5c5cea4dbb481d, type: 3}
   bosses: {fileID: 4900000, guid: c2fed33ef540da34099bd6c4b0cbb5ac, type: 3}
   bossAttacks: {fileID: 4900000, guid: 1c2415facedd5c54580087663f50c44d, type: 3}
+  arenas: {fileID: 4900000, guid: 4a9ff5b7f66970c45ba73de86bf95a56, type: 3}
   classes: {fileID: 4900000, guid: a8d1e65ea716a0748a0d025c7f11abaa, type: 3}
   skills: {fileID: 4900000, guid: c6c4bcdcccd1b0643ac37476090fe38c, type: 3}
   passives: {fileID: 4900000, guid: c456d6a790799214db00c49a3afcb38c, type: 3}
@@ -36,5 +46,6 @@ MonoBehaviour:
   events: {fileID: 4900000, guid: 183b394d6f81281498b4f8582888f6e6, type: 3}
   places: {fileID: 4900000, guid: 2de580b02d646624da5e2453d4451bc2, type: 3}
   characters: {fileID: 4900000, guid: 079b4ae6946c879409caae1333fb6cad, type: 3}
+  townsfolk: {fileID: 4900000, guid: 490e1081d5913524482e62477e1fd62a, type: 3}
   story: {fileID: 4900000, guid: f424a9a82e6ed594aa5014b1e239617d, type: 3}
   strings: {fileID: 4900000, guid: 23694ddcbbf31ef45bfa3e991ed218f9, type: 3}
