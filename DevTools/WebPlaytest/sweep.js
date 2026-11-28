@@ -1912,7 +1912,7 @@ async function forces(browser) {
       await game.send('heal; clear; boss tide_serpent use squeeze');
       await game.wait(450);
       s = await game.state();
-      check(s.waves === 2 && s.shadesShown >= 1, `조이는 물살: 양옆의 벽 둘, 가운데 초록 (벽 ${s.waves}, 초록 ${s.shadesShown})`);
+      check(s.waves >= 2 && s.shadesShown >= 1, `조이는 물살: 양옆의 벽 둘(보스가 스스로 쓴 파도가 함께 셀 수 있다), 가운데 초록 (벽 ${s.waves}, 초록 ${s.shadesShown})`);
       await game.shot('forces-squeeze', '조이는 물살: 가운데 틈만 남는다');
       await game.wait(1300);
       await game.shot('forces-squeeze-run', '조이는 물살: 양옆에서 좁혀 온다');
