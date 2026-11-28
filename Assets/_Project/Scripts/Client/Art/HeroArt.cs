@@ -2178,9 +2178,9 @@ namespace Game.Client
                     // A short rod and a small stone in a metal cup.
                     Thick(-1.5f, 6, 0.5f, WoodDark);
                     fine(-1.5f, 0.25f, 6, 0.25f, Wood);
-                    var cup = At(6.2f);
-                    Dot(image, cup.X, cup.Y, gear.Main);
-                    Stone(At(7.4f), 1.1f, 0.6f);
+                    // The stone big enough to tell it from a staff's at a glance (2026-11-28, the person).
+                    Bar(At(6, -1), At(6, 1), 0.5f, gear.Main);
+                    Stone(At(8), 1.8f, 1.3f);
                     return true;
                 }
                 case "orb":
