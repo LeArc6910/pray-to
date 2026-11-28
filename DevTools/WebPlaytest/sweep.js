@@ -8603,7 +8603,7 @@ async function title(browser) {
     await game.press('게임 시작');
     t = await game.title();
     const row = (t.characters || []).find(x => x.startsWith(made + '|')) || '';
-    check(/\|Lv \d+\|.+ · 오늘\|/.test(row) && row.endsWith('|' + look), `${name}: 목록에 그 캐릭터(레벨·플레이 시간·오늘·만든 외형) (${row})`);
+    check(/\|Lv \d+\|.+ · 오늘\|/.test(row) && row.endsWith('|' + turned.look), `${name}: 목록에 그 캐릭터(레벨·플레이 시간·오늘·만든 외형) (${row})`);
     await game.shot('title-characters', '캐릭터 목록(걷는 외형, 레벨·시간·마지막 날)');
     await game.press(made);
     t = await game.title();
