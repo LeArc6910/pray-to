@@ -57,6 +57,10 @@ GitHub Actions(`.github/workflows/core-tests.yml`)가 푸시마다 테스트, �
 - **도트 그림·사운드 작업은 Fable 모델로**(사용자 결정, 2026-11-28, 토큰 절약과 작업 효율): 도트 그림(스프라이트·타일·소품·이펙트·UI 그림·Retro Diffusion 그림 옮기기)과 사운드(효과음·배경음악 고르기·만들기·가공·연결)는 Fable(`claude-fable-5-2`)이 한다. 지금 세션이 다른 모델이면 그 일만 Fable 하위 작업으로 맡기고, 끝나면 닫는다
   - 클라우드: `create_session`에 `model: claude-fable-5-2`로 하위 세션을 만들어 맡기고, 결과를 받은 뒤 `archive_session`으로 닫는다. 처음부터 그림·소리 작업인 세션은 Fable로 만든다
   - 로컬: `Agent` 도구에 `model: "fable"`로 하위 에이전트를 띄워 맡긴다(끝나면 저절로 닫힌다). 로컬 세션 자체가 그림·소리 작업이면 Fable로 연다
+  - **하위 세션이 끝났는데 부모가 한없이 기다리지 않게**(사용자 결정, 2026-11-28): 클라우드 하위 세션은 깔끔하게 끝나면 부모에게 알리지 않을 수 있다
+    - 맡기는 글 끝에 꼭 적는다: "끝나면(막혀도) `send_message`로 `session_id: "@parent"`에 결과 요약(커밋, 숫자, 남은 것)을 보내고 차례를 끝낸다"
+    - 부모는 알림만 기다리지 않는다: 하위 세션을 만든 뒤 할 수 있는 다른 일을 하고, `send_later`로 20~30분 뒤 확인을 걸어 둔다. 확인 때 `get_session`의 `status_bucket`(completed·failed·review_ready, 또는 idle)과 `git log`로 끝났는지 보고, 끝났으면 결과(필요하면 `list_events`의 `result`만, 짧게)를 읽고 `archive_session`으로 닫은 뒤 이어서 일한다. 아직이면 다시 확인을 건다(세 번 넘게 그대로면 사람에게 알린다)
+    - `sleep`으로 돌며 기다리지 않는다. 로컬 `Agent`는 `run_in_background`로 띄우면 끝날 때 알림이 온다
   - 그림·소리와 코드가 섞인 일은 코드(규칙·시험·화면 배치)는 지금 세션이, 그림을 그리거나 소리를 고르는 부분만 Fable이 맡는다
 
 ## 규칙
