@@ -14,6 +14,26 @@ namespace Game.Client
         Pick,
     }
 
+    // Whose motions the hero strikes with (HeroArt.ClipOf): the four weapons of old and the kinds that have motions of
+    // their own (Docs/Weapons.md 묶음 B). A kind's picture and its other moves (rest, walk, cast, roll) are still those
+    // of its HeroWeapon.
+    enum HeroStyle : byte
+    {
+        None,
+        Sword,
+        Bow,
+        Staff,
+        Pick,
+        Dagger,
+        Greatsword,
+        Spear,
+        Hammer,
+        Crossbow,
+        Boomerang,
+        Wand,
+        Orb,
+    }
+
     // What the hero is doing. The three attacks are the steps of the basic-attack combo (World.ComboSteps) and differ
     // by weapon (HeroArt.ClipOf): a sword cuts down, cuts back up and then turns right round in a wide sweep; a bow
     // draws and looses, the third drawn further; a staff is raised and thrust, the third whirled overhead first; a
@@ -62,6 +82,7 @@ namespace Game.Client
         // a dagger or greatsword swung like a sword, a spear thrust like a staff, a hammer swung like a pick, a crossbow
         // shot like a bow, a boomerang thrown with a sword's swings, a wand or orb as a staff. Empty for the four of old.
         public string Shape { get; }
+        public HeroStyle Style => StyleOf(Kind, Shape);
         // Names the colours, for a sprite's key.
         public string Key { get; }
         public Rgba Light { get; }
@@ -93,6 +114,19 @@ namespace Game.Client
             "staff" or "wand" or "orb" or "spear" => HeroWeapon.Staff,
             "pickaxe" or "hammer" => HeroWeapon.Pick,
             _ => HeroWeapon.Sword,
+        };
+
+        public static HeroStyle StyleOf(HeroWeapon kind, string shape) => shape switch
+        {
+            "dagger" => HeroStyle.Dagger,
+            "greatsword" => HeroStyle.Greatsword,
+            "spear" => HeroStyle.Spear,
+            "hammer" => HeroStyle.Hammer,
+            "crossbow" => HeroStyle.Crossbow,
+            "throwing" => HeroStyle.Boomerang,
+            "wand" => HeroStyle.Wand,
+            "orb" => HeroStyle.Orb,
+            _ => (HeroStyle)kind,
         };
 
         public static string ShapeOf(string kind) => kind is "sword" or "bow" or "staff" or "pickaxe" or null ? "" : kind;
@@ -360,6 +394,8 @@ namespace Game.Client
             public float Tip;
             // The whole body rolled over forwards, head first the way it faces (degrees; 360 is up on the feet again).
             public float Roll;
+            // The weapon out of the hand (over a half): a boomerang in flight.
+            public float Empty;
         }
 
         static Pose Lerp(Pose a, Pose b, float t)
@@ -372,7 +408,7 @@ namespace Game.Client
                 HandR = V3.Lerp(a.HandR, b.HandR, t), HandL = V3.Lerp(a.HandL, b.HandL, t),
                 FootR = V3.Lerp(a.FootR, b.FootR, t), FootL = V3.Lerp(a.FootL, b.FootL, t),
                 Yaw = L(a.Yaw, b.Yaw), Pitch = L(a.Pitch, b.Pitch), Both = L(a.Both, b.Both),
-                Draw = L(a.Draw, b.Draw), Arrow = L(a.Arrow, b.Arrow), Glow = L(a.Glow, b.Glow), Shut = L(a.Shut, b.Shut), Tip = L(a.Tip, b.Tip), Roll = L(a.Roll, b.Roll),
+                Draw = L(a.Draw, b.Draw), Arrow = L(a.Arrow, b.Arrow), Glow = L(a.Glow, b.Glow), Shut = L(a.Shut, b.Shut), Tip = L(a.Tip, b.Tip), Roll = L(a.Roll, b.Roll), Empty = L(a.Empty, b.Empty),
             };
         }
 
@@ -555,24 +591,35 @@ namespace Game.Client
 
         static readonly Dictionary<int, Clip> Clips = new Dictionary<int, Clip>();
 
-        static Clip ClipOf(HeroMove move, HeroWeapon weapon)
+        static Clip ClipOf(HeroMove move, HeroWeapon weapon) => ClipOf(move, (HeroStyle)weapon);
+
+        static Clip ClipOf(HeroMove move, HeroStyle style)
         {
-            int key = (int)move * 8 + (int)weapon;
-            if (!Clips.TryGetValue(key, out var clip)) Clips[key] = clip = Make(move, weapon);
+            int key = (int)move * 16 + (int)style;
+            if (!Clips.TryGetValue(key, out var clip)) Clips[key] = clip = Make(move, style);
             return clip;
         }
 
-        public static int FramesOf(HeroMove move, HeroWeapon weapon) => ClipOf(move, weapon).Frames.Length;
+        static HeroWeapon FamilyOf(HeroStyle style) => style switch
+        {
+            HeroStyle.Dagger or HeroStyle.Greatsword or HeroStyle.Boomerang => HeroWeapon.Sword,
+            HeroStyle.Crossbow => HeroWeapon.Bow,
+            HeroStyle.Spear or HeroStyle.Wand or HeroStyle.Orb => HeroWeapon.Staff,
+            HeroStyle.Hammer => HeroWeapon.Pick,
+            _ => (HeroWeapon)style,
+        };
+
+        public static int FramesOf(HeroMove move, HeroStyle weapon) => ClipOf(move, weapon).Frames.Length;
 
         // How long the motion takes, once through.
-        public static float SecondsOf(HeroMove move, HeroWeapon weapon) => ClipOf(move, weapon).Length;
+        public static float SecondsOf(HeroMove move, HeroStyle weapon) => ClipOf(move, weapon).Length;
 
-        public static float FrameSeconds(HeroMove move, HeroWeapon weapon, int frame) => ClipOf(move, weapon).Seconds[Clamp(frame, move, weapon)];
+        public static float FrameSeconds(HeroMove move, HeroStyle weapon, int frame) => ClipOf(move, weapon).Seconds[Clamp(frame, move, weapon)];
 
-        public static Beat BeatOf(HeroMove move, HeroWeapon weapon, int frame) => ClipOf(move, weapon).Beats[Clamp(frame, move, weapon)];
+        public static Beat BeatOf(HeroMove move, HeroStyle weapon, int frame) => ClipOf(move, weapon).Beats[Clamp(frame, move, weapon)];
 
         // How far into the motion a strike that follows straight on another starts (seconds).
-        public static float ChainSeconds(HeroMove move, HeroWeapon weapon)
+        public static float ChainSeconds(HeroMove move, HeroStyle weapon)
         {
             var clip = ClipOf(move, weapon);
             float at = 0;
@@ -581,7 +628,7 @@ namespace Game.Client
         }
 
         // The frame shown this long into the motion; past its end the last one (the first again if it goes round).
-        public static int FrameAt(HeroMove move, HeroWeapon weapon, float elapsed)
+        public static int FrameAt(HeroMove move, HeroStyle weapon, float elapsed)
         {
             var clip = ClipOf(move, weapon);
             if (clip.Loops) elapsed %= clip.Length;
@@ -594,7 +641,7 @@ namespace Game.Client
         }
 
         // How far into the motion its blow has landed (the end of the strike's frame); 0 with no blow.
-        public static float StrikeSeconds(HeroMove move, HeroWeapon weapon)
+        public static float StrikeSeconds(HeroMove move, HeroStyle weapon)
         {
             var clip = ClipOf(move, weapon);
             int strike = Array.IndexOf(clip.Beats, Beat.Strike);
@@ -604,16 +651,27 @@ namespace Game.Client
         }
 
         // The frame of an attack in which the blow lands.
-        public static int StrikeFrame(HeroMove move, HeroWeapon weapon) => Array.IndexOf(ClipOf(move, weapon).Beats, Beat.Strike);
+        public static int StrikeFrame(HeroMove move, HeroStyle weapon) => Array.IndexOf(ClipOf(move, weapon).Beats, Beat.Strike);
 
-        static int Clamp(int frame, HeroMove move, HeroWeapon weapon) => Math.Max(0, Math.Min(ClipOf(move, weapon).Frames.Length - 1, frame));
+        public static int FramesOf(HeroMove move, HeroWeapon weapon) => FramesOf(move, (HeroStyle)weapon);
+        public static float SecondsOf(HeroMove move, HeroWeapon weapon) => SecondsOf(move, (HeroStyle)weapon);
+        public static float FrameSeconds(HeroMove move, HeroWeapon weapon, int frame) => FrameSeconds(move, (HeroStyle)weapon, frame);
+        public static Beat BeatOf(HeroMove move, HeroWeapon weapon, int frame) => BeatOf(move, (HeroStyle)weapon, frame);
+        public static float ChainSeconds(HeroMove move, HeroWeapon weapon) => ChainSeconds(move, (HeroStyle)weapon);
+        public static int FrameAt(HeroMove move, HeroWeapon weapon, float elapsed) => FrameAt(move, (HeroStyle)weapon, elapsed);
+        public static float StrikeSeconds(HeroMove move, HeroWeapon weapon) => StrikeSeconds(move, (HeroStyle)weapon);
+        public static int StrikeFrame(HeroMove move, HeroWeapon weapon) => StrikeFrame(move, (HeroStyle)weapon);
 
-        static Clip Make(HeroMove move, HeroWeapon weapon)
+        static int Clamp(int frame, HeroMove move, HeroStyle weapon) => Math.Max(0, Math.Min(ClipOf(move, weapon).Frames.Length - 1, frame));
+
+        static Clip Make(HeroMove move, HeroStyle style)
         {
+            var weapon = FamilyOf(style);
             // The weapon is put away to drink.
             if (move == HeroMove.Drink) weapon = HeroWeapon.None;
             _making = weapon;
             var rest = RestOf(weapon);
+            if (move >= HeroMove.Attack1 && move <= HeroMove.Attack3 && style > HeroStyle.Pick) return KindAttack(style, move - HeroMove.Attack1, rest);
             switch (move)
             {
                 case HeroMove.Stand: return Standing(rest);
@@ -1582,11 +1640,17 @@ namespace Game.Client
 
         static PixelImage Draw(Look look, HeroMove move, int frame, HeroGear gear, Paint paint, bool blink) =>
             move == HeroMove.Drink && gear.Kind != HeroWeapon.None ? Draw(look, move, frame, HeroGear.None, paint, blink) :
-            Render(look, ClipOf(move, gear.Kind).Frames[Clamp(frame, move, gear.Kind)], gear, paint, blink, out _);
+            Render(look, Frame(move, gear.Style, frame), gear, paint, blink, out _);
 
         public static Joints JointsOf(Look look, HeroMove move, int frame, HeroGear gear) =>
             move == HeroMove.Drink && gear.Kind != HeroWeapon.None ? JointsOf(look, move, frame, HeroGear.None) :
-            Solve(look, ClipOf(move, gear.Kind).Frames[Clamp(frame, move, gear.Kind)], gear.Kind).Joints;
+            Solve(look, Frame(move, gear.Style, frame), gear.Kind).Joints;
+
+        static Pose Frame(HeroMove move, HeroStyle style, int frame)
+        {
+            var frames = ClipOf(move, style).Frames;
+            return frames[Math.Max(0, Math.Min(frames.Length - 1, frame))];
+        }
 
         // The figure alone, cut from the canvas (previews and sheets): standing still with nothing in hand it is
         // exactly this box.
@@ -1819,7 +1883,7 @@ namespace Game.Client
 
             var canvas = new PixelImage(Size, Size);
             var layers = new List<(float Depth, int Order, PixelImage Image)>();
-            if (gear.Kind != HeroWeapon.None)
+            if (gear.Kind != HeroWeapon.None && pose.Empty < 0.99f)
             {
                 var weapon = new PixelImage(Size, Size);
                 Weapon(weapon, gear, rig.Grip.X, rig.Grip.Y, rig.WayX, rig.WayY, rig.Reach, pose, rig.NockX, rig.NockY);
