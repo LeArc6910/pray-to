@@ -1755,7 +1755,8 @@ async function props(browser) {
       await game.until(t => t.bossPhase === 3, 4000);
       await game.wait(2500);
       await game.send('heal; clear; boss cave_warden use core_burst');
-      await game.wait(900);
+      // Its wind-up is 1.28 s in phase 3: look while it is still coming, not as it lands.
+      await game.wait(500);
       s = await game.state();
       check(s.pillars >= 1 && s.shadesShown >= 1, `핵 폭주: 기둥 그늘에 초록 안전 표시 (기둥 ${s.pillars}, 안전 ${s.shadesShown})`);
       await game.shot('props-cover', '핵 폭주(필살기): 기둥 뒤 그늘만 안전');
