@@ -274,11 +274,37 @@ namespace Game.Client
         // ---- The cave warden's core overload (AttackShape.Cover, R2b): while it winds up, the shadow behind each of
         // its pillars (from where the blast comes) is lit pale as the only safe ground. ----
 
-        readonly List<SpriteRenderer> _shades = new List<SpriteRenderer>();
-        static readonly Color ShadeColor = new Color(0.65f, 0.95f, 1f, 0.32f);
+        // Each shadow is a dark band cut out of the red warning (drawn over it: the warning lies at DarkOrder + 10,
+        // so a shadow under it was hard to see, 2026-11-28 the person: "draw the safe room behind the pillars plainly,
+        // in a colour or shadow of its own") with a bright cyan line along each long edge and across its far end.
+        sealed class Shade
+        {
+            public SpriteRenderer Fill, EdgeA, EdgeB, End;
+        }
+
+        readonly List<Shade> _shades = new List<Shade>();
+        static readonly Color ShadeColor = new Color(0.03f, 0.07f, 0.16f, 0.62f);
+        static readonly Color ShadeEdgeColor = new Color(0.45f, 1f, 1f, 1f);
+        const float ShadeEdge = 0.12f;
 
         // Shadows shown now, for the playtests.
-        public int ShadesShown => _shades.Count(s => s.enabled);
+        public int ShadesShown => _shades.Count(s => s.Fill.enabled);
+
+        SpriteRenderer ShadePiece(string name, Color color, int order)
+        {
+            var made = Renderer(_root.transform, name, Shapes.Square, color);
+            made.sortingOrder = order;
+            return made;
+        }
+
+        static void Lay(SpriteRenderer piece, Vec2 middle, float angle, float length, float width, Color color)
+        {
+            piece.enabled = true;
+            piece.transform.localPosition = new Vector3(middle.X, middle.Y, 0);
+            piece.transform.localRotation = Quaternion.Euler(0, 0, angle);
+            piece.transform.localScale = new Vector3(length, width, 1);
+            piece.color = color;
+        }
 
         void DrawShades()
         {
@@ -295,30 +321,37 @@ namespace Game.Client
             if (blast != null)
             {
                 var from = blast.Value.Position;
+                float pulse = 0.5f + 0.5f * Mathf.Sin(Time.time * 6);
                 foreach (var prop in _client.Props())
                 {
                     if (prop.Kind != PropKind.Pillar) continue;
                     var way = prop.Position - from;
                     if (way.LengthSquared < 1e-4f) continue;
                     var along = way.Normalized;
+                    var across = new Vec2(-along.Y, along.X);
                     float width = 2 * (prop.Radius - World.ShadeMargin), length = blast.Value.Size;
                     if (used == _shades.Count)
-                    {
-                        var made = Renderer(_root.transform, "Shade", Shapes.Square, ShadeColor);
-                        made.sortingOrder = 34;
-                        _shades.Add(made);
-                    }
+                        _shades.Add(new Shade
+                        {
+                            Fill = ShadePiece("Shade", ShadeColor, DarkOrder + 11),
+                            EdgeA = ShadePiece("ShadeEdge", ShadeEdgeColor, DarkOrder + 12),
+                            EdgeB = ShadePiece("ShadeEdge", ShadeEdgeColor, DarkOrder + 12),
+                            End = ShadePiece("ShadeEdge", ShadeEdgeColor, DarkOrder + 12),
+                        });
                     var shade = _shades[used++];
-                    shade.enabled = true;
+                    float angle = Mathf.Atan2(along.Y, along.X) * Mathf.Rad2Deg;
                     var middle = prop.Position + along * (length / 2);
-                    shade.transform.localPosition = new Vector3(middle.X, middle.Y, 0);
-                    shade.transform.localRotation = Quaternion.Euler(0, 0, Mathf.Atan2(along.Y, along.X) * Mathf.Rad2Deg);
-                    shade.transform.localScale = new Vector3(length, width, 1);
-                    float pulse = 0.5f + 0.5f * Mathf.Sin(Time.time * 6);
-                    shade.color = new Color(ShadeColor.r, ShadeColor.g, ShadeColor.b, ShadeColor.a * (0.7f + 0.3f * pulse));
+                    Lay(shade.Fill, middle, angle, length, width, new Color(ShadeColor.r, ShadeColor.g, ShadeColor.b, ShadeColor.a * (0.85f + 0.15f * pulse)));
+                    var edge = new Color(ShadeEdgeColor.r, ShadeEdgeColor.g, ShadeEdgeColor.b, 0.65f + 0.35f * pulse);
+                    Lay(shade.EdgeA, middle + across * (width / 2), angle, length, ShadeEdge, edge);
+                    Lay(shade.EdgeB, middle - across * (width / 2), angle, length, ShadeEdge, edge);
+                    Lay(shade.End, prop.Position + along * length, angle, ShadeEdge, width + ShadeEdge, edge);
                 }
             }
-            for (int i = used; i < _shades.Count; i++) _shades[i].enabled = false;
+            for (int i = used; i < _shades.Count; i++)
+            {
+                _shades[i].Fill.enabled = _shades[i].EdgeA.enabled = _shades[i].EdgeB.enabled = _shades[i].End.enabled = false;
+            }
         }
 
         // A raging boss glows white-hot under itself, pulsing; the moment it starts it flares (SimEventType.Rage).
