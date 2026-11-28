@@ -1916,7 +1916,9 @@ namespace Game.Client
             Stamp(canvas, trunk, true);
             var head = new PixelImage(Size, Size);
             // The hair may stand above the head's eight rows and hang below them, over the trunk (HeroArt.Looks.cs).
-            Part(head, colors, FaceOf(HeadRows(paint.Hair, rig.HeadLook), rig.HeadLook, paint.Hair, paint.Female), rig.HeadFlip, HeadX + rig.HeadDx, HeadY + rig.HeadDy - HairUp(paint.Hair), shut);
+            // Seen from the side the head sits a pixel further back than first drawn (2026-11-28, the owner: the head stuck
+            // out too far in front of the body).
+            Part(head, colors, FaceOf(HeadRows(paint.Hair, rig.HeadLook), rig.HeadLook, paint.Hair, paint.Female), rig.HeadFlip, HeadX + rig.HeadDx + (rig.HeadLook == Look.Side ? (rig.HeadFlip ? 1 : -1) : 0), HeadY + rig.HeadDy - HairUp(paint.Hair), shut);
             Stamp(canvas, head, false);
 
             foreach (var layer in layers)
