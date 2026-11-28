@@ -134,7 +134,8 @@ namespace Game.Client
             var root = new GameObject("Telegraph").transform;
             root.SetParent(_root.transform, false);
             root.localPosition = new Vector3(hazard.Position.X, hazard.Position.Y, 0);
-            var layer = MakeLayer(root, "Warn", FieldOf(hazard), DarkOrder + 10);
+            // Safe ground (green) over the blast it is safe from, so the red does not tint it.
+            var layer = MakeLayer(root, "Warn", FieldOf(hazard), DarkOrder + (hazard.Warning == AttackWarning.Safe ? 11 : 10));
             return new Mark { Root = root, Edge = layer.Renderer, Fill = layer.Renderer, State = hazard, Warn = layer };
         }
 
