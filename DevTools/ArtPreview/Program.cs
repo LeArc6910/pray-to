@@ -98,6 +98,13 @@ namespace Game.Client
                 return GroundPreview.Write(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out", "ground"),
                     TileArt.Ground(TileArt.Index(GroundKind.Floor, 0, 0))) ? 0 : 1;
             }
+            if (args.Length == 2 && args[0] == "--only" && args[1] == "forces")
+            {
+                // --only forces: R3's sand pit, shallows, wall of water, thread, wake and grains (out/forces/, ForcesPreview).
+                string forces = Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out", "forces");
+                return ForcesPreview.Write(forces, TileArt.Ground(TileArt.ArenaIndex(ArenaKind.Pit, 0, 0)),
+                    TileArt.Ground(TileArt.ArenaIndex(ArenaKind.Flooded, 0, 0)), TileArt.Ground(TileArt.ArenaIndex(ArenaKind.Nest, 0, 0))) ? 0 : 1;
+            }
             if (args.Length == 2 && args[0] == "--only" && args[1] == "r1b")
             {
                 // --only r1b: the sheathed counter, the helm off and the two marks on one sheet (out/r1b/, R1bPreview).

@@ -128,6 +128,16 @@ namespace Game.Client
         CoreExposed,
         VeinCrunch,
         Enrage,
+        // A boss's forces (2026-11-28, R3, Docs/Bosses.md "R3 그림"): sand sliding down into a pit (a dry hiss that
+        // swells and runs out, grains ticking in it); a wall of water coming on (a low roar rising to a wash of foam
+        // as it passes); a taut thread nicked by a blade (a short high pluck); a thread bursting (a crack and the
+        // loose ends whipping); something big going down into the ground and off under it (earth torn, then a
+        // rumble sinking away; Burrow is the small monsters' short one).
+        SandDrag,
+        WaveRush,
+        ThreadCut,
+        ThreadSnap,
+        Tunnel,
     }
 
     // A monster's kind of voice (2026-11-09): what it sounds like when it notices someone, attacks and is struck.
@@ -659,6 +669,52 @@ namespace Game.Client
                     parts.Add(Noise(0, 0.46f, 0.5f, 0.55f, attack: 0.06f, decay: 1.8f, seed: 94));
                     parts.Add(Noise(0.02f, 0.3f, 0.2f, 0.9f, attack: 0.05f, decay: 3, seed: 95));
                     level = 0.85f;
+                    break;
+                case Sound.SandDrag:
+                    // 0.6 s: the slide (mid hiss swelling), finer grains over it, a low drag under it, grains ticking.
+                    parts.Add(Noise(0, 0.6f, 0.8f, 0.45f, attack: 0.22f, decay: 1.6f, seed: 101));
+                    parts.Add(Noise(0.04f, 0.5f, 0.45f, 0.93f, attack: 0.25f, decay: 2.2f, seed: 102));
+                    parts.Add(Noise(0, 0.55f, 0.5f, 0.08f, attack: 0.15f, decay: 1.4f, seed: 103));
+                    for (int i = 0; i < 9; i++)
+                        parts.Add(Noise(0.08f + i * 0.052f + i % 3 * 0.011f, 0.018f, 0.22f - 0.012f * i, 0.85f, attack: 0.001f, decay: 7, seed: 104 + i));
+                    level = 0.5f;
+                    break;
+                case Sound.WaveRush:
+                    // 0.9 s: the roar coming (low noise and a rumble rising), the crest going by (foam hiss at 0.5 s),
+                    // the wash after it.
+                    parts.Add(Noise(0, 0.9f, 0.9f, 0.12f, attack: 0.5f, decay: 1.3f, seed: 115));
+                    parts.Add(Tone(Wave.Sine, 0, 0.75f, 58, 104, 0.45f, attack: 0.45f, decay: 1, vibrato: 0.05f, vibratoRate: 7));
+                    parts.Add(Noise(0.1f, 0.8f, 0.6f, 0.5f, attack: 0.42f, decay: 2, seed: 116));
+                    parts.Add(Noise(0.42f, 0.48f, 0.55f, 0.95f, attack: 0.1f, decay: 3, seed: 117));
+                    parts.Add(Tone(Wave.Sine, 0.5f, 0.25f, 120, 60, 0.4f, attack: 0.01f, decay: 3));
+                    Crackle(parts, 0.55f, 0.3f, 5, 0.18f, 118);
+                    level = 0.7f;
+                    break;
+                case Sound.ThreadCut:
+                    // The blade's tick, and the strand ringing short and high, a little flat of itself.
+                    parts.Add(Noise(0, 0.02f, 0.5f, 0.9f, attack: 0.001f, decay: 8, seed: 121));
+                    parts.Add(Tone(Wave.Triangle, 0.005f, 0.16f, 932, 880, 0.7f, attack: 0.001f, decay: 5, vibrato: 0.012f, vibratoRate: 38));
+                    parts.Add(Tone(Wave.Sine, 0.005f, 0.1f, 1864, 1760, 0.25f, attack: 0.001f, decay: 6));
+                    level = 0.45f;
+                    break;
+                case Sound.ThreadSnap:
+                    // A crack as it parts, the pitch dropping out of it at once, and the ends whipping back.
+                    parts.Add(Noise(0, 0.03f, 1, 0.95f, attack: 0.0005f, decay: 6, seed: 122));
+                    parts.Add(Tone(Wave.Saw, 0, 0.07f, 2600, 420, 0.6f, attack: 0.0005f, decay: 5));
+                    parts.Add(Tone(Wave.Triangle, 0.02f, 0.2f, 620, 150, 0.5f, attack: 0.002f, decay: 4, vibrato: 0.05f, vibratoRate: 27));
+                    parts.Add(Noise(0.05f, 0.14f, 0.35f, 0.8f, attack: 0.03f, decay: 4, seed: 123));
+                    parts.Add(Tone(Wave.Sine, 0.01f, 0.05f, 3600, 3000, 0.2f, attack: 0.0005f, decay: 7));
+                    level = 0.65f;
+                    break;
+                case Sound.Tunnel:
+                    // 0.5 s: the ground torn open, loose earth thrown, and the rumble going down and away.
+                    parts.Add(Noise(0, 0.22f, 1, 0.25f, attack: 0.012f, decay: 3, seed: 124));
+                    parts.Add(Tone(Wave.Sine, 0, 0.5f, 104, 44, 0.75f, attack: 0.012f, decay: 2));
+                    parts.Add(Tone(Wave.Saw, 0.04f, 0.44f, 62, 38, 0.3f, attack: 0.05f, decay: 2.2f, vibrato: 0.14f, vibratoRate: 19));
+                    parts.Add(Noise(0.1f, 0.4f, 0.5f, 0.1f, attack: 0.06f, decay: 2.2f, seed: 125));
+                    parts.Add(Noise(0.06f, 0.22f, 0.3f, 0.7f, attack: 0.01f, decay: 4, seed: 126));
+                    Crackle(parts, 0.05f, 0.3f, 6, 0.3f, 127);
+                    level = 0.65f;
                     break;
                 case Sound.Sting:
                     parts.Add(Noise(0, 0.07f, 0.8f, 0.92f, attack: 0.001f, decay: 7, seed: 67));

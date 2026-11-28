@@ -11,7 +11,8 @@ namespace Game.Client
     // a ragged bank), a vent (a black mouth ringed with rock, the glow in it breathing). R2b ("R2b 그림"): the cave
     // warden's standing pillar of mossy rock (WardenArt's stone and moss), the vein eater's vein (a lump of mine rock
     // set with obsidian and teal crystal, its light beating, cracked as it is eaten), the wall of cherry petals and the
-    // curtain of web that close the forgotten shrine's floor in. WorldView.Ground places them.
+    // curtain of web that close the forgotten shrine's floor in. R3 ("R3 그림"): the antlion's sand funnel (Pit) and the
+    // tide serpent's shallows over the rim (Shallows). WorldView.Ground places them.
     static class GroundArt
     {
         // Frames each kind turns through, a loop.
@@ -113,7 +114,7 @@ namespace Game.Client
                         case HazardShape.Lava: image[x, y] = Lava(x, y, inside, 300 + variant, frame); break;
                         case HazardShape.Rock: image[x, y] = Rock(x, y, inside, d, 320 + variant, frame); break;
                         case HazardShape.Water: image[x, y] = Water(x, y, inside, 340 + variant, frame); break;
-                        case HazardShape.Pit: image[x, y] = Pit(x - cx, y - cy, d, frame); break;
+                        case HazardShape.Pit: image[x, y] = Pit(x - cx, y - cy, d, inside, half, x, y, frame); break;
                         default:
                             image[x, y] = strip ? CrackStrip(x, y, width, height, d, 360 + variant, frame)
                                 : CrackPool(x - cx, y - cy, half, d, x, y, 360 + variant, frame);
@@ -123,19 +124,84 @@ namespace Game.Client
             return image;
         }
 
-        // R3 (placeholder until its pixel art): a sand funnel, pale at its rim and dark at its throat, with a swirl of
-        // grains running in.
-        static readonly Rgba PitRim = new Rgba(222, 186, 126, 255), PitSand = new Rgba(196, 156, 98, 255),
-            PitShade = new Rgba(150, 110, 64, 255), PitThroat = new Rgba(70, 48, 30, 255);
+        // R3 (Docs/Bosses.md "R3 그림"): the antlion's sand funnel in AntlionArt's sand. A pale bank round the rim (lit
+        // from the upper left, a dark line under it outside), the slope going down in steps of tone that twist, the far
+        // slope in shade and the near one lit, a dark throat with the tips of the jaws showing in it (when it is big
+        // enough), and streams of grains running down the twist: each stream's dashes move a quarter of their spacing
+        // inward a frame, and the twist of the steps turns a quarter, so the four frames loop. half: its radius in
+        // pixels (17 to 48).
+        static readonly Rgba PitLight = new Rgba(242, 196, 120, 255), PitMain = new Rgba(214, 164, 96, 255),
+            PitMid = new Rgba(192, 142, 82, 255), PitShade = new Rgba(170, 120, 70, 255), PitDeep = new Rgba(132, 90, 54, 255),
+            PitDark = new Rgba(96, 62, 40, 255), PitThroat = new Rgba(40, 26, 16, 255), PitEdge = new Rgba(62, 42, 26, 215),
+            JawDark = new Rgba(92, 44, 24, 255), JawMain = new Rgba(150, 78, 38, 255), JawTip = new Rgba(236, 214, 170, 255);
+        static readonly Rgba[] PitSteps = { PitMain, PitMid, PitShade, PitDeep, PitDark };
 
-        static Rgba Pit(float dx, float dy, float d, int frame)
+        static Rgba Pit(float dx, float dy, float d, float inside, float half, int x, int y, int frame)
         {
+            float r = (float)Math.Sqrt(dx * dx + dy * dy);
             double angle = Math.Atan2(dy, dx);
-            float swirl = (float)Math.Sin(angle * 3 + d * 9 - frame * Math.PI / 2);
-            if (d < 0.18f) return PitThroat;
-            if (d > 0.9f) return PitRim;
-            var tone = d < 0.45f ? PitShade : PitSand;
-            return swirl > 0.75f ? (d < 0.45f ? PitThroat : PitShade) : tone;
+            // Lit: -1 on the upper left of the funnel, 1 on the lower right.
+            float side = r < 0.5f ? 0 : (dx + dy) / (r * 1.414f);
+            if (inside < 1) return side > 0.2f ? PitEdge : PitEdge.WithAlpha(150);
+            if (inside < 3.2f)
+            {
+                // The bank: its upper left edge catches the light, the lower right is in its own shade.
+                bool lit = side < 0.15f + 0.3f * (PixelNoise.Value(x, y, 601) - 0.5f);
+                if (inside < 2.1f) return lit ? PitLight : PitMain;
+                return lit ? PitMain : PixelNoise.Hash(x, y, 602) % 3 == 0 ? PitMain : PitMid;
+            }
+            const float Throat = 0.2f;
+            float throatPx = Throat * half;
+            if (d < Throat)
+            {
+                var jaw = Jaws(dx, dy, throatPx, frame);
+                if (jaw.A > 0) return jaw;
+                return d < Throat * 0.72f ? PitThroat : side < 0 ? PitThroat : PitDark;
+            }
+            // The twist: how far round a grain has been carried by the time it is this deep.
+            float deep = (1 - d) / (1 - Throat);
+            double turned = angle + 2.6 * deep * deep + 1.2 * deep;
+            const int Arms = 3;
+            float twist = (float)Math.Sin(turned * Arms - frame * Math.PI / 2);
+            // Grains: streams about four pixels apart at the rim, a dash every six pixels or so.
+            int streams = Math.Max(8, (int)Math.Round(2 * Math.PI * half / 9));
+            double u = (turned / (2 * Math.PI) + 2) * streams;
+            int stream = (int)Math.Floor(u);
+            uint hs = PixelNoise.Hash(stream % streams, 0, 603);
+            float off = (float)Math.Abs(u - stream - 0.5) * (float)(2 * Math.PI * r / streams);
+            if (off < 0.75f && hs % 5 < 3)
+            {
+                float dashes = Math.Max(2, half * (1 - Throat) / 6f);
+                float along = deep * dashes - frame / 4f + (hs >> 8) % 16 / 16f;
+                along -= (float)Math.Floor(along);
+                if (along < 0.34f) return (hs >> 4) % 3 == 0 || deep > 0.6f ? PitMain : PitLight;
+                if (along < 0.5f && deep > 0.15f) return PitDark;
+            }
+            float level = 0.1f + deep * 3.7f - side * 0.75f + twist * 0.6f;
+            int step = Math.Max(0, Math.Min(PitSteps.Length - 1, (int)Math.Floor(level)));
+            // The step's lip, one pixel of the lighter tone broken up, where it meets the next one down.
+            float into = level - (float)Math.Floor(level);
+            if (step > 0 && into < 0.16f && (x + y) % 2 == 0) return PitSteps[step - 1];
+            return PitSteps[step];
+        }
+
+        // The antlion's jaws in the throat: two curved pincers, their pale tips nearly meeting, opening and closing a
+        // pixel over the four frames. Only their tips when the throat is small.
+        static Rgba Jaws(float dx, float dy, float throat, int frame)
+        {
+            if (throat < 4.5f) return Rgba.Clear;
+            float open = frame == 1 ? 0.12f : frame == 3 ? -0.08f : 0;
+            float reach = throat * 0.78f;
+            float ax = Math.Abs(dx);
+            // Each pincer is an arc of a circle off to its side, from the bottom of the throat up toward the middle.
+            float cx = reach * (0.95f + open), cy = reach * 0.55f, radius = reach * 0.92f;
+            float away = (float)Math.Sqrt((ax - cx) * (ax - cx) + (dy - cy) * (dy - cy));
+            float thick = Math.Max(0.7f, throat * 0.13f);
+            if (Math.Abs(away - radius) > thick || ax > cx || dy > cy + reach * 0.2f) return Rgba.Clear;
+            // Up the arc toward its tip.
+            float up = (cy - dy) / radius;
+            if (up > 0.99f || ax < 0.4f + open * reach) return Rgba.Clear;
+            return up > 0.9f ? JawTip : up > 0.5f ? JawMain : JawDark;
         }
 
         static float Wobble(int x, int variant) => (float)Math.Sin(x * 0.7f + variant) * 0.5f + (float)Math.Sin(x * 1.9f + variant * 3) * 0.5f;
@@ -331,15 +397,51 @@ namespace Game.Client
                     }
                     if (kind == EdgeKind.Water)
                     {
-                        float shore = floor + 1.2f * (float)Math.Sin(angle * 7 + lap * Math.PI / 2) + 0.7f * (float)Math.Sin(angle * 19 + 1);
-                        float wet = Math.Min(r - shore, outer - r + 1.5f);
-                        if (wet > 0) image[x, y] = Water(x, y, wet, 540, lap);
+                        var water = Shallows(x, y, r, angle, floor, outer, lap);
+                        if (water.A > 0) image[x, y] = water;
                         continue;
                     }
                     var pixel = kind == EdgeKind.Petal ? Petal(x, y, r, angle, floor, outer, lap) : Web(r, angle, floor, outer, lap);
                     if (pixel.A > 0) image[x, y] = pixel;
                 }
             return image;
+        }
+
+        // R3 (Docs/Bosses.md "R3 그림"): the tide serpent's shallows over the rim, in SerpentArt's water. The shore laps
+        // in and out over the four frames (a thin wet film where it has just been), a line of foam on it and a broken
+        // one a few pixels behind, ripples running in to the shore, and the water darker and less clear toward the wall.
+        static readonly Rgba TideDark = new Rgba(22, 58, 92, 205), TideDeep = new Rgba(36, 86, 126, 190),
+            TideMain = new Rgba(52, 118, 160, 170), TideLight = new Rgba(120, 196, 224, 190), TideFoam = new Rgba(214, 244, 250, 235),
+            TideFilm = new Rgba(40, 96, 136, 70);
+        static readonly float[] TideLap = { 0, 0.9f, 1.5f, 0.6f };
+
+        static Rgba Shallows(int x, int y, float r, double angle, int floor, int outer, int lap)
+        {
+            float shore = floor + 1.3f * (float)Math.Sin(angle * 7 + lap * Math.PI / 2) + 0.8f * (float)Math.Sin(angle * 19 + 1)
+                + 0.5f * (float)Math.Sin(angle * 43 + 3) - TideLap[lap];
+            float wet = Math.Min(r - shore, outer - r + 1.5f);
+            if (wet <= 0)
+            {
+                // Where the water stood a frame ago the floor is still wet.
+                return wet > -1.6f && r < outer && (lap == 0 || lap == 3 || (x + y) % 2 == 0) ? TideFilm : Rgba.Clear;
+            }
+            float gate = Smooth(x, y, 5, 541);
+            if (wet < 1) return gate > 0.22f ? TideFoam : TideLight;
+            if (wet < 2.2f) return gate > 0.5f ? TideLight : TideMain;
+            // The second line of foam, broken, washing in behind the first.
+            float second = 4.6f + 1.4f * (float)Math.Sin(angle * 11 - lap * Math.PI / 2) + TideLap[(lap + 2) % 4];
+            float off = wet - second;
+            if (off > -0.6f && off < 0.6f && gate > 0.42f) return gate > 0.62f ? TideFoam : TideLight;
+            if (off >= 0.6f && off < 1.7f && gate > 0.55f) return TideLight.WithAlpha(150);
+            float back = Math.Min(1, wet / Math.Max(1, outer - floor));
+            // Ripples coming in: a pale crest and a dark trough every eight pixels, broken up.
+            float ring = (wet + lap * 2) % 8;
+            float patch = Smooth(x, y, 9, 542);
+            if (wet > 7 && ring < 1.1f && patch > 0.48f) return patch > 0.7f && ring < 0.6f ? TideFoam.WithAlpha(200) : TideLight;
+            if (wet > 7 && ring >= 1.1f && ring < 2.3f && patch > 0.5f) return TideDark;
+            if ((PixelNoise.Hash(x, y, 543) + (uint)lap) % 131 == 0) return TideFoam;
+            float depth = back + 0.3f * (Smooth(x, y, 12, 544) - 0.5f);
+            return depth < 0.3f ? TideMain : depth < 0.68f ? TideDeep : TideDark;
         }
 
         // A petal of the wall, r pixels from the middle: loose petals lie ahead of the heap, its crest is pale and
